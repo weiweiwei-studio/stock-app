@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>服裝品牌庫存管理系統 (Stock Planner - Firebase Connected)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+    <!-- CSS Styling -->
+    <style>
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: #fafaf9; color: #44403c; }
+        .chart-container { position: relative; width: 100%; max-width: 600px; margin: 0 auto; height: 300px; max-height: 400px; }
+        @media (min-width: 768px) { .chart-container { height: 350px; } }
+        .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f5f5f4; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #d6d3d1; border-radius: 4px; }
+        .nav-active { background-color: #e7e5e4; color: #1c1917; font-weight: 700; }
+        .loader { border: 3px solid #f3f3f3; border-top: 3px solid #44403c; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen">
+
+    <!-- Navigation Bar -->
+    <nav class="bg-white border-b border-stone-200 shadow-sm sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center gap-4">
+                    <div class="flex-shrink-0 flex items-center">
+                        <span class="text-2xl font-bold tracking-tight text-stone-800">BRAND<span class="text-stone-400">.ERP</span></span>
+                        <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] bg-stone-100 text-stone-400">Connecting...</span>
+                    </div>
+                    <!-- Desktop Nav -->
+                    <div class="hidden sm:ml-6 sm:flex sm:space-x-4">
+                        <button onclick="window.switchView('dashboard')" id="nav-dashboard" class="nav-item px-3 py-2 rounded-md text-sm font-medium hover:bg-stone-100 transition-colors nav-active">總覽儀表板</button>
+                        <button onclick="window.switchView('production')" id="nav-production" class="nav-item px-3 py-2 rounded-md text-sm font-medium hover:bg-stone-100 transition-colors text-stone-500">生產排程</button>
+                        <button onclick="window.switchView('allocation')" id="nav-allocation" class="nav-item px-3 py-2 rounded-md text-sm font-medium hover:bg-stone-100 transition-colors text-stone-500">庫存與去向</button>
+                    </div>
+                </div>
+                
+                <!-- Role Switcher -->
+                <div class="flex items-center">
+                    <label for="role-select" class="mr-2 text-sm font-medium text-stone-500 hidden sm:block">視角:</label>
+                    <select id="role-select" onchange="window.updateRole()" class="block w-full pl-3 pr-10 py-2 text-base border-stone-300 focus:outline-none focus:ring-stone-500 focus:border-stone-500 sm:text-sm rounded-md bg-stone-100">
+                        <option value="admin">Admin (Rie/Raina)</option>
+                        <option value="maker_kim">Maker (Kim)</option>
+                        <option value="maker_kelly">Maker (Kelly)</option>
+                        <option value="logistics">Logistics (庫存管理)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <!-- Mobile Nav Menu -->
+        <div class="sm:hidden bg-white border-t border-stone-200 flex justify-around p-2">
+             <button onclick="window.switchView('dashboard')" class="text-xs font-medium p-2 text-stone-600">總覽</button>
+             <button onclick="window.switchView('production')" class="text-xs font-medium p-2 text-stone-600">生產</button>
+             <button onclick="window.switchView('allocation')" class="text-xs font-medium p-2 text-stone-600">庫存</button>
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        <!-- VIEW: DASHBOARD -->
+        <section id="view-dashboard" class="space-y-8 animate-fade-in">
+            <div class="bg-white rounded-lg p-6 shadow-sm border border-stone-100">
+                <h2 class="text-xl font-bold text-stone-800 mb-2">營運概況總覽 (雲端同步中)</h2>
+                <p class="text-stone-500 text-sm">此為即時數據。任何裝置上的更新都會立刻顯示於此。</p>
+            </div>
+
+            <!-- KPI Cards -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-stone-800">
+                    <div class="text-stone-500 text-xs font-bold uppercase tracking-wider">本月目標</div>
+                    <div class="mt-2 text-3xl font-bold text-stone-800" id="kpi-total">0</div>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-amber-500">
+                    <div class="text-amber-600 text-xs font-bold uppercase tracking-wider">製作中</div>
+                    <div class="mt-2 text-3xl font-bold text-stone-800" id="kpi-making">0</div>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-emerald-500">
+                    <div class="text-emerald-600 text-xs font-bold uppercase tracking-wider">在庫 (In Studio)</div>
+                    <div class="mt-2 text-3xl font-bold text-stone-800" id="kpi-studio">0</div>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-blue-500">
+                    <div class="text-blue-600 text-xs font-bold uppercase tracking-wider">已上架</div>
+                    <div class="mt-2 text-3xl font-bold text-stone-800" id="kpi-listed">0</div>
+                </div>
+            </div>
+
+            <!-- Charts Section -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="bg-white p-6 rounded-lg shadow-sm">
+                    <h3 class="text-lg font-bold text-stone-800 mb-4">生產進度</h3>
+                    <div class="chart-container"><canvas id="productionChart"></canvas></div>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-sm">
+                    <h3 class="text-lg font-bold text-stone-800 mb-4">庫存去向</h3>
+                    <div class="chart-container"><canvas id="allocationChart"></canvas></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- VIEW: PRODUCTION PLANNER -->
+        <section id="view-production" class="space-y-6 hidden">
+            <div class="bg-white rounded-lg p-6 shadow-sm border-l-4 border-amber-500">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h2 class="text-xl font-bold text-stone-800">生產排程表</h2>
+                        <p class="text-stone-500 text-sm mt-1">製作完成後，請上傳照片並將狀態更新為 "Ready"。</p>
+                    </div>
+                    <button onclick="window.openModal()" class="bg-stone-800 hover:bg-stone-700 text-white px-4 py-2 rounded-md text-sm shadow-md flex items-center gap-2">
+                        <span>&#43;</span> 新增工單
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="flex flex-wrap gap-4 bg-white p-4 rounded-lg shadow-sm">
+                <div class="flex items-center gap-2">
+                    <span class="text-sm font-medium text-stone-600">製作人:</span>
+                    <select id="prod-filter-maker" onchange="window.renderProductionList()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5">
+                        <option value="all">全部</option>
+                        <option value="Kim">Kim</option>
+                        <option value="Kelly">Kelly</option>
+                        <option value="Lijin">Lijin</option>
+                        <option value="Aiwen">Aiwen</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Production Table -->
+            <div class="bg-white rounded-lg shadow-sm overflow-hidden border border-stone-200">
+                <div class="overflow-x-auto custom-scrollbar">
+                    <table class="min-w-full text-left text-sm">
+                        <thead class="bg-stone-100 text-stone-600 uppercase font-semibold">
+                            <tr>
+                                <th class="px-6 py-3">Month</th>
+                                <th class="px-6 py-3 w-20">照片</th>
+                                <th class="px-6 py-3">Category</th>
+                                <th class="px-6 py-3">Item Name</th>
+                                <th class="px-6 py-3">Qty</th>
+                                <th class="px-6 py-3">Maker</th>
+                                <th class="px-6 py-3">Status</th>
+                                <th class="px-6 py-3">Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody id="production-table-body" class="divide-y divide-stone-100"></tbody>
+                    </table>
+                    <div id="loading-indicator" class="p-8 text-center text-stone-400 hidden">載入中...</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- VIEW: ALLOCATION -->
+        <section id="view-allocation" class="space-y-6 hidden">
+            <div class="bg-white rounded-lg p-6 shadow-sm border-l-4 border-blue-500">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h2 class="text-xl font-bold text-stone-800">庫存與去向</h2>
+                        <p class="text-stone-500 text-sm mt-1">確認實物照片無誤後，進行去向分配。</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Inventory Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-stone-800 text-white p-4 rounded-lg flex justify-between items-center">
+                    <div><div class="text-xs text-stone-400 uppercase">Studio Inventory</div><div class="text-2xl font-bold" id="alloc-studio-count">0</div></div>
+                    <div class="text-2xl">🏠</div>
+                </div>
+                <div class="bg-blue-600 text-white p-4 rounded-lg flex justify-between items-center">
+                    <div><div class="text-xs text-blue-200 uppercase">Online Store</div><div class="text-2xl font-bold" id="alloc-online-count">0</div></div>
+                    <div class="text-2xl">🛒</div>
+                </div>
+                <div class="bg-indigo-600 text-white p-4 rounded-lg flex justify-between items-center">
+                    <div><div class="text-xs text-indigo-200 uppercase">Bev C (Stockist)</div><div class="text-2xl font-bold" id="alloc-stockist-count">0</div></div>
+                    <div class="text-2xl">🏬</div>
+                </div>
+            </div>
+
+            <!-- Allocation Table -->
+             <div class="bg-white rounded-lg shadow-sm overflow-hidden border border-stone-200">
+                <div class="p-4 border-b border-stone-100 bg-stone-50"><h3 class="font-bold text-stone-700">待分配項目 (Ready / In Studio)</h3></div>
+                <div class="overflow-x-auto custom-scrollbar">
+                    <table class="min-w-full text-left text-sm">
+                        <thead class="bg-stone-100 text-stone-600 uppercase font-semibold">
+                            <tr>
+                                <th class="px-6 py-3 w-20">照片</th>
+                                <th class="px-6 py-3">Item Name</th>
+                                <th class="px-6 py-3">Category</th>
+                                <th class="px-6 py-3">Location</th>
+                                <th class="px-6 py-3">Action (Move To)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="allocation-table-body" class="divide-y divide-stone-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Modal for Adding New Item -->
+    <div id="add-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full p-6 animate-fade-in-up">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-stone-800">新增生產工單</h3>
+                <button onclick="window.closeModal()" class="text-stone-400 hover:text-stone-600">&times;</button>
+            </div>
+            <form id="add-item-form" onsubmit="window.handleAddItem(event)" class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-stone-500 mb-1">月份</label>
+                        <input type="text" name="month" value="Dec 2025" class="w-full border-stone-300 rounded-md shadow-sm text-sm p-2 border">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-stone-500 mb-1">類別</label>
+                        <select name="category" class="w-full border-stone-300 rounded-md shadow-sm text-sm p-2 border bg-white">
+                            <option value="Dress">Dress</option>
+                            <option value="Top">Top</option>
+                            <option value="Pants">Pants</option>
+                            <option value="Outerwear">Outerwear</option>
+                            <option value="Accessory">Accessory</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-stone-500 mb-1">品名 (Item Name)</label>
+                    <input type="text" name="itemName" required placeholder="e.g. Linen Sleeveless Top" class="w-full border-stone-300 rounded-md shadow-sm text-sm p-2 border">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-stone-500 mb-1">數量</label>
+                        <input type="number" name="quantity" value="1" min="1" class="w-full border-stone-300 rounded-md shadow-sm text-sm p-2 border">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-stone-500 mb-1">指定製作人</label>
+                        <select name="maker" class="w-full border-stone-300 rounded-md shadow-sm text-sm p-2 border bg-white">
+                            <option value="Kim">Kim</option>
+                            <option value="Kelly">Kelly</option>
+                            <option value="Lijin">Lijin</option>
+                            <option value="Aiwen">Aiwen</option>
+                            <option value="SewingRoom">Sewing Room</option>
+                        </select>
+                    </div>
+                </div>
+                <!-- Optional: Initial Photo Upload -->
+                <div>
+                     <label class="block text-xs font-medium text-stone-500 mb-1">初始照片 (選填)</label>
+                     <input type="file" name="initialPhoto" accept="image/*" class="block w-full text-xs text-stone-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-stone-100 file:text-stone-700 hover:file:bg-stone-200">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-stone-500 mb-1">備註</label>
+                    <textarea name="notes" rows="2" class="w-full border-stone-300 rounded-md shadow-sm text-sm p-2 border"></textarea>
+                </div>
+                <div class="pt-4 flex justify-end gap-2">
+                    <button type="button" onclick="window.closeModal()" class="px-4 py-2 text-sm text-stone-600 hover:bg-stone-100 rounded-md">取消</button>
+                    <button type="submit" id="btn-submit" class="px-4 py-2 text-sm bg-stone-800 text-white hover:bg-stone-700 rounded-md flex items-center justify-center min-w-[100px]">確認新增</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Image Preview Modal -->
+    <div id="img-modal" onclick="window.closeImgModal()" class="fixed inset-0 bg-black bg-opacity-90 hidden z-[60] flex items-center justify-center p-4 cursor-pointer">
+        <img id="img-modal-content" src="" class="max-w-full max-h-screen rounded shadow-lg object-contain">
+    </div>
+
+    <!-- Firebase & App Logic -->
+    <script type="module">
+        // 1. Import Firebase SDKs
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, updateDoc, doc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
+
+        // 2. Your Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyAlB24yzUmGCqsPofuoYhWBiIUj7IWjybc",
+            authDomain: "stock-planner-7ca50.firebaseapp.com",
+            projectId: "stock-planner-7ca50",
+            storageBucket: "stock-planner-7ca50.firebasestorage.app",
+            messagingSenderId: "150326512952",
+            appId: "1:150326512952:web:0396231677d9841929c5cd"
+        };
+
+        // 3. Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const dbFirestore = getFirestore(app);
+        const storage = getStorage(app);
+
+        // --- GLOBAL STATE ---
+        let db = []; // Local mirror of Firestore data
+        let currentRole = 'admin';
+        let prodChartInstance = null;
+        let allocChartInstance = null;
+
+        // --- AUTH & REALTIME LISTENER ---
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('loading-indicator').classList.remove('hidden');
+            
+            // Auto Sign-in
+            signInAnonymously(auth).catch((error) => {
+                console.error("Auth Error", error);
+                document.getElementById('connection-status').innerText = "Auth Error";
+                document.getElementById('connection-status').className = "ml-2 px-2 py-0.5 rounded text-[10px] bg-red-100 text-red-600";
+            });
+
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    console.log("Logged in as:", user.uid);
+                    document.getElementById('connection-status').innerText = "Connected";
+                    document.getElementById('connection-status').className = "ml-2 px-2 py-0.5 rounded text-[10px] bg-green-100 text-green-600";
+                    startRealtimeListener();
+                }
+            });
+            
+            initCharts();
+        });
+
+        function startRealtimeListener() {
+            // Listen to 'stock_items' collection ordered by creation time
+            const q = query(collection(dbFirestore, "stock_items"), orderBy("createdAt", "desc"));
+            
+            onSnapshot(q, (snapshot) => {
+                db = snapshot.docs.map(doc => ({
+                    id: doc.id, // Store doc ID for updates
+                    ...doc.data()
+                }));
+                
+                document.getElementById('loading-indicator').classList.add('hidden');
+                
+                // Refresh ALL views with new data
+                updateDashboard();
+                renderProductionList();
+                renderAllocationList();
+            });
+        }
+
+        // --- UI RENDER LOGIC ---
+        // (Attach functions to window so HTML onclick works)
+
+        window.switchView = function(viewName) {
+            document.getElementById('view-dashboard').classList.add('hidden');
+            document.getElementById('view-production').classList.add('hidden');
+            document.getElementById('view-allocation').classList.add('hidden');
+
+            document.querySelectorAll('.nav-item').forEach(el => {
+                el.classList.remove('nav-active', 'text-stone-900');
+                el.classList.add('text-stone-500');
+            });
+
+            document.getElementById(`view-${viewName}`).classList.remove('hidden');
+            
+            const activeNav = document.getElementById(`nav-${viewName}`);
+            activeNav.classList.add('nav-active', 'text-stone-900');
+            activeNav.classList.remove('text-stone-500');
+
+            if(viewName === 'dashboard') updateDashboard();
+            if(viewName === 'production') renderProductionList();
+            if(viewName === 'allocation') renderAllocationList();
+        };
+
+        window.updateRole = function() {
+            currentRole = document.getElementById('role-select').value;
+            if (currentRole.startsWith('maker')) {
+                window.switchView('production');
+            } else if (currentRole === 'logistics') {
+                window.switchView('allocation');
+            } else {
+                window.switchView('dashboard');
+            }
+            renderProductionList();
+        };
+
+        window.renderProductionList = function() {
+            const tbody = document.getElementById('production-table-body');
+            const makerFilter = document.getElementById('prod-filter-maker').value;
+
+            tbody.innerHTML = '';
+            let filteredData = db;
+            
+            if (currentRole.startsWith('maker')) {
+                const makerName = currentRole.split('_')[1];
+                const makerNameCap = makerName.charAt(0).toUpperCase() + makerName.slice(1);
+                filteredData = filteredData.filter(i => i.maker === makerNameCap);
+            } else if (makerFilter !== 'all') {
+                filteredData = filteredData.filter(i => i.maker === makerFilter);
+            }
+
+            if(filteredData.length === 0) {
+                 tbody.innerHTML = `<tr><td colspan="8" class="px-6 py-4 text-center text-stone-400 text-sm">暫無資料</td></tr>`;
+                 return;
+            }
+
+            filteredData.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-stone-50 transition-colors border-b border-stone-50';
+                
+                let statusColor = 'bg-gray-100 text-gray-600';
+                if(item.status === 'Making') statusColor = 'bg-amber-100 text-amber-700 font-bold';
+                if(item.status === 'Ready') statusColor = 'bg-emerald-100 text-emerald-700 font-bold';
+                if(item.status === 'To Make') statusColor = 'bg-red-50 text-red-600';
+
+                // Photo Cell Logic
+                let photoHTML = `<div class="w-10 h-10 bg-stone-100 rounded-md flex items-center justify-center text-xs text-stone-300">無</div>`;
+                if (item.photo) {
+                    photoHTML = `<img src="${item.photo}" onclick="window.showImage('${item.photo}')" class="w-10 h-10 object-cover rounded-md border border-stone-200 cursor-zoom-in hover:opacity-80">`;
+                } else if (currentRole === 'admin' || currentRole.startsWith('maker')) {
+                    // Upload Button
+                    photoHTML = `
+                        <label class="w-10 h-10 bg-white border border-dashed border-stone-300 rounded-md flex items-center justify-center cursor-pointer hover:bg-stone-50 text-stone-400 hover:text-stone-600 transition-colors relative" title="上傳照片">
+                            <span class="text-lg">📷</span>
+                            <div class="hidden absolute inset-0 bg-white/80 items-center justify-center" id="loader-${item.id}"><div class="loader !w-4 !h-4"></div></div>
+                            <input type="file" class="hidden" accept="image/*" onchange="window.handlePhotoUpload('${item.id}', this)">
+                        </label>
+                    `;
+                }
+
+                let actionHTML = `<span class="px-2 py-1 rounded-full text-xs ${statusColor}">${item.status}</span>`;
+                if (currentRole === 'admin' || currentRole.startsWith('maker')) {
+                     actionHTML = `
+                        <select onchange="window.handleStatusChange('${item.id}', this.value)" class="text-xs border-stone-200 rounded p-1 bg-white focus:ring-amber-500 cursor-pointer ${statusColor.split(' ')[0]}">
+                            <option value="Pending" ${item.status === 'Pending' ? 'selected' : ''}>Pending</option>
+                            <option value="To Make" ${item.status === 'To Make' ? 'selected' : ''}>To Make</option>
+                            <option value="Making" ${item.status === 'Making' ? 'selected' : ''}>Making</option>
+                            <option value="Ready" ${item.status === 'Ready' ? 'selected' : ''}>Ready</option>
+                        </select>
+                     `;
+                }
+
+                tr.innerHTML = `
+                    <td class="px-6 py-4 font-mono text-xs text-stone-500">${item.month}</td>
+                    <td class="px-6 py-4">${photoHTML}</td>
+                    <td class="px-6 py-4">${item.category}</td>
+                    <td class="px-6 py-4 font-medium text-stone-800">${item.itemName}</td>
+                    <td class="px-6 py-4">${item.quantity}</td>
+                    <td class="px-6 py-4"><span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-stone-100 text-stone-800">${item.maker}</span></td>
+                    <td class="px-6 py-4">${actionHTML}</td>
+                    <td class="px-6 py-4 text-stone-400 text-xs truncate max-w-[150px]">${item.notes}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        };
+
+        window.renderAllocationList = function() {
+            const tbody = document.getElementById('allocation-table-body');
+            tbody.innerHTML = '';
+            
+            const studioCount = db.filter(i => i.allocation === 'Studio' && (i.status === 'Ready' || i.status === 'In Studio')).length;
+            const onlineCount = db.filter(i => i.allocation === 'Online Store').length;
+            const stockistCount = db.filter(i => i.allocation === 'Bev C').length;
+
+            document.getElementById('alloc-studio-count').textContent = studioCount;
+            document.getElementById('alloc-online-count').textContent = onlineCount;
+            document.getElementById('alloc-stockist-count').textContent = stockistCount;
+
+            const readyItems = db.filter(i => i.status === 'Ready' || i.status === 'In Studio');
+
+            if(readyItems.length === 0) {
+                 tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-4 text-center text-stone-400 text-sm">無待分配項目</td></tr>`;
+                 return;
+            }
+
+            readyItems.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-stone-50 transition-colors';
+                
+                let allocColor = 'bg-stone-100 text-stone-600';
+                if (item.allocation === 'Online Store') allocColor = 'bg-blue-50 text-blue-600';
+                if (item.allocation === 'Bev C') allocColor = 'bg-indigo-50 text-indigo-600';
+
+                // Photo Display
+                let photoHTML = `<div class="w-10 h-10 bg-stone-100 rounded-md flex items-center justify-center text-xs text-stone-300">無</div>`;
+                if (item.photo) {
+                    photoHTML = `<img src="${item.photo}" onclick="window.showImage('${item.photo}')" class="w-10 h-10 object-cover rounded-md border border-stone-200 cursor-zoom-in">`;
+                }
+
+                let actionHTML = `<span class="px-2 py-1 rounded text-xs ${allocColor}">${item.allocation}</span>`;
+                if (currentRole === 'admin' || currentRole === 'logistics') {
+                    actionHTML = `
+                        <select onchange="window.handleAllocChange('${item.id}', this.value)" class="text-xs border-stone-200 rounded p-1 bg-white focus:ring-blue-500 cursor-pointer font-medium text-stone-700">
+                            <option value="Studio" ${item.allocation === 'Studio' ? 'selected' : ''}>Studio</option>
+                            <option value="Online Store" ${item.allocation === 'Online Store' ? 'selected' : ''}>Online Store</option>
+                            <option value="Bev C" ${item.allocation === 'Bev C' ? 'selected' : ''}>Bev C (Stockist)</option>
+                            <option value="Pop-Up" ${item.allocation === 'Pop-Up' ? 'selected' : ''}>Pop-Up Event</option>
+                        </select>
+                    `;
+                }
+
+                tr.innerHTML = `
+                    <td class="px-6 py-4">${photoHTML}</td>
+                    <td class="px-6 py-4 font-medium text-stone-800">${item.itemName}</td>
+                    <td class="px-6 py-4 text-stone-500">${item.category}</td>
+                    <td class="px-6 py-4"><span class="px-2 py-1 rounded-full text-xs border ${allocColor}">${item.allocation}</span></td>
+                    <td class="px-6 py-4">${actionHTML}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        };
+
+        function updateDashboard() {
+            const total = db.length;
+            const making = db.filter(i => i.status === 'Making').length;
+            const studio = db.filter(i => i.allocation === 'Studio' && (i.status === 'Ready' || i.status === 'In Studio')).length;
+            const listed = db.filter(i => i.allocation !== 'Studio' && i.status !== 'Pending' && i.status !== 'To Make' && i.status !== 'Making').length;
+
+            document.getElementById('kpi-total').textContent = total;
+            document.getElementById('kpi-making').textContent = making;
+            document.getElementById('kpi-studio').textContent = studio;
+            document.getElementById('kpi-listed').textContent = listed;
+
+            updateCharts();
+        }
+
+        // --- FIRESTORE ACTIONS ---
+
+        // 1. Add New Item (Logic with Firestore + Storage)
+        window.handleAddItem = async function(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btn-submit');
+            btn.innerHTML = `<div class="loader !w-4 !h-4 border-white border-t-transparent"></div>`;
+            btn.disabled = true;
+
+            const formData = new FormData(e.target);
+            const fileInput = formData.get('initialPhoto');
+            
+            let photoUrl = null;
+
+            try {
+                // A. Upload Photo if exists
+                if (fileInput && fileInput.size > 0) {
+                    const storageRef = ref(storage, 'photos/' + new Date().getTime() + '_' + fileInput.name);
+                    const snapshot = await uploadBytes(storageRef, fileInput);
+                    photoUrl = await getDownloadURL(snapshot.ref);
+                }
+
+                // B. Add to Firestore
+                await addDoc(collection(dbFirestore, "stock_items"), {
+                    month: formData.get('month'),
+                    category: formData.get('category'),
+                    itemName: formData.get('itemName'),
+                    quantity: parseInt(formData.get('quantity')),
+                    maker: formData.get('maker'),
+                    status: 'To Make',
+                    allocation: 'Studio',
+                    photo: photoUrl,
+                    notes: formData.get('notes'),
+                    createdAt: serverTimestamp() // Important for sorting
+                });
+
+                window.closeModal();
+                e.target.reset();
+                // View updates automatically via onSnapshot
+            } catch (error) {
+                console.error("Error adding document: ", error);
+                alert("新增失敗: " + error.message);
+            } finally {
+                btn.innerHTML = "確認新增";
+                btn.disabled = false;
+            }
+        };
+
+        // 2. Update Status
+        window.handleStatusChange = async function(id, newStatus) {
+            try {
+                const docRef = doc(dbFirestore, "stock_items", id);
+                let updateData = { status: newStatus };
+                if (newStatus === 'Ready') updateData.allocation = 'Studio';
+                await updateDoc(docRef, updateData);
+            } catch (e) { console.error(e); }
+        };
+
+        // 3. Update Allocation
+        window.handleAllocChange = async function(id, newAlloc) {
+            try {
+                const docRef = doc(dbFirestore, "stock_items", id);
+                await updateDoc(docRef, { allocation: newAlloc });
+            } catch (e) { console.error(e); }
+        };
+
+        // 4. Upload Photo from List
+        window.handlePhotoUpload = async function(id, input) {
+            if (input.files && input.files[0]) {
+                const loader = document.getElementById(`loader-${id}`);
+                if(loader) loader.classList.remove('hidden');
+                if(loader) loader.classList.add('flex');
+
+                try {
+                    const file = input.files[0];
+                    const storageRef = ref(storage, 'photos/' + new Date().getTime() + '_' + file.name);
+                    const snapshot = await uploadBytes(storageRef, file);
+                    const photoUrl = await getDownloadURL(snapshot.ref);
+
+                    const docRef = doc(dbFirestore, "stock_items", id);
+                    await updateDoc(docRef, { photo: photoUrl });
+                } catch (error) {
+                    console.error("Upload failed", error);
+                    alert("上傳失敗");
+                } finally {
+                    if(loader) loader.classList.add('hidden');
+                }
+            }
+        };
+
+        // --- HELPERS ---
+        window.showImage = function(src) {
+            document.getElementById('img-modal-content').src = src;
+            document.getElementById('img-modal').classList.remove('hidden');
+        };
+        window.closeImgModal = function() {
+            document.getElementById('img-modal').classList.add('hidden');
+        };
+        window.openModal = function() { document.getElementById('add-modal').classList.remove('hidden'); };
+        window.closeModal = function() { document.getElementById('add-modal').classList.add('hidden'); };
+
+        // --- CHARTS ---
+        function initCharts() {
+            const ctxProd = document.getElementById('productionChart').getContext('2d');
+            prodChartInstance = new Chart(ctxProd, {
+                type: 'bar',
+                data: {
+                    labels: ['Pending', 'To Make', 'Making', 'Ready'],
+                    datasets: [{ label: 'Item Count', data: [0,0,0,0], backgroundColor: ['#e5e7eb', '#fca5a5', '#fbbf24', '#34d399'], borderRadius: 4 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { display: false } } } }
+            });
+
+            const ctxAlloc = document.getElementById('allocationChart').getContext('2d');
+            allocChartInstance = new Chart(ctxAlloc, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Studio', 'Online', 'Stockist'],
+                    datasets: [{ data: [0,0,0], backgroundColor: ['#78716c', '#3b82f6', '#6366f1'], borderWidth: 0 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, font: { size: 10 } } } } }
+            });
+        }
+
+        function updateCharts() {
+            const counts = {
+                'Pending': db.filter(i => i.status === 'Pending').length,
+                'To Make': db.filter(i => i.status === 'To Make').length,
+                'Making': db.filter(i => i.status === 'Making').length,
+                'Ready': db.filter(i => i.status === 'Ready' || i.status === 'In Studio').length
+            };
+            prodChartInstance.data.datasets[0].data = [counts['Pending'], counts['To Make'], counts['Making'], counts['Ready']];
+            prodChartInstance.update();
+
+            const allocs = {
+                'Studio': db.filter(i => i.allocation === 'Studio').length,
+                'Online': db.filter(i => i.allocation === 'Online Store').length,
+                'Stockist': db.filter(i => i.allocation === 'Bev C' || i.allocation === 'Stockist').length
+            };
+            allocChartInstance.data.datasets[0].data = [allocs['Studio'], allocs['Online'], allocs['Stockist']];
+            allocChartInstance.update();
+        }
+    </script>
+</body>
+</html>
