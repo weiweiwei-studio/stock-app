@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weiweiwei ERP (v11.4 Location Master)</title>
+    <title>Weiweiwei ERP (v11.9 Calendar Pro)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -51,6 +51,15 @@
         .sold-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; border-radius: 4px; }
         .has-note-dot { position: absolute; top: -3px; right: -3px; width: 8px; height: 8px; background-color: #ef4444; border-radius: 50%; border: 1px solid white; z-index: 20; }
 
+        /* Timeline Calendar Styles */
+        .timeline-container { position: relative; padding-left: 20px; border-left: 2px solid #e7e5e4; margin-left: 10px; }
+        .timeline-week { position: relative; margin-bottom: 24px; }
+        .timeline-dot { position: absolute; left: -27px; top: 0; width: 12px; height: 12px; background: #d6d3d1; border-radius: 50%; border: 2px solid #fff; }
+        .timeline-current .timeline-dot { background: #f59e0b; }
+        .cal-card { background: white; border: 1px solid #e7e5e4; padding: 8px; border-radius: 6px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.03); transition: transform 0.1s; }
+        .cal-card:hover { transform: translateX(2px); border-color: #d6d3d1; }
+        .maker-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+
         /* Loading */
         .loader { border: 2px solid #f3f3f3; border-top: 2px solid #44403c; border-radius: 50%; width: 16px; height: 16px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -65,7 +74,7 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center gap-4">
                     <div class="flex-shrink-0 flex items-center">
-                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.4 Locs</span></span>
+                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.9 Cal Pro</span></span>
                         <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] bg-stone-100 text-stone-400">Loading...</span>
                     </div>
                     <div class="hidden sm:ml-6 sm:flex sm:space-x-4">
@@ -95,47 +104,71 @@
     <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
         <section id="view-dashboard" class="space-y-8 animate-fade-in">
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+                 <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-stone-800">
+                    <div class="text-stone-500 text-xs font-bold uppercase tracking-wider">總生產件數 (Total)</div>
+                    <div class="mt-2 text-3xl font-bold text-stone-800" id="kpi-total">0</div>
+                </div>
                 <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-amber-500">
-                    <div class="text-amber-600 text-xs font-bold uppercase">製作中</div>
+                    <div class="text-amber-600 text-xs font-bold uppercase">製作中 (件)</div>
                     <div class="mt-2 text-3xl font-bold text-stone-800" id="kpi-making">0</div>
                 </div>
                 <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-emerald-500">
-                    <div class="text-emerald-600 text-xs font-bold uppercase">在庫 (All Ready)</div>
+                    <div class="text-emerald-600 text-xs font-bold uppercase">在庫 (件)</div>
                     <div class="mt-2 text-3xl font-bold text-stone-800" id="kpi-studio">0</div>
                 </div>
                 <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-gray-400">
-                    <div class="text-gray-500 text-xs font-bold uppercase">未分配 (Unallocated)</div>
+                    <div class="text-gray-500 text-xs font-bold uppercase">未分配 (件)</div>
                     <div class="mt-2 text-3xl font-bold text-stone-800" id="kpi-unallocated">0</div>
                 </div>
                 <div class="bg-stone-800 p-6 rounded-lg shadow-md border-l-4 border-yellow-500 text-white">
-                    <div class="text-yellow-500 text-xs font-bold uppercase">已售出 (Sold)</div>
+                    <div class="text-yellow-500 text-xs font-bold uppercase">已售出 (件)</div>
                     <div class="mt-2 text-3xl font-bold" id="kpi-sold">0</div>
                 </div>
             </div>
 
-            <div class="space-y-6">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                     <div>
-                        <h3 class="font-bold text-stone-700 mb-2 text-sm uppercase tracking-wide">現貨地點分佈 (Current Stock Location)</h3>
-                        <div id="location-stats-container" class="flex flex-wrap gap-2">
-                             </div>
-                     </div>
-                     <div>
-                        <h3 class="font-bold text-stone-700 mb-2 text-sm uppercase tracking-wide">類別生產總計 (Total Category)</h3>
-                        <div id="category-stats-container" class="flex flex-wrap gap-2">
-                             </div>
-                     </div>
-                </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                 <div>
+                    <h3 class="font-bold text-stone-700 mb-2 text-sm uppercase tracking-wide">現貨地點分佈 (點擊查看)</h3>
+                    <div id="location-stats-container" class="flex flex-wrap gap-2"></div>
+                    <div id="location-breakdown-panel" class="mt-4 hidden bg-white border border-stone-200 rounded p-4 shadow-sm animate-fade-in">
+                        <h4 class="text-sm font-bold text-stone-800 mb-2 border-b pb-1" id="breakdown-title">Location</h4>
+                        <div class="text-xs text-stone-500 mb-2" id="breakdown-categories"></div>
+                        <ul class="text-xs text-stone-700 space-y-1 max-h-40 overflow-y-auto custom-scrollbar" id="breakdown-list"></ul>
+                    </div>
+                 </div>
+                 <div>
+                    <h3 class="font-bold text-stone-700 mb-2 text-sm uppercase tracking-wide">類別生產總計 (件數)</h3>
+                    <div id="category-stats-container" class="flex flex-wrap gap-2"></div>
+                 </div>
+            </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    <div class="bg-white p-6 rounded-lg shadow-sm md:col-span-2 h-96">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="bg-white p-6 rounded-lg shadow-sm md:col-span-2 space-y-8">
+                    <div class="h-64">
                         <h4 class="text-sm font-bold text-stone-500 mb-4 uppercase">每月生產結構</h4>
                         <div class="relative w-full h-full pb-8"><canvas id="categoryChart"></canvas></div>
                     </div>
-                    <div class="bg-white p-6 rounded-lg shadow-sm h-96">
+                    <div class="h-64 border-t border-stone-100 pt-8">
                         <h4 class="text-sm font-bold text-stone-500 mb-4 uppercase">庫存版圖 (分佈)</h4>
                         <div class="relative w-full h-full pb-8"><canvas id="allocationChart"></canvas></div>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-lg shadow-sm h-full overflow-hidden flex flex-col">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="text-sm font-bold text-stone-800 uppercase flex items-center gap-2">
+                            <i data-lucide="calendar" class="w-4 h-4"></i> 本月排程
+                        </h4>
+                        <span class="text-xs text-stone-400" id="calendar-month-label">Current</span>
+                    </div>
+                    <div class="flex-grow overflow-y-auto custom-scrollbar pr-2">
+                        <div class="mb-4">
+                            <h5 class="text-[10px] font-bold text-stone-400 uppercase tracking-wide mb-2">待定日期 (To Be Scheduled)</h5>
+                            <div id="cal-unscheduled-list" class="space-y-1"></div>
+                        </div>
+                        <div class="timeline-container" id="cal-timeline">
+                            </div>
                     </div>
                 </div>
             </div>
@@ -153,9 +186,12 @@
             </div>
             
             <div class="flex items-center gap-2 bg-white p-3 rounded-lg shadow-sm">
-                <span class="text-sm font-medium text-stone-600">過濾:</span>
+                <span class="text-sm font-medium text-stone-600 flex-shrink-0">過濾:</span>
                 <select id="prod-filter-maker" onchange="window.renderProductionList()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5 dynamic-maker-select">
                     <option value="all">全部製作人</option>
+                </select>
+                <select id="prod-filter-category" onchange="window.renderProductionList()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5 dynamic-category-select">
+                    <option value="all">全部類別</option>
                 </select>
             </div>
 
@@ -378,6 +414,7 @@
         let currentDetailItem = null, currentDetailPhotoIdx = -1, tempLocations = []; 
         const catColors = ['#f472b6', '#60a5fa', '#a78bfa', '#34d399', '#fbbf24', '#9ca3af'];
         const locColors = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#6366f1', '#14b8a6'];
+        let locationBreakdownData = {}; 
 
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('form-month-input').value = new Date().toLocaleString('en-US', { month: 'short', year: 'numeric' });
@@ -434,39 +471,46 @@
             });
         }
 
-        // --- DASHBOARD (Expanded) ---
+        // --- DASHBOARD & CALENDAR ---
         function updateDashboard() {
-            const making = db.filter(i => i.status === 'Making').length;
-            let soldCount = 0, studioCount = 0, unallocatedCount = 0;
+            const totalPieces = db.reduce((sum, item) => sum + (parseInt(item.quantity)||1), 0);
+            document.getElementById('kpi-total').textContent = totalPieces;
 
-            // Stats Counters
+            const making = db
+                .filter(i => i.status === 'Making')
+                .reduce((sum, item) => sum + (parseInt(item.quantity) || 1), 0);
+
+            let soldCount = 0, studioCount = 0, unallocatedCount = 0;
             const catStats = {};
             const locStats = { 'Unallocated': 0, 'Sold': 0 };
+            
+            locationBreakdownData = { 'Unallocated': { total: 0, items: [], catBreakdown: {} }, 'Sold': { total: 0, items: [], catBreakdown: {} } };
+            appSettings.locations.forEach(l => {
+                locStats[l] = 0;
+                locationBreakdownData[l] = { total: 0, items: [], catBreakdown: {} };
+            });
             appSettings.categories.forEach(c => catStats[c] = 0);
-            appSettings.locations.forEach(l => locStats[l] = 0);
 
             db.forEach(i => {
-                // Category Stats
-                const count = i.photos && i.photos.length > 0 ? i.photos.length : i.quantity;
+                const count = i.photos && i.photos.length > 0 ? i.photos.length : (parseInt(i.quantity)||1);
                 if(catStats[i.category] !== undefined) catStats[i.category] += count;
                 else catStats['Other'] = (catStats['Other'] || 0) + count;
 
-                // Location & KPI Stats
                 const photos = normalizePhotos(i);
-                photos.forEach(p => {
+                photos.forEach((p, idx) => {
+                    const itemName = `${i.itemName} (${i.color})`;
+                    const cat = i.category;
                     if (p.status === 'Sold') {
-                        soldCount++;
-                        locStats['Sold']++;
+                        soldCount++; locStats['Sold']++; addToBreakdown('Sold', itemName, cat);
                     } else {
                         if (p.locations.length > 0) {
-                            studioCount++; // KPI: Available
-                            // Detailed Location Stats (Multi-count allowed for visibility)
+                            studioCount++;
                             p.locations.forEach(loc => {
                                 if(locStats[loc] !== undefined) locStats[loc]++;
+                                addToBreakdown(loc, itemName, cat);
                             });
                         } else {
-                            unallocatedCount++;
-                            locStats['Unallocated']++;
+                            unallocatedCount++; locStats['Unallocated']++; addToBreakdown('Unallocated', itemName, cat);
                         }
                     }
                 });
@@ -477,21 +521,134 @@
             document.getElementById('kpi-unallocated').textContent = unallocatedCount;
             document.getElementById('kpi-sold').textContent = soldCount;
 
-            // Render Badges
-            const catContainer = document.getElementById('category-stats-container');
-            catContainer.innerHTML = '';
-            Object.keys(catStats).forEach(c => {
-                if(catStats[c] > 0) catContainer.innerHTML += `<div class="bg-white px-3 py-1 rounded shadow-sm border border-stone-200 text-sm text-stone-600">${c}: <b class="text-stone-800">${catStats[c]}</b></div>`;
+            renderCategoryBadges(catStats);
+            renderLocationButtons(locStats);
+            updateCharts(locStats);
+            renderCalendar(); 
+        }
+
+        // --- CALENDAR LOGIC (UPDATED: Category Name + Weekly Total) ---
+        function renderCalendar() {
+            const today = new Date();
+            const currentMonthName = today.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+            const currentMonthShort = today.toLocaleString('en-US', { month: 'short' });
+            
+            document.getElementById('calendar-month-label').innerText = currentMonthName;
+            
+            const unscheduledContainer = document.getElementById('cal-unscheduled-list');
+            const timelineContainer = document.getElementById('cal-timeline');
+            unscheduledContainer.innerHTML = '';
+            timelineContainer.innerHTML = '';
+
+            const unscheduled = [];
+            const weeks = { 1: [], 2: [], 3: [], 4: [], 5: [] };
+
+            db.forEach(item => {
+                if (item.makingAt) {
+                    const d = new Date(item.makingAt.seconds * 1000);
+                    if (d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear()) {
+                        const date = d.getDate();
+                        let week = Math.ceil(date / 7); 
+                        if(week > 5) week = 5;
+                        weeks[week].push(item);
+                    }
+                } 
+                else if (item.month && (item.month.includes(currentMonthName) || item.month.includes(currentMonthShort))) {
+                    unscheduled.push(item);
+                }
             });
 
-            const locContainer = document.getElementById('location-stats-container');
-            locContainer.innerHTML = '';
-            appSettings.locations.forEach(l => {
-                if(locStats[l] > 0) locContainer.innerHTML += `<div class="bg-blue-50 px-3 py-1 rounded shadow-sm border border-blue-100 text-sm text-blue-800">${l}: <b>${locStats[l]}</b></div>`;
+            if (unscheduled.length === 0) unscheduledContainer.innerHTML = '<span class="text-[10px] text-stone-300 italic">None</span>';
+            else {
+                unscheduled.forEach(i => { unscheduledContainer.innerHTML += createCalCard(i); });
+            }
+
+            [1, 2, 3, 4, 5].forEach(w => {
+                const items = weeks[w];
+                const dateStart = (w - 1) * 7 + 1;
+                const dateEnd = Math.min(w * 7, 31);
+                
+                // Calculate Total for the week
+                const weekTotal = items.reduce((sum, item) => sum + (parseInt(item.quantity) || 1), 0);
+
+                const currentDay = today.getDate();
+                const isCurrentWeek = currentDay >= dateStart && currentDay <= dateEnd;
+
+                const weekHTML = `
+                    <div class="timeline-week ${isCurrentWeek ? 'timeline-current' : ''}">
+                        <div class="timeline-dot"></div>
+                        <h5 class="text-xs font-bold text-stone-500 mb-2 uppercase flex justify-between items-center">
+                            <span>Week ${w} <span class="font-normal text-[10px] text-stone-400">(${dateStart}-${dateEnd})</span></span>
+                            ${weekTotal > 0 ? `<span class="text-[10px] bg-stone-100 text-stone-600 px-1.5 py-0.5 rounded border border-stone-200">Total: ${weekTotal}</span>` : ''}
+                        </h5>
+                        <div class="space-y-1">
+                            ${items.length > 0 ? items.map(i => createCalCard(i)).join('') : '<div class="text-[10px] text-stone-300 italic pl-1">Empty</div>'}
+                        </div>
+                    </div>
+                `;
+                timelineContainer.innerHTML += weekHTML;
             });
-            
-            updateCharts(locStats);
         }
+
+        function createCalCard(item) {
+            const maker = item.maker || 'Unknown';
+            let color = '#ccc';
+            if (maker.includes('Kim')) color = '#f472b6';
+            else if (maker.includes('Kelly')) color = '#60a5fa';
+            else if (maker.includes('Lijin')) color = '#34d399';
+
+            // UPDATED: Main text is Category, Item Name is smaller below
+            return `
+                <div class="cal-card cursor-pointer flex-col !items-start gap-1" onclick="window.openEditModal('${item.id}')">
+                    <div class="flex items-center justify-between w-full">
+                         <div class="flex items-center">
+                            <span class="maker-dot" style="background-color: ${color}"></span>
+                            <span class="font-bold text-stone-800 text-xs">${item.category}</span>
+                         </div>
+                         <span class="text-[10px] bg-stone-100 px-1 rounded text-stone-500 font-bold">${item.quantity}</span>
+                    </div>
+                    <div class="text-[10px] text-stone-400 truncate w-full pl-3">${item.itemName}</div>
+                </div>
+            `;
+        }
+
+        function addToBreakdown(loc, name, cat) {
+            if(!locationBreakdownData[loc]) locationBreakdownData[loc] = { total: 0, items: [], catBreakdown: {} };
+            locationBreakdownData[loc].total++;
+            locationBreakdownData[loc].items.push(name);
+            locationBreakdownData[loc].catBreakdown[cat] = (locationBreakdownData[loc].catBreakdown[cat] || 0) + 1;
+        }
+
+        function renderCategoryBadges(stats) {
+            const container = document.getElementById('category-stats-container');
+            container.innerHTML = '';
+            Object.keys(stats).forEach(c => {
+                if(stats[c] > 0) container.innerHTML += `<div class="bg-white px-3 py-1 rounded shadow-sm border border-stone-200 text-sm text-stone-600">${c}: <b class="text-stone-800">${stats[c]}</b></div>`;
+            });
+        }
+
+        function renderLocationButtons(stats) {
+            const container = document.getElementById('location-stats-container');
+            container.innerHTML = '';
+            appSettings.locations.forEach(l => {
+                if(stats[l] > 0) {
+                    container.innerHTML += `<button onclick="window.showLocationBreakdown('${l}')" class="bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded shadow-sm border border-blue-100 text-sm text-blue-800 transition-colors">${l}: <b>${stats[l]}</b></button>`;
+                }
+            });
+            if(stats['Unallocated'] > 0) {
+                container.innerHTML += `<button onclick="window.showLocationBreakdown('Unallocated')" class="bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded shadow-sm border border-gray-200 text-sm text-gray-600">Unallocated: <b>${stats['Unallocated']}</b></button>`;
+            }
+        }
+
+        window.showLocationBreakdown = function(loc) {
+            const data = locationBreakdownData[loc];
+            if(!data) return;
+            const panel = document.getElementById('location-breakdown-panel');
+            document.getElementById('breakdown-title').innerText = `${loc} (Total: ${data.total})`;
+            document.getElementById('breakdown-categories').innerText = Object.entries(data.catBreakdown).map(([k,v]) => `${k}: ${v}`).join(', ');
+            document.getElementById('breakdown-list').innerHTML = data.items.map(i => `<li class="border-b border-stone-50 pb-1 last:border-0">${i}</li>`).join('');
+            panel.classList.remove('hidden');
+        };
 
         function initCharts() {
             categoryChart = new Chart(document.getElementById('categoryChart'), {
@@ -503,7 +660,6 @@
                     plugins: { legend: { position: 'bottom' } }
                 }
             });
-
             allocChart = new Chart(document.getElementById('allocationChart'), {
                 type: 'doughnut',
                 data: { labels: [], datasets: [{ data: [], backgroundColor: [] }] },
@@ -512,24 +668,14 @@
         }
 
         function updateCharts(locStats) {
-            // Update Allocation Chart (Dynamic Locations)
-            // Order: Known Locations -> Unallocated -> Sold
             const labels = [...appSettings.locations, 'Unallocated', 'Sold'];
             const data = [...appSettings.locations.map(l => locStats[l]), locStats['Unallocated'], locStats['Sold']];
-            
-            // Generate colors
-            const bgColors = [
-                ...appSettings.locations.map((_, i) => locColors[i % locColors.length]),
-                '#e5e7eb', // Unallocated
-                '#1c1917'  // Sold
-            ];
-
+            const bgColors = [...appSettings.locations.map((_, i) => locColors[i % locColors.length]), '#e5e7eb', '#1c1917'];
             allocChart.data.labels = labels;
             allocChart.data.datasets[0].data = data;
             allocChart.data.datasets[0].backgroundColor = bgColors;
             allocChart.update();
 
-            // Update Category Chart
             const months = [...new Set(db.map(i => i.month))]; 
             const categories = appSettings.categories;
             const datasets = categories.map((cat, idx) => {
@@ -537,12 +683,11 @@
                     label: cat,
                     data: months.map(m => {
                         return db.filter(i => i.month === m && i.category === cat)
-                                 .reduce((sum, item) => sum + (item.photos && item.photos.length > 0 ? item.photos.length : item.quantity), 0);
+                                 .reduce((sum, item) => sum + (item.photos && item.photos.length > 0 ? item.photos.length : parseInt(item.quantity)||1), 0);
                     }),
                     backgroundColor: catColors[idx % catColors.length]
                 }
             });
-
             categoryChart.data.labels = months;
             categoryChart.data.datasets = datasets;
             categoryChart.update();
@@ -551,11 +696,13 @@
         // --- PRODUCTION ---
         window.renderProductionList = function() {
             const tbody = document.getElementById('production-table-body');
-            const filter = document.getElementById('prod-filter-maker').value;
+            const makerFilter = document.getElementById('prod-filter-maker').value;
+            const catFilter = document.getElementById('prod-filter-category').value;
             tbody.innerHTML = '';
             
             let data = db;
-            if (filter !== 'all') data = data.filter(i => i.maker === filter);
+            if (makerFilter !== 'all') data = data.filter(i => i.maker === makerFilter);
+            if (catFilter !== 'all') data = data.filter(i => i.category === catFilter);
 
             data.forEach(item => {
                 const tr = document.createElement('tr');
@@ -621,22 +768,18 @@
                         const hasNote = p.notes && p.notes.length > 0;
                         const hasImg = p.url && p.url.length > 0;
                         
-                        let badgeText = '';
-                        let badgeClass = '';
+                        let badgeText = '', badgeClass = '';
                         
                         if (isSold) {
-                            badgeText = 'SOLD';
-                            badgeClass = 'badge-sold';
+                            badgeText = 'SOLD'; badgeClass = 'badge-sold';
                         } else {
                             if (p.locations.length > 1) {
-                                badgeText = 'MULTI';
-                                badgeClass = 'badge-multi';
+                                badgeText = 'MULTI'; badgeClass = 'badge-multi';
                             } else if (p.locations.length === 1) {
                                 badgeText = p.locations[0].substring(0,6).toUpperCase();
                                 badgeClass = p.locations[0] === 'Studio' ? 'badge-studio' : 'badge-multi';
                             } else {
-                                badgeText = '未分配 (None)'; 
-                                badgeClass = 'badge-none';
+                                badgeText = '未分配 (None)'; badgeClass = 'badge-none';
                             }
                         }
 
