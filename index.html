@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weiweiwei ERP (v11.3 Stable)</title>
+    <title>Weiweiwei ERP (v11.4 Location Master)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -65,7 +65,7 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center gap-4">
                     <div class="flex-shrink-0 flex items-center">
-                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.3 Stable</span></span>
+                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.4 Locs</span></span>
                         <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] bg-stone-100 text-stone-400">Loading...</span>
                     </div>
                     <div class="hidden sm:ml-6 sm:flex sm:space-x-4">
@@ -114,16 +114,27 @@
                 </div>
             </div>
 
-            <div class="space-y-4">
-                <h3 class="font-bold text-stone-700">類別生產總計 (Total Breakdown)</h3>
-                <div id="category-stats-container" class="flex flex-wrap gap-3"></div>
+            <div class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                     <div>
+                        <h3 class="font-bold text-stone-700 mb-2 text-sm uppercase tracking-wide">現貨地點分佈 (Current Stock Location)</h3>
+                        <div id="location-stats-container" class="flex flex-wrap gap-2">
+                             </div>
+                     </div>
+                     <div>
+                        <h3 class="font-bold text-stone-700 mb-2 text-sm uppercase tracking-wide">類別生產總計 (Total Category)</h3>
+                        <div id="category-stats-container" class="flex flex-wrap gap-2">
+                             </div>
+                     </div>
+                </div>
+
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
                     <div class="bg-white p-6 rounded-lg shadow-sm md:col-span-2 h-96">
                         <h4 class="text-sm font-bold text-stone-500 mb-4 uppercase">每月生產結構</h4>
                         <div class="relative w-full h-full pb-8"><canvas id="categoryChart"></canvas></div>
                     </div>
                     <div class="bg-white p-6 rounded-lg shadow-sm h-96">
-                        <h4 class="text-sm font-bold text-stone-500 mb-4 uppercase">庫存去向佔比</h4>
+                        <h4 class="text-sm font-bold text-stone-500 mb-4 uppercase">庫存版圖 (分佈)</h4>
                         <div class="relative w-full h-full pb-8"><canvas id="allocationChart"></canvas></div>
                     </div>
                 </div>
@@ -366,6 +377,7 @@
         let appSettings = { makers: ['Kim', 'Kelly', 'Lijin'], locations: ['Studio', 'Online', 'Bev C', 'Pop-Up'], categories: ['Top', 'Dress', 'Pants'] };
         let currentDetailItem = null, currentDetailPhotoIdx = -1, tempLocations = []; 
         const catColors = ['#f472b6', '#60a5fa', '#a78bfa', '#34d399', '#fbbf24', '#9ca3af'];
+        const locColors = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#6366f1', '#14b8a6'];
 
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('form-month-input').value = new Date().toLocaleString('en-US', { month: 'short', year: 'numeric' });
@@ -397,14 +409,12 @@
             });
         }
 
-        // --- NORMALIZE (Fix: Virtual vs Real) ---
+        // --- NORMALIZE ---
         function normalizePhotos(item) {
             let raw = [];
             if (item.photos && Array.isArray(item.photos)) raw = item.photos;
             else if (item.photo) raw = [item.photo];
 
-            // If empty DB photos but Qty>0, generate virtual placeholders
-            // BUT: We will ensure these are NOT saved as-is in handleEditSubmit
             if (raw.length === 0 && item.quantity > 0) {
                  return Array(item.quantity).fill({ url: '', status: 'Available', locations: [], notes: '' }); 
             }
@@ -424,18 +434,40 @@
             });
         }
 
-        // --- DASHBOARD ---
+        // --- DASHBOARD (Expanded) ---
         function updateDashboard() {
             const making = db.filter(i => i.status === 'Making').length;
             let soldCount = 0, studioCount = 0, unallocatedCount = 0;
 
+            // Stats Counters
+            const catStats = {};
+            const locStats = { 'Unallocated': 0, 'Sold': 0 };
+            appSettings.categories.forEach(c => catStats[c] = 0);
+            appSettings.locations.forEach(l => locStats[l] = 0);
+
             db.forEach(i => {
+                // Category Stats
+                const count = i.photos && i.photos.length > 0 ? i.photos.length : i.quantity;
+                if(catStats[i.category] !== undefined) catStats[i.category] += count;
+                else catStats['Other'] = (catStats['Other'] || 0) + count;
+
+                // Location & KPI Stats
                 const photos = normalizePhotos(i);
                 photos.forEach(p => {
-                    if (p.status === 'Sold') soldCount++;
-                    else {
-                        if (p.locations.length > 0) studioCount++;
-                        else unallocatedCount++;
+                    if (p.status === 'Sold') {
+                        soldCount++;
+                        locStats['Sold']++;
+                    } else {
+                        if (p.locations.length > 0) {
+                            studioCount++; // KPI: Available
+                            // Detailed Location Stats (Multi-count allowed for visibility)
+                            p.locations.forEach(loc => {
+                                if(locStats[loc] !== undefined) locStats[loc]++;
+                            });
+                        } else {
+                            unallocatedCount++;
+                            locStats['Unallocated']++;
+                        }
                     }
                 });
             });
@@ -445,23 +477,20 @@
             document.getElementById('kpi-unallocated').textContent = unallocatedCount;
             document.getElementById('kpi-sold').textContent = soldCount;
 
-            const catStats = {};
-            appSettings.categories.forEach(c => catStats[c] = 0);
-            db.forEach(i => {
-                const count = i.photos && i.photos.length > 0 ? i.photos.length : i.quantity;
-                if(catStats[i.category] !== undefined) catStats[i.category] += count;
-                else catStats['Other'] = (catStats['Other'] || 0) + count;
-            });
-            
+            // Render Badges
             const catContainer = document.getElementById('category-stats-container');
             catContainer.innerHTML = '';
             Object.keys(catStats).forEach(c => {
-                if(catStats[c] > 0) {
-                    catContainer.innerHTML += `<div class="bg-white px-3 py-1 rounded shadow-sm border border-stone-200 text-sm text-stone-600">${c}: <b class="text-stone-800">${catStats[c]}</b></div>`;
-                }
+                if(catStats[c] > 0) catContainer.innerHTML += `<div class="bg-white px-3 py-1 rounded shadow-sm border border-stone-200 text-sm text-stone-600">${c}: <b class="text-stone-800">${catStats[c]}</b></div>`;
             });
 
-            updateCharts(studioCount, unallocatedCount, soldCount);
+            const locContainer = document.getElementById('location-stats-container');
+            locContainer.innerHTML = '';
+            appSettings.locations.forEach(l => {
+                if(locStats[l] > 0) locContainer.innerHTML += `<div class="bg-blue-50 px-3 py-1 rounded shadow-sm border border-blue-100 text-sm text-blue-800">${l}: <b>${locStats[l]}</b></div>`;
+            });
+            
+            updateCharts(locStats);
         }
 
         function initCharts() {
@@ -477,15 +506,30 @@
 
             allocChart = new Chart(document.getElementById('allocationChart'), {
                 type: 'doughnut',
-                data: { labels: ['Assigned', 'Unallocated', 'Sold'], datasets: [{ data: [], backgroundColor: ['#10b981', '#e5e7eb', '#1c1917'] }] },
+                data: { labels: [], datasets: [{ data: [], backgroundColor: [] }] },
                 options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
             });
         }
 
-        function updateCharts(st, un, sd) {
-            allocChart.data.datasets[0].data = [st, un, sd];
+        function updateCharts(locStats) {
+            // Update Allocation Chart (Dynamic Locations)
+            // Order: Known Locations -> Unallocated -> Sold
+            const labels = [...appSettings.locations, 'Unallocated', 'Sold'];
+            const data = [...appSettings.locations.map(l => locStats[l]), locStats['Unallocated'], locStats['Sold']];
+            
+            // Generate colors
+            const bgColors = [
+                ...appSettings.locations.map((_, i) => locColors[i % locColors.length]),
+                '#e5e7eb', // Unallocated
+                '#1c1917'  // Sold
+            ];
+
+            allocChart.data.labels = labels;
+            allocChart.data.datasets[0].data = data;
+            allocChart.data.datasets[0].backgroundColor = bgColors;
             allocChart.update();
 
+            // Update Category Chart
             const months = [...new Set(db.map(i => i.month))]; 
             const categories = appSettings.categories;
             const datasets = categories.map((cat, idx) => {
@@ -752,7 +796,7 @@
             btn.innerText = '確認新增'; btn.disabled = false;
         };
 
-        // --- EDIT MODAL (FIXED) ---
+        // --- EDIT MODAL ---
         window.openEditModal = (id) => { 
             const item = db.find(i=>i.id===id);
             document.getElementById('edit-id').value=id; 
@@ -784,11 +828,9 @@
             if(sDateVal) data.makingAt = new Date(sDateVal);
             if(cDateVal) data.completedAt = new Date(cDateVal);
 
-            // Handle New Photos - KEY FIX: IGNORE VIRTUAL PLACEHOLDERS
             const photoInput = document.getElementById('edit-addPhotos');
             if(photoInput.files.length > 0) {
                  const item = db.find(i=>i.id===id);
-                 // Direct DB Access logic: if DB photos is empty, start empty.
                  let existingPhotos = item.photos || [];
                  
                  for(let i=0; i<photoInput.files.length; i++) {
