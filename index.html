@@ -121,4 +121,933 @@
                     <div class="text-gray-500 text-xs font-bold uppercase">未分配 (件)</div>
                     <div class="mt-2 text-3xl font-bold text-stone-800" id="kpi-unallocated">0</div>
                 </div>
-                <div class="bg-stone-800 p-6 rounded-lg shadow-md border-l-4 border-yellow-50
+                <div class="bg-stone-800 p-6 rounded-lg shadow-md border-l-4 border-yellow-500 text-white">
+                    <div class="text-yellow-500 text-xs font-bold uppercase">已售出 (件)</div>
+                    <div class="mt-2 text-3xl font-bold" id="kpi-sold">0</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                 <div>
+                    <h3 class="font-bold text-stone-700 mb-2 text-sm uppercase tracking-wide">現貨地點分佈 (點擊查看)</h3>
+                    <div id="location-stats-container" class="flex flex-wrap gap-2"></div>
+                    <div id="location-breakdown-panel" class="mt-4 hidden bg-white border border-stone-200 rounded p-4 shadow-sm animate-fade-in">
+                        <h4 class="text-sm font-bold text-stone-800 mb-2 border-b pb-1" id="breakdown-title">Location</h4>
+                        <div class="text-xs text-stone-500 mb-2" id="breakdown-categories"></div>
+                        <ul class="text-xs text-stone-700 space-y-1 max-h-40 overflow-y-auto custom-scrollbar" id="breakdown-list"></ul>
+                    </div>
+                 </div>
+                 <div>
+                    <h3 class="font-bold text-stone-700 mb-2 text-sm uppercase tracking-wide">類別生產總計 (件數)</h3>
+                    <div id="category-stats-container" class="flex flex-wrap gap-2"></div>
+                 </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="bg-white p-6 rounded-lg shadow-sm md:col-span-2 space-y-8">
+                    <div class="h-64">
+                        <h4 class="text-sm font-bold text-stone-500 mb-4 uppercase">每月生產結構</h4>
+                        <div class="relative w-full h-full pb-8"><canvas id="categoryChart"></canvas></div>
+                    </div>
+                    <div class="h-64 border-t border-stone-100 pt-8">
+                        <h4 class="text-sm font-bold text-stone-500 mb-4 uppercase">庫存版圖 (分佈)</h4>
+                        <div class="relative w-full h-full pb-8"><canvas id="allocationChart"></canvas></div>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-lg shadow-sm h-full overflow-hidden flex flex-col">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="text-sm font-bold text-stone-800 uppercase flex items-center gap-2">
+                            <i data-lucide="calendar" class="w-4 h-4"></i> 本月排程
+                        </h4>
+                        <span class="text-xs text-stone-400" id="calendar-month-label">Current</span>
+                    </div>
+                    <div class="flex-grow overflow-y-auto custom-scrollbar pr-2">
+                        <div class="mb-4">
+                            <h5 class="text-[10px] font-bold text-stone-400 uppercase tracking-wide mb-2">待定日期 (To Be Scheduled)</h5>
+                            <div id="cal-unscheduled-list" class="space-y-1"></div>
+                        </div>
+                        <div class="timeline-container" id="cal-timeline">
+                            </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="view-production" class="space-y-6 hidden animate-fade-in">
+            <div class="bg-white rounded-lg p-6 shadow-sm border-l-4 border-amber-500 flex justify-between items-center">
+                <div>
+                    <h2 class="text-xl font-bold text-stone-800">生產排程</h2>
+                    <p class="text-stone-500 text-sm mt-1">Pending &rarr; Making &rarr; QC &rarr; Ready</p>
+                </div>
+                <button onclick="window.openModal()" class="bg-stone-800 text-white px-4 py-2 rounded-md text-sm shadow-md flex items-center gap-2">
+                    <span>&#43;</span> 新增工單
+                </button>
+            </div>
+            
+            <div class="flex items-center gap-2 bg-white p-3 rounded-lg shadow-sm">
+                <span class="text-sm font-medium text-stone-600 flex-shrink-0">過濾:</span>
+                <select id="prod-filter-maker" onchange="window.renderProductionList()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5 dynamic-maker-select">
+                    <option value="all">全部製作人</option>
+                </select>
+                <select id="prod-filter-category" onchange="window.renderProductionList()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5 dynamic-category-select">
+                    <option value="all">全部類別</option>
+                </select>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-sm overflow-hidden border border-stone-200">
+                <div class="overflow-x-auto custom-scrollbar">
+                    <table class="min-w-full text-left text-sm">
+                        <thead class="bg-stone-100 text-stone-600 uppercase font-semibold">
+                            <tr>
+                                <th class="px-6 py-3">Month</th>
+                                <th class="px-6 py-3">Photos (Reel)</th>
+                                <th class="px-6 py-3">Item Info</th>
+                                <th class="px-6 py-3">Qty</th>
+                                <th class="px-6 py-3">Maker</th>
+                                <th class="px-6 py-3">Status</th>
+                                <th class="px-6 py-3">Dates</th>
+                                <th class="px-6 py-3">Edit</th>
+                            </tr>
+                        </thead>
+                        <tbody id="production-table-body" class="divide-y divide-stone-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section id="view-allocation" class="space-y-6 hidden animate-fade-in">
+            <div class="bg-white rounded-lg p-6 shadow-sm border-l-4 border-blue-500">
+                <h2 class="text-xl font-bold text-stone-800">庫存與去向</h2>
+                <p class="text-stone-500 text-sm mt-1">
+                    <span class="bg-gray-200 border text-gray-500 text-[10px] px-1 rounded">未分配</span> 代表尚未入庫，請點擊照片分配地點。
+                </p>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow-sm overflow-hidden border border-stone-200">
+                <div class="overflow-x-auto custom-scrollbar">
+                    <table class="min-w-full text-left text-sm">
+                        <thead class="bg-stone-100 text-stone-600 uppercase font-semibold">
+                            <tr>
+                                <th class="px-6 py-3 w-[450px]">Unique Pieces (Inventory)</th>
+                                <th class="px-6 py-3">Item Detail</th>
+                                <th class="px-6 py-3">Category</th>
+                            </tr>
+                        </thead>
+                        <tbody id="allocation-table-body" class="divide-y divide-stone-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section id="view-settings" class="space-y-6 hidden">
+             <div class="bg-white p-6 rounded-lg shadow-sm border border-stone-200">
+                <h2 class="text-xl font-bold text-stone-800">系統設定</h2>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-white p-6 rounded-lg shadow-sm">
+                    <h3 class="font-bold text-stone-700 mb-2">製作人</h3>
+                    <div id="settings-makers-list" class="flex flex-wrap gap-1 mb-2"></div>
+                    <div class="flex gap-2"><input id="new-maker-input" placeholder="新增..." class="flex-1 border text-sm rounded px-2"><button onclick="window.addSetting('makers')" class="bg-stone-800 text-white px-2 rounded">+</button></div>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-sm">
+                    <h3 class="font-bold text-stone-700 mb-2">地點</h3>
+                    <div id="settings-locations-list" class="flex flex-wrap gap-1 mb-2"></div>
+                    <div class="flex gap-2"><input id="new-location-input" placeholder="新增..." class="flex-1 border text-sm rounded px-2"><button onclick="window.addSetting('locations')" class="bg-stone-800 text-white px-2 rounded">+</button></div>
+                </div>
+                 <div class="bg-white p-6 rounded-lg shadow-sm">
+                    <h3 class="font-bold text-stone-700 mb-2">類別</h3>
+                    <div id="settings-categories-list" class="flex flex-wrap gap-1 mb-2"></div>
+                    <div class="flex gap-2"><input id="new-category-input" placeholder="新增..." class="flex-1 border text-sm rounded px-2"><button onclick="window.addSetting('categories')" class="bg-stone-800 text-white px-2 rounded">+</button></div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <div id="add-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
+            <h3 class="text-lg font-bold mb-4">新增工單</h3>
+            <form id="add-item-form" onsubmit="window.handleAddItem(event)" class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <input type="text" name="month" id="form-month-input" class="border p-2 rounded text-sm" placeholder="月份">
+                    <input type="text" name="itemName" required class="border p-2 rounded text-sm" placeholder="品名">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <select name="category" class="border p-2 rounded text-sm dynamic-category-select"></select>
+                    <select name="maker" class="border p-2 rounded text-sm dynamic-maker-select"></select>
+                </div>
+                 <div class="grid grid-cols-2 gap-4">
+                    <input type="text" name="color" class="border p-2 rounded text-sm" placeholder="顏色">
+                    <select name="size" class="border p-2 rounded text-sm bg-white"><option value="F">F</option><option value="S">S</option><option value="M">M</option><option value="L">L</option></select>
+                </div>
+                 <div>
+                    <label class="block text-xs font-medium text-stone-500 mb-1">數量</label>
+                    <input type="number" name="quantity" value="1" min="1" class="w-full border-stone-300 rounded-md shadow-sm text-sm p-2 border">
+                </div>
+                <div class="bg-stone-50 p-3 rounded border border-dashed border-stone-300">
+                    <label class="text-xs font-bold text-stone-700 block mb-2">單品照片 (多選)</label>
+                    <input type="file" name="initialPhotos" accept="image/*" multiple class="block w-full text-xs">
+                </div>
+                <div class="flex justify-end pt-2 gap-2">
+                    <button type="button" onclick="window.closeModal()" class="text-stone-500 text-sm">取消</button>
+                    <button type="submit" id="btn-submit" class="bg-stone-800 text-white px-4 py-2 rounded text-sm">確認新增</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="edit-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-sm w-full p-6 max-h-[90vh] overflow-y-auto">
+            <h3 class="text-lg font-bold text-stone-800 mb-4">編輯工單與日期</h3>
+            <input type="hidden" id="edit-id">
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs text-stone-500">品名</label>
+                    <input type="text" id="edit-itemName" class="w-full border p-2 rounded text-sm">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                      <div>
+                        <label class="text-xs text-stone-500">月份</label>
+                        <input type="text" id="edit-month" class="w-full border p-2 rounded text-sm">
+                      </div>
+                      <div>
+                        <label class="text-xs text-stone-500">生產階段</label>
+                        <select id="edit-status" class="w-full border p-2 rounded text-sm bg-white">
+                            <option value="Pending">Pending</option>
+                            <option value="To Make">To Make</option>
+                            <option value="Making">Making</option>
+                            <option value="QC">QC</option>
+                            <option value="Ready">Ready</option>
+                        </select>
+                      </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2 pt-2 border-t border-stone-100">
+                    <div>
+                        <label class="text-xs text-stone-500 font-bold">開始製作日</label>
+                        <input type="date" id="edit-startDate" class="w-full border p-2 rounded text-xs text-stone-600">
+                    </div>
+                    <div>
+                        <label class="text-xs text-stone-500 font-bold">完成日</label>
+                        <input type="date" id="edit-completedDate" class="w-full border p-2 rounded text-xs text-stone-600">
+                    </div>
+                </div>
+                <div class="pt-2 border-t border-stone-100">
+                    <label class="text-xs text-stone-700 font-bold block mb-2">追加照片 (Add Photos)</label>
+                    <input type="file" id="edit-addPhotos" accept="image/*" multiple class="block w-full text-xs text-stone-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-stone-100">
+                    <p class="text-[10px] text-stone-400 mt-1">上傳後將取代預設的空圖片 (如有) 並新增。</p>
+                </div>
+            </div>
+            <div class="flex justify-between mt-6">
+                <button onclick="window.handleDelete()" class="text-red-500 text-xs flex items-center gap-1"><i data-lucide="trash-2" class="w-3 h-3"></i> 刪除</button>
+                <div class="flex gap-2">
+                    <button onclick="window.closeEditModal()" class="px-3 py-1 text-sm bg-gray-100 rounded">取消</button>
+                    <button onclick="window.handleEditSubmit()" id="btn-edit-save" class="px-3 py-1 text-sm bg-stone-800 text-white rounded">儲存變更</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="detail-modal" class="fixed inset-0 bg-black bg-opacity-80 hidden z-[60] flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col md:flex-row max-h-[90vh]">
+            <div class="w-full md:w-1/2 bg-stone-100 flex items-center justify-center p-4 relative">
+                <img id="detail-img" src="" class="max-w-full max-h-[300px] md:max-h-full object-contain rounded shadow-sm">
+                <div id="detail-sold-badge" class="absolute top-4 right-4 bg-stone-900 text-white px-3 py-1 text-xs font-bold hidden shadow-lg border border-white">SOLD</div>
+            </div>
+            <div class="w-full md:w-1/2 p-6 flex flex-col">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h3 class="text-lg font-bold text-stone-800" id="detail-title">Name</h3>
+                        <p class="text-xs text-stone-500" id="detail-sku">SKU</p>
+                    </div>
+                    <button onclick="window.closeDetailModal()" class="text-stone-400 hover:text-stone-800 text-2xl">&times;</button>
+                </div>
+
+                <div class="space-y-6 flex-grow overflow-y-auto pr-2">
+                    <div>
+                        <label class="text-xs font-bold text-stone-600 uppercase tracking-wider mb-2 block">庫存地點 (可複選)</label>
+                        <div class="grid grid-cols-2 gap-2" id="detail-location-options"></div>
+                        <p class="text-[10px] text-stone-400 mt-1">* 若未選擇，將顯示為「未分配 (None)」</p>
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-stone-600 uppercase tracking-wider mb-2 block">單品備註</label>
+                        <textarea id="detail-notes" rows="3" class="w-full border border-stone-200 rounded p-2 text-sm bg-stone-50" placeholder="備註..."></textarea>
+                    </div>
+                </div>
+
+                <div class="pt-4 border-t border-stone-100 mt-4 flex justify-between items-center gap-2">
+                    <button id="btn-toggle-sold" onclick="window.confirmToggleSold()" class="bg-stone-800 hover:bg-stone-700 text-white px-4 py-2 rounded text-sm w-full font-bold">
+                        標記為已售出
+                    </button>
+                    <button onclick="window.saveItemDetails()" class="bg-stone-200 text-stone-600 px-4 py-2 rounded text-sm font-bold w-1/3 hover:bg-stone-300">
+                        儲存
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAlB24yzUmGCqsPofuoYhWBiIUj7IWjybc",
+            authDomain: "stock-planner-7ca50.firebaseapp.com",
+            projectId: "stock-planner-7ca50",
+            storageBucket: "stock-planner-7ca50.firebasestorage.app",
+            messagingSenderId: "150326512952",
+            appId: "1:150326512952:web:0396231677d9841929c5cd"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const dbFirestore = getFirestore(app);
+        const storage = getStorage(app);
+
+        let db = [];
+        let currentRole = 'admin';
+        let categoryChart = null, allocChart = null;
+        let appSettings = { makers: ['Kim', 'Kelly', 'Lijin'], locations: ['Studio', 'Online', 'Bev C', 'Pop-Up'], categories: ['Top', 'Dress', 'Pants'] };
+        let currentDetailItem = null, currentDetailPhotoIdx = -1, tempLocations = []; 
+        const catColors = ['#f472b6', '#60a5fa', '#a78bfa', '#34d399', '#fbbf24', '#9ca3af'];
+        const locColors = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#6366f1', '#14b8a6'];
+        let locationBreakdownData = {}; 
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('form-month-input').value = new Date().toLocaleString('en-US', { month: 'short', year: 'numeric' });
+            signInAnonymously(auth).catch(console.error);
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    document.getElementById('connection-status').innerText = "Connected";
+                    document.getElementById('connection-status').className = "ml-2 px-2 py-0.5 rounded text-[10px] bg-green-100 text-green-600";
+                    startListeners();
+                }
+            });
+            initCharts();
+            window.updateRole();
+        });
+
+        function startListeners() {
+            // FIXED: Modified listener to merge data safely and NOT overwrite if missing
+            onSnapshot(doc(dbFirestore, "settings", "config"), (snap) => {
+                if(snap.exists()) {
+                    const data = snap.data();
+                    // Merge remote data with local defaults (prioritizing remote)
+                    appSettings = {
+                        makers: data.makers || appSettings.makers,
+                        locations: data.locations || appSettings.locations,
+                        categories: data.categories || appSettings.categories
+                    };
+                }
+                // REMOVED: else setDoc(...) <- This was causing the reset bug!
+                
+                renderSettingsView();
+                updateDropdowns();
+            });
+
+            const q = query(collection(dbFirestore, "stock_items"), orderBy("createdAt", "desc"));
+            onSnapshot(q, (snapshot) => {
+                db = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                updateDashboard();
+                renderProductionList();
+                renderAllocationList();
+            });
+        }
+
+        // --- NORMALIZE ---
+        function normalizePhotos(item) {
+            let raw = [];
+            if (item.photos && Array.isArray(item.photos)) raw = item.photos;
+            else if (item.photo) raw = [item.photo];
+
+            if (raw.length === 0 && item.quantity > 0) {
+                 return Array(item.quantity).fill({ url: '', status: 'Available', locations: [], notes: '' }); 
+            }
+
+            return raw.map(p => {
+                if (typeof p === 'string') return { url: p, status: 'Available', locations: [], notes: '' };
+                let locs = [];
+                if (Array.isArray(p.locations)) locs = p.locations;
+                else if (p.location && p.location !== 'Studio') locs = [p.location]; 
+                
+                return {
+                    url: p.url || '',
+                    status: p.status || 'Available',
+                    locations: locs, 
+                    notes: p.notes || ''
+                };
+            });
+        }
+
+        // --- DASHBOARD & CALENDAR ---
+        function updateDashboard() {
+            const totalPieces = db.reduce((sum, item) => sum + (parseInt(item.quantity)||1), 0);
+            document.getElementById('kpi-total').textContent = totalPieces;
+
+            const making = db
+                .filter(i => i.status === 'Making')
+                .reduce((sum, item) => sum + (parseInt(item.quantity) || 1), 0);
+
+            let soldCount = 0, studioCount = 0, unallocatedCount = 0;
+            const catStats = {};
+            const locStats = { 'Unallocated': 0, 'Sold': 0 };
+            
+            locationBreakdownData = { 'Unallocated': { total: 0, items: [], catBreakdown: {} }, 'Sold': { total: 0, items: [], catBreakdown: {} } };
+            appSettings.locations.forEach(l => {
+                locStats[l] = 0;
+                locationBreakdownData[l] = { total: 0, items: [], catBreakdown: {} };
+            });
+            appSettings.categories.forEach(c => catStats[c] = 0);
+
+            db.forEach(i => {
+                const count = i.photos && i.photos.length > 0 ? i.photos.length : (parseInt(i.quantity)||1);
+                if(catStats[i.category] !== undefined) catStats[i.category] += count;
+                else catStats['Other'] = (catStats['Other'] || 0) + count;
+
+                const photos = normalizePhotos(i);
+                photos.forEach((p, idx) => {
+                    const itemName = `${i.itemName} (${i.color})`;
+                    const cat = i.category;
+                    if (p.status === 'Sold') {
+                        soldCount++; locStats['Sold']++; addToBreakdown('Sold', itemName, cat);
+                    } else {
+                        if (p.locations.length > 0) {
+                            studioCount++;
+                            p.locations.forEach(loc => {
+                                if(locStats[loc] !== undefined) locStats[loc]++;
+                                addToBreakdown(loc, itemName, cat);
+                            });
+                        } else {
+                            unallocatedCount++; locStats['Unallocated']++; addToBreakdown('Unallocated', itemName, cat);
+                        }
+                    }
+                });
+            });
+
+            document.getElementById('kpi-making').textContent = making;
+            document.getElementById('kpi-studio').textContent = studioCount;
+            document.getElementById('kpi-unallocated').textContent = unallocatedCount;
+            document.getElementById('kpi-sold').textContent = soldCount;
+
+            renderCategoryBadges(catStats);
+            renderLocationButtons(locStats);
+            updateCharts(locStats);
+            renderCalendar(); 
+        }
+
+        // --- CALENDAR LOGIC (UPDATED: Category Name + Weekly Total) ---
+        function renderCalendar() {
+            const today = new Date();
+            const currentMonthName = today.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+            const currentMonthShort = today.toLocaleString('en-US', { month: 'short' });
+            
+            document.getElementById('calendar-month-label').innerText = currentMonthName;
+            
+            const unscheduledContainer = document.getElementById('cal-unscheduled-list');
+            const timelineContainer = document.getElementById('cal-timeline');
+            unscheduledContainer.innerHTML = '';
+            timelineContainer.innerHTML = '';
+
+            const unscheduled = [];
+            const weeks = { 1: [], 2: [], 3: [], 4: [], 5: [] };
+
+            db.forEach(item => {
+                if (item.makingAt) {
+                    const d = new Date(item.makingAt.seconds * 1000);
+                    if (d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear()) {
+                        const date = d.getDate();
+                        let week = Math.ceil(date / 7); 
+                        if(week > 5) week = 5;
+                        weeks[week].push(item);
+                    }
+                } 
+                else if (item.month && (item.month.includes(currentMonthName) || item.month.includes(currentMonthShort))) {
+                    unscheduled.push(item);
+                }
+            });
+
+            if (unscheduled.length === 0) unscheduledContainer.innerHTML = '<span class="text-[10px] text-stone-300 italic">None</span>';
+            else {
+                unscheduled.forEach(i => { unscheduledContainer.innerHTML += createCalCard(i); });
+            }
+
+            [1, 2, 3, 4, 5].forEach(w => {
+                const items = weeks[w];
+                const dateStart = (w - 1) * 7 + 1;
+                const dateEnd = Math.min(w * 7, 31);
+                
+                // Calculate Total for the week
+                const weekTotal = items.reduce((sum, item) => sum + (parseInt(item.quantity) || 1), 0);
+
+                const currentDay = today.getDate();
+                const isCurrentWeek = currentDay >= dateStart && currentDay <= dateEnd;
+
+                const weekHTML = `
+                    <div class="timeline-week ${isCurrentWeek ? 'timeline-current' : ''}">
+                        <div class="timeline-dot"></div>
+                        <h5 class="text-xs font-bold text-stone-500 mb-2 uppercase flex justify-between items-center">
+                            <span>Week ${w} <span class="font-normal text-[10px] text-stone-400">(${dateStart}-${dateEnd})</span></span>
+                            ${weekTotal > 0 ? `<span class="text-[10px] bg-stone-100 text-stone-600 px-1.5 py-0.5 rounded border border-stone-200">Total: ${weekTotal}</span>` : ''}
+                        </h5>
+                        <div class="space-y-1">
+                            ${items.length > 0 ? items.map(i => createCalCard(i)).join('') : '<div class="text-[10px] text-stone-300 italic pl-1">Empty</div>'}
+                        </div>
+                    </div>
+                `;
+                timelineContainer.innerHTML += weekHTML;
+            });
+        }
+
+        function createCalCard(item) {
+            const maker = item.maker || 'Unknown';
+            let color = '#ccc';
+            if (maker.includes('Kim')) color = '#f472b6';
+            else if (maker.includes('Kelly')) color = '#60a5fa';
+            else if (maker.includes('Lijin')) color = '#34d399';
+
+            // UPDATED: Main text is Category, Item Name is smaller below
+            return `
+                <div class="cal-card cursor-pointer flex-col !items-start gap-1" onclick="window.openEditModal('${item.id}')">
+                    <div class="flex items-center justify-between w-full">
+                         <div class="flex items-center">
+                            <span class="maker-dot" style="background-color: ${color}"></span>
+                            <span class="font-bold text-stone-800 text-xs">${item.category}</span>
+                         </div>
+                         <span class="text-[10px] bg-stone-100 px-1 rounded text-stone-500 font-bold">${item.quantity}</span>
+                    </div>
+                    <div class="text-[10px] text-stone-400 truncate w-full pl-3">${item.itemName}</div>
+                </div>
+            `;
+        }
+
+        function addToBreakdown(loc, name, cat) {
+            if(!locationBreakdownData[loc]) locationBreakdownData[loc] = { total: 0, items: [], catBreakdown: {} };
+            locationBreakdownData[loc].total++;
+            locationBreakdownData[loc].items.push(name);
+            locationBreakdownData[loc].catBreakdown[cat] = (locationBreakdownData[loc].catBreakdown[cat] || 0) + 1;
+        }
+
+        function renderCategoryBadges(stats) {
+            const container = document.getElementById('category-stats-container');
+            container.innerHTML = '';
+            Object.keys(stats).forEach(c => {
+                if(stats[c] > 0) container.innerHTML += `<div class="bg-white px-3 py-1 rounded shadow-sm border border-stone-200 text-sm text-stone-600">${c}: <b class="text-stone-800">${stats[c]}</b></div>`;
+            });
+        }
+
+        function renderLocationButtons(stats) {
+            const container = document.getElementById('location-stats-container');
+            container.innerHTML = '';
+            appSettings.locations.forEach(l => {
+                if(stats[l] > 0) {
+                    container.innerHTML += `<button onclick="window.showLocationBreakdown('${l}')" class="bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded shadow-sm border border-blue-100 text-sm text-blue-800 transition-colors">${l}: <b>${stats[l]}</b></button>`;
+                }
+            });
+            if(stats['Unallocated'] > 0) {
+                container.innerHTML += `<button onclick="window.showLocationBreakdown('Unallocated')" class="bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded shadow-sm border border-gray-200 text-sm text-gray-600">Unallocated: <b>${stats['Unallocated']}</b></button>`;
+            }
+        }
+
+        window.showLocationBreakdown = function(loc) {
+            const data = locationBreakdownData[loc];
+            if(!data) return;
+            const panel = document.getElementById('location-breakdown-panel');
+            document.getElementById('breakdown-title').innerText = `${loc} (Total: ${data.total})`;
+            document.getElementById('breakdown-categories').innerText = Object.entries(data.catBreakdown).map(([k,v]) => `${k}: ${v}`).join(', ');
+            document.getElementById('breakdown-list').innerHTML = data.items.map(i => `<li class="border-b border-stone-50 pb-1 last:border-0">${i}</li>`).join('');
+            panel.classList.remove('hidden');
+        };
+
+        function initCharts() {
+            categoryChart = new Chart(document.getElementById('categoryChart'), {
+                type: 'bar',
+                data: { labels: [], datasets: [] },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+            allocChart = new Chart(document.getElementById('allocationChart'), {
+                type: 'doughnut',
+                data: { labels: [], datasets: [{ data: [], backgroundColor: [] }] },
+                options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+            });
+        }
+
+        function updateCharts(locStats) {
+            const labels = [...appSettings.locations, 'Unallocated', 'Sold'];
+            const data = [...appSettings.locations.map(l => locStats[l]), locStats['Unallocated'], locStats['Sold']];
+            const bgColors = [...appSettings.locations.map((_, i) => locColors[i % locColors.length]), '#e5e7eb', '#1c1917'];
+            allocChart.data.labels = labels;
+            allocChart.data.datasets[0].data = data;
+            allocChart.data.datasets[0].backgroundColor = bgColors;
+            allocChart.update();
+
+            const months = [...new Set(db.map(i => i.month))]; 
+            const categories = appSettings.categories;
+            const datasets = categories.map((cat, idx) => {
+                return {
+                    label: cat,
+                    data: months.map(m => {
+                        return db.filter(i => i.month === m && i.category === cat)
+                                 .reduce((sum, item) => sum + (item.photos && item.photos.length > 0 ? item.photos.length : parseInt(item.quantity)||1), 0);
+                    }),
+                    backgroundColor: catColors[idx % catColors.length]
+                }
+            });
+            categoryChart.data.labels = months;
+            categoryChart.data.datasets = datasets;
+            categoryChart.update();
+        }
+
+        // --- PRODUCTION ---
+        window.renderProductionList = function() {
+            const tbody = document.getElementById('production-table-body');
+            const makerFilter = document.getElementById('prod-filter-maker').value;
+            const catFilter = document.getElementById('prod-filter-category').value;
+            tbody.innerHTML = '';
+            
+            let data = db;
+            if (makerFilter !== 'all') data = data.filter(i => i.maker === makerFilter);
+            if (catFilter !== 'all') data = data.filter(i => i.category === catFilter);
+
+            data.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-stone-50 transition-colors border-b border-stone-50';
+                
+                const photos = normalizePhotos(item);
+                let reelHTML = `<div class="photo-reel">`;
+                if(photos.length === 0 || !photos[0].url) reelHTML += `<div class="w-8 h-10 bg-stone-100 flex items-center justify-center text-[10px] text-stone-300 rounded border">No Img</div>`;
+                else {
+                    photos.forEach(p => {
+                        reelHTML += `<img src="${p.url}" class="reel-img" onclick="window.open('${p.url}')">`;
+                    });
+                }
+                reelHTML += `</div>`;
+
+                let statusColor = 'bg-gray-100 text-gray-600';
+                if(item.status === 'Making') statusColor = 'bg-amber-100 text-amber-700';
+                if(item.status === 'QC') statusColor = 'bg-purple-100 text-purple-700';
+                if(item.status === 'Ready') statusColor = 'bg-emerald-100 text-emerald-700';
+
+                const startStr = item.makingAt ? new Date(item.makingAt.seconds*1000).toLocaleDateString() : '-';
+                const endStr = item.completedAt ? new Date(item.completedAt.seconds*1000).toLocaleDateString() : '-';
+
+                tr.innerHTML = `
+                    <td class="px-6 py-4 font-mono text-xs text-stone-500">${item.month}</td>
+                    <td class="px-6 py-4">${reelHTML}</td>
+                    <td class="px-6 py-4">
+                        <div class="font-medium text-stone-800">${item.itemName}</div>
+                        <div class="text-xs text-stone-400">${item.color||'-'} ${item.size||'-'}</div>
+                    </td>
+                    <td class="px-6 py-4">${item.quantity}</td>
+                    <td class="px-6 py-4 text-xs">${item.maker}</td>
+                    <td class="px-6 py-4"><span class="px-2 py-1 rounded-full text-xs font-bold ${statusColor}">${item.status}</span></td>
+                    <td class="px-6 py-4 text-[10px] text-stone-400">
+                        <div>S: ${startStr}</div>
+                        <div>F: ${endStr}</div>
+                    </td>
+                    <td class="px-6 py-4"><button onclick="window.openEditModal('${item.id}')" class="text-stone-400 hover:text-stone-800"><i data-lucide="pencil" class="w-4 h-4"></i></button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+            lucide.createIcons();
+        };
+
+        // --- ALLOCATION ---
+        window.renderAllocationList = function() {
+            const tbody = document.getElementById('allocation-table-body');
+            tbody.innerHTML = '';
+            
+            const relevant = db.filter(i => i.status === 'Ready' || i.status === 'In Studio' || i.status === 'Sold' || i.status === 'Partial Sold');
+
+            relevant.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-stone-50 transition-colors border-b border-stone-50';
+                
+                const photos = normalizePhotos(item);
+                let gridHTML = `<div class="photo-grid">`;
+                
+                if(photos.length === 0) gridHTML = `<span class="text-xs text-stone-400">無照片資料</span>`;
+                else {
+                    photos.forEach((p, idx) => {
+                        const isSold = p.status === 'Sold';
+                        const hasNote = p.notes && p.notes.length > 0;
+                        const hasImg = p.url && p.url.length > 0;
+                        
+                        let badgeText = '', badgeClass = '';
+                        
+                        if (isSold) {
+                            badgeText = 'SOLD'; badgeClass = 'badge-sold';
+                        } else {
+                            if (p.locations.length > 1) {
+                                badgeText = 'MULTI'; badgeClass = 'badge-multi';
+                            } else if (p.locations.length === 1) {
+                                badgeText = p.locations[0].substring(0,6).toUpperCase();
+                                badgeClass = p.locations[0] === 'Studio' ? 'badge-studio' : 'badge-multi';
+                            } else {
+                                badgeText = '未分配 (None)'; badgeClass = 'badge-none';
+                            }
+                        }
+
+                        gridHTML += `
+                            <div class="grid-item" onclick="window.openDetailModal('${item.id}', ${idx})">
+                                ${hasImg ? `<img src="${p.url}" class="grid-img ${isSold ? 'opacity-50 grayscale' : ''}">` : `<div class="grid-img bg-stone-100 flex items-center justify-center text-[8px] text-stone-400">No Img</div>`}
+                                <div class="status-badge ${badgeClass}">${badgeText}</div>
+                                ${isSold ? `<div class="sold-overlay"><i data-lucide="check" class="text-white w-5 h-5"></i></div>` : ''}
+                                ${hasNote ? `<div class="has-note-dot"></div>` : ''}
+                            </div>
+                        `;
+                    });
+                }
+                gridHTML += `</div>`;
+
+                tr.innerHTML = `
+                    <td class="px-6 py-4">${gridHTML}</td>
+                    <td class="px-6 py-4">
+                        <div class="font-bold text-stone-800">${item.itemName}</div>
+                        <div class="text-xs text-stone-500">${item.color||''} ${item.size||''}</div>
+                    </td>
+                    <td class="px-6 py-4 text-xs text-stone-500">${item.category}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+            lucide.createIcons();
+        };
+
+        // --- DETAILS ---
+        window.openDetailModal = function(id, idx) {
+            currentDetailItem = db.find(i => i.id === id);
+            currentDetailPhotoIdx = idx;
+            const p = normalizePhotos(currentDetailItem)[idx];
+            
+            const imgEl = document.getElementById('detail-img');
+            if(p.url) {
+                 imgEl.src = p.url;
+                 imgEl.classList.remove('hidden');
+            } else {
+                 imgEl.classList.add('hidden');
+            }
+
+            document.getElementById('detail-title').innerText = currentDetailItem.itemName;
+            document.getElementById('detail-sku').innerText = `${currentDetailItem.category} / ${currentDetailItem.color}`;
+            document.getElementById('detail-notes').value = p.notes;
+            
+            tempLocations = [...p.locations]; 
+
+            const btnSold = document.getElementById('btn-toggle-sold');
+            const badgeSold = document.getElementById('detail-sold-badge');
+            if(p.status === 'Sold') {
+                btnSold.innerText = "取消售出 (Back to Stock)";
+                btnSold.className = "bg-red-50 text-red-600 hover:bg-red-100 px-4 py-2 rounded text-sm w-full font-bold border border-red-200";
+                badgeSold.classList.remove('hidden');
+            } else {
+                btnSold.innerText = "標記為已售出 (SOLD)";
+                btnSold.className = "bg-stone-800 text-white hover:bg-stone-700 px-4 py-2 rounded text-sm w-full font-bold";
+                badgeSold.classList.add('hidden');
+            }
+
+            renderDetailLocationButtons();
+            document.getElementById('detail-modal').classList.remove('hidden');
+        };
+
+        function renderDetailLocationButtons() {
+            const container = document.getElementById('detail-location-options');
+            container.innerHTML = '';
+            
+            const p = normalizePhotos(currentDetailItem)[currentDetailPhotoIdx];
+            if(p.status === 'Sold') {
+                 container.innerHTML = `<div class="col-span-2 text-center text-stone-400 text-xs py-2 bg-stone-50 rounded">已售出商品無法編輯地點</div>`;
+                 return;
+            }
+
+            appSettings.locations.forEach(loc => {
+                const isSelected = tempLocations.includes(loc);
+                const btnClass = isSelected ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-stone-500 border-stone-200 hover:border-blue-300';
+                
+                container.innerHTML += `
+                    <button onclick="window.toggleDetailLocation('${loc}')" class="border rounded py-2 text-xs font-bold transition-colors ${btnClass}">
+                        ${loc} ${isSelected ? '✓' : ''}
+                    </button>
+                `;
+            });
+        }
+
+        window.toggleDetailLocation = function(loc) {
+            if(tempLocations.includes(loc)) {
+                tempLocations = tempLocations.filter(l => l !== loc);
+            } else {
+                tempLocations.push(loc);
+            }
+            renderDetailLocationButtons();
+        };
+
+        window.saveItemDetails = async function() {
+            if(!currentDetailItem) return;
+            let photos = normalizePhotos(currentDetailItem);
+            
+            photos[currentDetailPhotoIdx].notes = document.getElementById('detail-notes').value;
+            photos[currentDetailPhotoIdx].locations = tempLocations;
+
+            try {
+                await updateDoc(doc(dbFirestore, "stock_items", currentDetailItem.id), { photos: photos });
+                window.closeDetailModal();
+            } catch(e) { alert("Save failed"); }
+        };
+
+        window.confirmToggleSold = async function() {
+            let photos = normalizePhotos(currentDetailItem);
+            const currentStatus = photos[currentDetailPhotoIdx].status;
+            const newStatus = currentStatus === 'Sold' ? 'Available' : 'Sold';
+            
+            if(confirm(newStatus === 'Sold' ? "確認售出？" : "確認取消售出？")) {
+                photos[currentDetailPhotoIdx].status = newStatus;
+                if(newStatus === 'Sold') photos[currentDetailPhotoIdx].soldAt = new Date(); 
+
+                const allSold = photos.every(p => p.status === 'Sold');
+                const anySold = photos.some(p => p.status === 'Sold');
+                let globalStatus = allSold ? 'Sold' : (anySold ? 'Partial Sold' : 'Ready');
+
+                await updateDoc(doc(dbFirestore, "stock_items", currentDetailItem.id), { photos: photos, status: globalStatus });
+                window.closeDetailModal();
+            }
+        };
+        
+        window.closeDetailModal = () => document.getElementById('detail-modal').classList.add('hidden');
+
+        // --- ADD ITEM ---
+        window.handleAddItem = async function(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btn-submit');
+            btn.innerText = '處理中...'; btn.disabled = true;
+            const form = new FormData(e.target);
+            const fileInput = document.querySelector('input[name="initialPhotos"]');
+            let photoObjs = [];
+            
+            if(fileInput.files.length > 0) {
+                for(let i=0; i<fileInput.files.length; i++) {
+                    const file = fileInput.files[i];
+                    const sRef = ref(storage, 'photos/'+Date.now()+'_'+file.name);
+                    const snap = await uploadBytes(sRef, file);
+                    const url = await getDownloadURL(snap.ref);
+                    photoObjs.push({ url: url, status: 'Available', locations: [], notes: '' });
+                }
+            }
+            await addDoc(collection(dbFirestore, "stock_items"), {
+                month: form.get('month'), itemName: form.get('itemName'),
+                category: form.get('category'), maker: form.get('maker'),
+                color: form.get('color'), size: form.get('size'),
+                quantity: parseInt(form.get('quantity')) || 1,
+                status: 'To Make', photos: photoObjs,
+                createdAt: serverTimestamp()
+            });
+            window.closeModal();
+            e.target.reset();
+            btn.innerText = '確認新增'; btn.disabled = false;
+        };
+
+        // --- EDIT MODAL ---
+        window.openEditModal = (id) => { 
+            const item = db.find(i=>i.id===id);
+            document.getElementById('edit-id').value=id; 
+            document.getElementById('edit-itemName').value=item.itemName;
+            document.getElementById('edit-month').value=item.month;
+            document.getElementById('edit-status').value=item.status;
+            document.getElementById('edit-addPhotos').value = '';
+
+            document.getElementById('edit-startDate').value = item.makingAt ? new Date(item.makingAt.seconds*1000).toISOString().split('T')[0] : '';
+            document.getElementById('edit-completedDate').value = item.completedAt ? new Date(item.completedAt.seconds*1000).toISOString().split('T')[0] : '';
+
+            document.getElementById('edit-modal').classList.remove('hidden'); 
+        };
+        window.closeEditModal = () => document.getElementById('edit-modal').classList.add('hidden');
+        
+        window.handleEditSubmit = async () => {
+            const id = document.getElementById('edit-id').value;
+            const btn = document.getElementById('btn-edit-save');
+            btn.innerText = 'Saving...'; btn.disabled = true;
+
+            const sDateVal = document.getElementById('edit-startDate').value;
+            const cDateVal = document.getElementById('edit-completedDate').value;
+            
+            let data = { 
+                status: document.getElementById('edit-status').value,
+                itemName: document.getElementById('edit-itemName').value,
+                month: document.getElementById('edit-month').value
+            };
+            if(sDateVal) data.makingAt = new Date(sDateVal);
+            if(cDateVal) data.completedAt = new Date(cDateVal);
+
+            const photoInput = document.getElementById('edit-addPhotos');
+            if(photoInput.files.length > 0) {
+                 const item = db.find(i=>i.id===id);
+                 let existingPhotos = item.photos || [];
+                 
+                 for(let i=0; i<photoInput.files.length; i++) {
+                    const file = photoInput.files[i];
+                    const sRef = ref(storage, 'photos/'+Date.now()+'_added_'+file.name);
+                    const snap = await uploadBytes(sRef, file);
+                    const url = await getDownloadURL(snap.ref);
+                    existingPhotos.push({ url: url, status: 'Available', locations: [], notes: '' });
+                 }
+                 data.photos = existingPhotos;
+            }
+
+            await updateDoc(doc(dbFirestore, "stock_items", id), data);
+            window.closeEditModal();
+            btn.innerText = '儲存變更'; btn.disabled = false;
+        };
+
+        window.handleDelete = async () => {
+             if(confirm('確定刪除此工單？(無法復原)')) { await deleteDoc(doc(dbFirestore, "stock_items", document.getElementById('edit-id').value)); window.closeEditModal(); }
+        };
+
+        // --- UTILS ---
+        window.renderSettingsView = function() {
+            const render = (type) => (appSettings[type]||[]).map(i => `<span class="bg-stone-100 px-2 py-1 rounded text-xs mr-1 mb-1 inline-block border cursor-pointer hover:bg-red-50 hover:text-red-500" onclick="window.removeSetting('${type}','${i}')">${i} &times;</span>`).join('');
+            document.getElementById('settings-makers-list').innerHTML = render('makers');
+            document.getElementById('settings-locations-list').innerHTML = render('locations');
+            document.getElementById('settings-categories-list').innerHTML = render('categories');
+        };
+        window.addSetting = async function(type) {
+             const map = {'makers':'new-maker-input', 'locations':'new-location-input', 'categories':'new-category-input'};
+             const val = document.getElementById(map[type]).value.trim();
+             if(val) {
+                 await updateDoc(doc(dbFirestore, "settings", "config"), { [type]: [...appSettings[type], val] });
+                 document.getElementById(map[type]).value = '';
+             }
+        };
+        window.removeSetting = async function(type, val) {
+            if(confirm(`Remove ${val}?`)) await updateDoc(doc(dbFirestore, "settings", "config"), { [type]: appSettings[type].filter(x => x !== val) });
+        }
+        window.updateDropdowns = function() {
+            const fill = (cls, list) => document.querySelectorAll(cls).forEach(s => {
+                const old = s.value;
+                s.innerHTML = (s.id.includes('filter')?'<option value="all">全部</option>':'') + list.map(i=>`<option value="${i}">${i}</option>`).join('');
+                if(list.includes(old)) s.value = old;
+            });
+            fill('.dynamic-maker-select', appSettings.makers);
+            fill('.dynamic-category-select', appSettings.categories);
+        };
+        window.switchView = (v) => {
+            document.querySelectorAll('section[id^="view-"]').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`view-${v}`).classList.remove('hidden');
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('nav-active'));
+            document.getElementById(`nav-${v}`)?.classList.add('nav-active');
+        };
+        window.updateRole = () => {
+            currentRole = document.getElementById('role-select').value;
+            const isAdmin = currentRole === 'admin';
+            document.getElementById('nav-settings').classList.toggle('hidden', !isAdmin);
+            window.switchView(currentRole.startsWith('maker') ? 'production' : 'dashboard');
+        };
+        window.openModal = () => document.getElementById('add-modal').classList.remove('hidden');
+        window.closeModal = () => document.getElementById('add-modal').classList.add('hidden');
+
+    </script>
+</body>
+</html>
