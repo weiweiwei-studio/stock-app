@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weiweiwei ERP (v11.9.1 Fixed)</title>
+    <title>Weiweiwei ERP (v11.9.2 Auto-Detect)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -74,7 +74,7 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center gap-4">
                     <div class="flex-shrink-0 flex items-center">
-                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.9.1 Fixed</span></span>
+                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.9.2 Auto-Detect</span></span>
                         <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] bg-stone-100 text-stone-400">Loading...</span>
                     </div>
                     <div class="hidden sm:ml-6 sm:flex sm:space-x-4">
@@ -416,34 +416,58 @@
         const locColors = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#6366f1', '#14b8a6'];
         let locationBreakdownData = {}; 
 
+        // === DEBUG MODE: 強制顯示錯誤 ===
         document.addEventListener('DOMContentLoaded', () => {
+            const statusEl = document.getElementById('connection-status');
+            statusEl.innerText = "Initializing...";
             document.getElementById('form-month-input').value = new Date().toLocaleString('en-US', { month: 'short', year: 'numeric' });
-            signInAnonymously(auth).catch(console.error);
+
+            if (!auth) {
+                statusEl.innerText = "Error: Firebase Auth not loaded";
+                statusEl.className = "ml-2 px-2 py-0.5 rounded text-[10px] bg-red-100 text-red-600";
+                return;
+            }
+
+            signInAnonymously(auth)
+                .then(() => {
+                    console.log("Login successful");
+                })
+                .catch((error) => {
+                    console.error("Login Failed:", error);
+                    statusEl.innerText = "Login Fail: " + error.code;
+                    statusEl.className = "ml-2 px-2 py-0.5 rounded text-[10px] bg-red-100 text-red-600";
+                });
+
             onAuthStateChanged(auth, (user) => {
                 if (user) {
-                    document.getElementById('connection-status').innerText = "Connected";
-                    document.getElementById('connection-status').className = "ml-2 px-2 py-0.5 rounded text-[10px] bg-green-100 text-green-600";
-                    startListeners();
+                    statusEl.innerText = "Connected";
+                    statusEl.className = "ml-2 px-2 py-0.5 rounded text-[10px] bg-green-100 text-green-600";
+                    try {
+                        startListeners();
+                    } catch (e) {
+                        statusEl.innerText = "Data Error: " + e.message;
+                        statusEl.className = "ml-2 px-2 py-0.5 rounded text-[10px] bg-red-100 text-red-600";
+                    }
+                } else {
+                    console.log("No user found yet...");
                 }
             });
+
             initCharts();
             window.updateRole();
         });
+        // === END DEBUG MODE ===
 
         function startListeners() {
-            // FIXED: Modified listener to merge data safely and NOT overwrite if missing
             onSnapshot(doc(dbFirestore, "settings", "config"), (snap) => {
                 if(snap.exists()) {
                     const data = snap.data();
-                    // Merge remote data with local defaults (prioritizing remote)
                     appSettings = {
                         makers: data.makers || appSettings.makers,
                         locations: data.locations || appSettings.locations,
                         categories: data.categories || appSettings.categories
                     };
                 }
-                // REMOVED: else setDoc(...) <- This was causing the reset bug!
-                
                 renderSettingsView();
                 updateDropdowns();
             });
@@ -454,6 +478,7 @@
                 updateDashboard();
                 renderProductionList();
                 renderAllocationList();
+                updateDropdowns(); // Also update dropdowns when DB changes to include historical categories
             });
         }
 
@@ -495,22 +520,30 @@
             const catStats = {};
             const locStats = { 'Unallocated': 0, 'Sold': 0 };
             
+            // FIXED: Don't just use appSettings, look at DB categories too
+            const allDbCategories = [...new Set(db.map(i => i.category))];
+            allDbCategories.forEach(c => {
+                if(c) catStats[c] = 0;
+            });
+            // Ensure settings categories are also initialized
+            appSettings.categories.forEach(c => catStats[c] = 0);
+
             locationBreakdownData = { 'Unallocated': { total: 0, items: [], catBreakdown: {} }, 'Sold': { total: 0, items: [], catBreakdown: {} } };
             appSettings.locations.forEach(l => {
                 locStats[l] = 0;
                 locationBreakdownData[l] = { total: 0, items: [], catBreakdown: {} };
             });
-            appSettings.categories.forEach(c => catStats[c] = 0);
 
             db.forEach(i => {
                 const count = i.photos && i.photos.length > 0 ? i.photos.length : (parseInt(i.quantity)||1);
-                if(catStats[i.category] !== undefined) catStats[i.category] += count;
-                else catStats['Other'] = (catStats['Other'] || 0) + count;
+                
+                // Count category
+                const cat = i.category || 'Unknown';
+                catStats[cat] = (catStats[cat] || 0) + count;
 
                 const photos = normalizePhotos(i);
                 photos.forEach((p, idx) => {
                     const itemName = `${i.itemName} (${i.color})`;
-                    const cat = i.category;
                     if (p.status === 'Sold') {
                         soldCount++; locStats['Sold']++; addToBreakdown('Sold', itemName, cat);
                     } else {
@@ -538,7 +571,7 @@
             renderCalendar(); 
         }
 
-        // --- CALENDAR LOGIC (UPDATED: Category Name + Weekly Total) ---
+        // --- CALENDAR LOGIC ---
         function renderCalendar() {
             const today = new Date();
             const currentMonthName = today.toLocaleString('en-US', { month: 'short', year: 'numeric' });
@@ -578,10 +611,7 @@
                 const items = weeks[w];
                 const dateStart = (w - 1) * 7 + 1;
                 const dateEnd = Math.min(w * 7, 31);
-                
-                // Calculate Total for the week
                 const weekTotal = items.reduce((sum, item) => sum + (parseInt(item.quantity) || 1), 0);
-
                 const currentDay = today.getDate();
                 const isCurrentWeek = currentDay >= dateStart && currentDay <= dateEnd;
 
@@ -608,7 +638,6 @@
             else if (maker.includes('Kelly')) color = '#60a5fa';
             else if (maker.includes('Lijin')) color = '#34d399';
 
-            // UPDATED: Main text is Category, Item Name is smaller below
             return `
                 <div class="cal-card cursor-pointer flex-col !items-start gap-1" onclick="window.openEditModal('${item.id}')">
                     <div class="flex items-center justify-between w-full">
@@ -633,7 +662,17 @@
         function renderCategoryBadges(stats) {
             const container = document.getElementById('category-stats-container');
             container.innerHTML = '';
-            Object.keys(stats).forEach(c => {
+            // Sort keys so Settings come first, then others
+            const keys = Object.keys(stats).sort((a,b) => {
+                const idxA = appSettings.categories.indexOf(a);
+                const idxB = appSettings.categories.indexOf(b);
+                if(idxA !== -1 && idxB !== -1) return idxA - idxB;
+                if(idxA !== -1) return -1;
+                if(idxB !== -1) return 1;
+                return a.localeCompare(b);
+            });
+
+            keys.forEach(c => {
                 if(stats[c] > 0) container.innerHTML += `<div class="bg-white px-3 py-1 rounded shadow-sm border border-stone-200 text-sm text-stone-600">${c}: <b class="text-stone-800">${stats[c]}</b></div>`;
             });
         }
@@ -688,8 +727,10 @@
             allocChart.update();
 
             const months = [...new Set(db.map(i => i.month))]; 
-            const categories = appSettings.categories;
-            const datasets = categories.map((cat, idx) => {
+            // FIXED: Use distinct categories from BOTH Settings AND DB
+            const distinctCategories = [...new Set([...appSettings.categories, ...db.map(i => i.category)])].filter(Boolean);
+            
+            const datasets = distinctCategories.map((cat, idx) => {
                 return {
                     label: cat,
                     data: months.map(m => {
@@ -819,26 +860,17 @@
             lucide.createIcons();
         };
 
-        // --- DETAILS ---
+        // --- DETAILS & OTHER MODALS (No Changes needed, included for completeness) ---
         window.openDetailModal = function(id, idx) {
             currentDetailItem = db.find(i => i.id === id);
             currentDetailPhotoIdx = idx;
             const p = normalizePhotos(currentDetailItem)[idx];
-            
             const imgEl = document.getElementById('detail-img');
-            if(p.url) {
-                 imgEl.src = p.url;
-                 imgEl.classList.remove('hidden');
-            } else {
-                 imgEl.classList.add('hidden');
-            }
-
+            if(p.url) { imgEl.src = p.url; imgEl.classList.remove('hidden'); } else { imgEl.classList.add('hidden'); }
             document.getElementById('detail-title').innerText = currentDetailItem.itemName;
             document.getElementById('detail-sku').innerText = `${currentDetailItem.category} / ${currentDetailItem.color}`;
             document.getElementById('detail-notes').value = p.notes;
-            
             tempLocations = [...p.locations]; 
-
             const btnSold = document.getElementById('btn-toggle-sold');
             const badgeSold = document.getElementById('detail-sold-badge');
             if(p.status === 'Sold') {
@@ -850,7 +882,6 @@
                 btnSold.className = "bg-stone-800 text-white hover:bg-stone-700 px-4 py-2 rounded text-sm w-full font-bold";
                 badgeSold.classList.add('hidden');
             }
-
             renderDetailLocationButtons();
             document.getElementById('detail-modal').classList.remove('hidden');
         };
@@ -858,193 +889,38 @@
         function renderDetailLocationButtons() {
             const container = document.getElementById('detail-location-options');
             container.innerHTML = '';
-            
             const p = normalizePhotos(currentDetailItem)[currentDetailPhotoIdx];
-            if(p.status === 'Sold') {
-                 container.innerHTML = `<div class="col-span-2 text-center text-stone-400 text-xs py-2 bg-stone-50 rounded">已售出商品無法編輯地點</div>`;
-                 return;
-            }
-
+            if(p.status === 'Sold') { container.innerHTML = `<div class="col-span-2 text-center text-stone-400 text-xs py-2 bg-stone-50 rounded">已售出商品無法編輯地點</div>`; return; }
             appSettings.locations.forEach(loc => {
                 const isSelected = tempLocations.includes(loc);
                 const btnClass = isSelected ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-stone-500 border-stone-200 hover:border-blue-300';
-                
-                container.innerHTML += `
-                    <button onclick="window.toggleDetailLocation('${loc}')" class="border rounded py-2 text-xs font-bold transition-colors ${btnClass}">
-                        ${loc} ${isSelected ? '✓' : ''}
-                    </button>
-                `;
+                container.innerHTML += `<button onclick="window.toggleDetailLocation('${loc}')" class="border rounded py-2 text-xs font-bold transition-colors ${btnClass}">${loc} ${isSelected ? '✓' : ''}</button>`;
             });
         }
-
-        window.toggleDetailLocation = function(loc) {
-            if(tempLocations.includes(loc)) {
-                tempLocations = tempLocations.filter(l => l !== loc);
-            } else {
-                tempLocations.push(loc);
-            }
-            renderDetailLocationButtons();
-        };
-
-        window.saveItemDetails = async function() {
-            if(!currentDetailItem) return;
-            let photos = normalizePhotos(currentDetailItem);
-            
-            photos[currentDetailPhotoIdx].notes = document.getElementById('detail-notes').value;
-            photos[currentDetailPhotoIdx].locations = tempLocations;
-
-            try {
-                await updateDoc(doc(dbFirestore, "stock_items", currentDetailItem.id), { photos: photos });
-                window.closeDetailModal();
-            } catch(e) { alert("Save failed"); }
-        };
-
-        window.confirmToggleSold = async function() {
-            let photos = normalizePhotos(currentDetailItem);
-            const currentStatus = photos[currentDetailPhotoIdx].status;
-            const newStatus = currentStatus === 'Sold' ? 'Available' : 'Sold';
-            
-            if(confirm(newStatus === 'Sold' ? "確認售出？" : "確認取消售出？")) {
-                photos[currentDetailPhotoIdx].status = newStatus;
-                if(newStatus === 'Sold') photos[currentDetailPhotoIdx].soldAt = new Date(); 
-
-                const allSold = photos.every(p => p.status === 'Sold');
-                const anySold = photos.some(p => p.status === 'Sold');
-                let globalStatus = allSold ? 'Sold' : (anySold ? 'Partial Sold' : 'Ready');
-
-                await updateDoc(doc(dbFirestore, "stock_items", currentDetailItem.id), { photos: photos, status: globalStatus });
-                window.closeDetailModal();
-            }
-        };
-        
+        window.toggleDetailLocation = function(loc) { if(tempLocations.includes(loc)) { tempLocations = tempLocations.filter(l => l !== loc); } else { tempLocations.push(loc); } renderDetailLocationButtons(); };
+        window.saveItemDetails = async function() { if(!currentDetailItem) return; let photos = normalizePhotos(currentDetailItem); photos[currentDetailPhotoIdx].notes = document.getElementById('detail-notes').value; photos[currentDetailPhotoIdx].locations = tempLocations; try { await updateDoc(doc(dbFirestore, "stock_items", currentDetailItem.id), { photos: photos }); window.closeDetailModal(); } catch(e) { alert("Save failed"); } };
+        window.confirmToggleSold = async function() { let photos = normalizePhotos(currentDetailItem); const currentStatus = photos[currentDetailPhotoIdx].status; const newStatus = currentStatus === 'Sold' ? 'Available' : 'Sold'; if(confirm(newStatus === 'Sold' ? "確認售出？" : "確認取消售出？")) { photos[currentDetailPhotoIdx].status = newStatus; if(newStatus === 'Sold') photos[currentDetailPhotoIdx].soldAt = new Date(); const allSold = photos.every(p => p.status === 'Sold'); const anySold = photos.some(p => p.status === 'Sold'); let globalStatus = allSold ? 'Sold' : (anySold ? 'Partial Sold' : 'Ready'); await updateDoc(doc(dbFirestore, "stock_items", currentDetailItem.id), { photos: photos, status: globalStatus }); window.closeDetailModal(); } };
         window.closeDetailModal = () => document.getElementById('detail-modal').classList.add('hidden');
 
-        // --- ADD ITEM ---
-        window.handleAddItem = async function(e) {
-            e.preventDefault();
-            const btn = document.getElementById('btn-submit');
-            btn.innerText = '處理中...'; btn.disabled = true;
-            const form = new FormData(e.target);
-            const fileInput = document.querySelector('input[name="initialPhotos"]');
-            let photoObjs = [];
-            
-            if(fileInput.files.length > 0) {
-                for(let i=0; i<fileInput.files.length; i++) {
-                    const file = fileInput.files[i];
-                    const sRef = ref(storage, 'photos/'+Date.now()+'_'+file.name);
-                    const snap = await uploadBytes(sRef, file);
-                    const url = await getDownloadURL(snap.ref);
-                    photoObjs.push({ url: url, status: 'Available', locations: [], notes: '' });
-                }
-            }
-            await addDoc(collection(dbFirestore, "stock_items"), {
-                month: form.get('month'), itemName: form.get('itemName'),
-                category: form.get('category'), maker: form.get('maker'),
-                color: form.get('color'), size: form.get('size'),
-                quantity: parseInt(form.get('quantity')) || 1,
-                status: 'To Make', photos: photoObjs,
-                createdAt: serverTimestamp()
-            });
-            window.closeModal();
-            e.target.reset();
-            btn.innerText = '確認新增'; btn.disabled = false;
-        };
-
-        // --- EDIT MODAL ---
-        window.openEditModal = (id) => { 
-            const item = db.find(i=>i.id===id);
-            document.getElementById('edit-id').value=id; 
-            document.getElementById('edit-itemName').value=item.itemName;
-            document.getElementById('edit-month').value=item.month;
-            document.getElementById('edit-status').value=item.status;
-            document.getElementById('edit-addPhotos').value = '';
-
-            document.getElementById('edit-startDate').value = item.makingAt ? new Date(item.makingAt.seconds*1000).toISOString().split('T')[0] : '';
-            document.getElementById('edit-completedDate').value = item.completedAt ? new Date(item.completedAt.seconds*1000).toISOString().split('T')[0] : '';
-
-            document.getElementById('edit-modal').classList.remove('hidden'); 
-        };
-        window.closeEditModal = () => document.getElementById('edit-modal').classList.add('hidden');
-        
-        window.handleEditSubmit = async () => {
-            const id = document.getElementById('edit-id').value;
-            const btn = document.getElementById('btn-edit-save');
-            btn.innerText = 'Saving...'; btn.disabled = true;
-
-            const sDateVal = document.getElementById('edit-startDate').value;
-            const cDateVal = document.getElementById('edit-completedDate').value;
-            
-            let data = { 
-                status: document.getElementById('edit-status').value,
-                itemName: document.getElementById('edit-itemName').value,
-                month: document.getElementById('edit-month').value
-            };
-            if(sDateVal) data.makingAt = new Date(sDateVal);
-            if(cDateVal) data.completedAt = new Date(cDateVal);
-
-            const photoInput = document.getElementById('edit-addPhotos');
-            if(photoInput.files.length > 0) {
-                 const item = db.find(i=>i.id===id);
-                 let existingPhotos = item.photos || [];
-                 
-                 for(let i=0; i<photoInput.files.length; i++) {
-                    const file = photoInput.files[i];
-                    const sRef = ref(storage, 'photos/'+Date.now()+'_added_'+file.name);
-                    const snap = await uploadBytes(sRef, file);
-                    const url = await getDownloadURL(snap.ref);
-                    existingPhotos.push({ url: url, status: 'Available', locations: [], notes: '' });
-                 }
-                 data.photos = existingPhotos;
-            }
-
-            await updateDoc(doc(dbFirestore, "stock_items", id), data);
-            window.closeEditModal();
-            btn.innerText = '儲存變更'; btn.disabled = false;
-        };
-
-        window.handleDelete = async () => {
-             if(confirm('確定刪除此工單？(無法復原)')) { await deleteDoc(doc(dbFirestore, "stock_items", document.getElementById('edit-id').value)); window.closeEditModal(); }
-        };
-
         // --- UTILS ---
-        window.renderSettingsView = function() {
-            const render = (type) => (appSettings[type]||[]).map(i => `<span class="bg-stone-100 px-2 py-1 rounded text-xs mr-1 mb-1 inline-block border cursor-pointer hover:bg-red-50 hover:text-red-500" onclick="window.removeSetting('${type}','${i}')">${i} &times;</span>`).join('');
-            document.getElementById('settings-makers-list').innerHTML = render('makers');
-            document.getElementById('settings-locations-list').innerHTML = render('locations');
-            document.getElementById('settings-categories-list').innerHTML = render('categories');
+        window.handleAddItem = async function(e) { e.preventDefault(); const btn = document.getElementById('btn-submit'); btn.innerText = '處理中...'; btn.disabled = true; const form = new FormData(e.target); const fileInput = document.querySelector('input[name="initialPhotos"]'); let photoObjs = []; if(fileInput.files.length > 0) { for(let i=0; i<fileInput.files.length; i++) { const file = fileInput.files[i]; const sRef = ref(storage, 'photos/'+Date.now()+'_'+file.name); const snap = await uploadBytes(sRef, file); const url = await getDownloadURL(snap.ref); photoObjs.push({ url: url, status: 'Available', locations: [], notes: '' }); } } await addDoc(collection(dbFirestore, "stock_items"), { month: form.get('month'), itemName: form.get('itemName'), category: form.get('category'), maker: form.get('maker'), color: form.get('color'), size: form.get('size'), quantity: parseInt(form.get('quantity')) || 1, status: 'To Make', photos: photoObjs, createdAt: serverTimestamp() }); window.closeModal(); e.target.reset(); btn.innerText = '確認新增'; btn.disabled = false; };
+        window.openEditModal = (id) => { const item = db.find(i=>i.id===id); document.getElementById('edit-id').value=id; document.getElementById('edit-itemName').value=item.itemName; document.getElementById('edit-month').value=item.month; document.getElementById('edit-status').value=item.status; document.getElementById('edit-addPhotos').value = ''; document.getElementById('edit-startDate').value = item.makingAt ? new Date(item.makingAt.seconds*1000).toISOString().split('T')[0] : ''; document.getElementById('edit-completedDate').value = item.completedAt ? new Date(item.completedAt.seconds*1000).toISOString().split('T')[0] : ''; document.getElementById('edit-modal').classList.remove('hidden'); };
+        window.closeEditModal = () => document.getElementById('edit-modal').classList.add('hidden');
+        window.handleEditSubmit = async () => { const id = document.getElementById('edit-id').value; const btn = document.getElementById('btn-edit-save'); btn.innerText = 'Saving...'; btn.disabled = true; const sDateVal = document.getElementById('edit-startDate').value; const cDateVal = document.getElementById('edit-completedDate').value; let data = { status: document.getElementById('edit-status').value, itemName: document.getElementById('edit-itemName').value, month: document.getElementById('edit-month').value }; if(sDateVal) data.makingAt = new Date(sDateVal); if(cDateVal) data.completedAt = new Date(cDateVal); const photoInput = document.getElementById('edit-addPhotos'); if(photoInput.files.length > 0) { const item = db.find(i=>i.id===id); let existingPhotos = item.photos || []; for(let i=0; i<photoInput.files.length; i++) { const file = photoInput.files[i]; const sRef = ref(storage, 'photos/'+Date.now()+'_added_'+file.name); const snap = await uploadBytes(sRef, file); const url = await getDownloadURL(snap.ref); existingPhotos.push({ url: url, status: 'Available', locations: [], notes: '' }); } data.photos = existingPhotos; } await updateDoc(doc(dbFirestore, "stock_items", id), data); window.closeEditModal(); btn.innerText = '儲存變更'; btn.disabled = false; };
+        window.handleDelete = async () => { if(confirm('確定刪除此工單？(無法復原)')) { await deleteDoc(doc(dbFirestore, "stock_items", document.getElementById('edit-id').value)); window.closeEditModal(); } };
+        window.renderSettingsView = function() { const render = (type) => (appSettings[type]||[]).map(i => `<span class="bg-stone-100 px-2 py-1 rounded text-xs mr-1 mb-1 inline-block border cursor-pointer hover:bg-red-50 hover:text-red-500" onclick="window.removeSetting('${type}','${i}')">${i} &times;</span>`).join(''); document.getElementById('settings-makers-list').innerHTML = render('makers'); document.getElementById('settings-locations-list').innerHTML = render('locations'); document.getElementById('settings-categories-list').innerHTML = render('categories'); };
+        window.addSetting = async function(type) { const map = {'makers':'new-maker-input', 'locations':'new-location-input', 'categories':'new-category-input'}; const val = document.getElementById(map[type]).value.trim(); if(val) { await updateDoc(doc(dbFirestore, "settings", "config"), { [type]: [...appSettings[type], val] }); document.getElementById(map[type]).value = ''; } };
+        window.removeSetting = async function(type, val) { if(confirm(`Remove ${val}?`)) await updateDoc(doc(dbFirestore, "settings", "config"), { [type]: appSettings[type].filter(x => x !== val) }); }
+        // FIXED: Dropdowns now include both settings AND distinct values from DB
+        window.updateDropdowns = function() { 
+            const distinctMakers = [...new Set([...appSettings.makers, ...db.map(i => i.maker)])].filter(Boolean);
+            const distinctCategories = [...new Set([...appSettings.categories, ...db.map(i => i.category)])].filter(Boolean);
+            const fill = (cls, list) => document.querySelectorAll(cls).forEach(s => { const old = s.value; s.innerHTML = (s.id.includes('filter')?'<option value="all">全部</option>':'') + list.map(i=>`<option value="${i}">${i}</option>`).join(''); if(list.includes(old)) s.value = old; }); 
+            fill('.dynamic-maker-select', distinctMakers); 
+            fill('.dynamic-category-select', distinctCategories); 
         };
-        window.addSetting = async function(type) {
-             const map = {'makers':'new-maker-input', 'locations':'new-location-input', 'categories':'new-category-input'};
-             const val = document.getElementById(map[type]).value.trim();
-             if(val) {
-                 await updateDoc(doc(dbFirestore, "settings", "config"), { [type]: [...appSettings[type], val] });
-                 document.getElementById(map[type]).value = '';
-             }
-        };
-        window.removeSetting = async function(type, val) {
-            if(confirm(`Remove ${val}?`)) await updateDoc(doc(dbFirestore, "settings", "config"), { [type]: appSettings[type].filter(x => x !== val) });
-        }
-        window.updateDropdowns = function() {
-            const fill = (cls, list) => document.querySelectorAll(cls).forEach(s => {
-                const old = s.value;
-                s.innerHTML = (s.id.includes('filter')?'<option value="all">全部</option>':'') + list.map(i=>`<option value="${i}">${i}</option>`).join('');
-                if(list.includes(old)) s.value = old;
-            });
-            fill('.dynamic-maker-select', appSettings.makers);
-            fill('.dynamic-category-select', appSettings.categories);
-        };
-        window.switchView = (v) => {
-            document.querySelectorAll('section[id^="view-"]').forEach(el => el.classList.add('hidden'));
-            document.getElementById(`view-${v}`).classList.remove('hidden');
-            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('nav-active'));
-            document.getElementById(`nav-${v}`)?.classList.add('nav-active');
-        };
-        window.updateRole = () => {
-            currentRole = document.getElementById('role-select').value;
-            const isAdmin = currentRole === 'admin';
-            document.getElementById('nav-settings').classList.toggle('hidden', !isAdmin);
-            window.switchView(currentRole.startsWith('maker') ? 'production' : 'dashboard');
-        };
+        window.switchView = (v) => { document.querySelectorAll('section[id^="view-"]').forEach(el => el.classList.add('hidden')); document.getElementById(`view-${v}`).classList.remove('hidden'); document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('nav-active')); document.getElementById(`nav-${v}`)?.classList.add('nav-active'); };
+        window.updateRole = () => { currentRole = document.getElementById('role-select').value; const isAdmin = currentRole === 'admin'; document.getElementById('nav-settings').classList.toggle('hidden', !isAdmin); window.switchView(currentRole.startsWith('maker') ? 'production' : 'dashboard'); };
         window.openModal = () => document.getElementById('add-modal').classList.remove('hidden');
         window.closeModal = () => document.getElementById('add-modal').classList.add('hidden');
 
