@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weiweiwei ERP (v11.9.2 Auto-Detect)</title>
+    <title>Weiweiwei ERP (v11.9.3 Fixed Sort)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -74,7 +74,7 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center gap-4">
                     <div class="flex-shrink-0 flex items-center">
-                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.9.2 Auto-Detect</span></span>
+                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.9.3 Fixed</span></span>
                         <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] bg-stone-100 text-stone-400">Loading...</span>
                     </div>
                     <div class="hidden sm:ml-6 sm:flex sm:space-x-4">
@@ -472,13 +472,24 @@
                 updateDropdowns();
             });
 
-            const q = query(collection(dbFirestore, "stock_items"), orderBy("createdAt", "desc"));
+            // === FIXED: Removed orderBy("createdAt") to prevent hiding old data ===
+            const q = collection(dbFirestore, "stock_items");
+            
             onSnapshot(q, (snapshot) => {
                 db = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                // Manually sort in JS instead of Firestore to safely handle items without createdAt
+                db.sort((a, b) => {
+                    if (a.createdAt && b.createdAt) return b.createdAt.seconds - a.createdAt.seconds;
+                    // Put items without date at the bottom
+                    if (!a.createdAt) return 1;
+                    if (!b.createdAt) return -1;
+                    return 0; 
+                });
+                
                 updateDashboard();
                 renderProductionList();
                 renderAllocationList();
-                updateDropdowns(); // Also update dropdowns when DB changes to include historical categories
+                updateDropdowns(); 
             });
         }
 
@@ -520,12 +531,10 @@
             const catStats = {};
             const locStats = { 'Unallocated': 0, 'Sold': 0 };
             
-            // FIXED: Don't just use appSettings, look at DB categories too
             const allDbCategories = [...new Set(db.map(i => i.category))];
             allDbCategories.forEach(c => {
                 if(c) catStats[c] = 0;
             });
-            // Ensure settings categories are also initialized
             appSettings.categories.forEach(c => catStats[c] = 0);
 
             locationBreakdownData = { 'Unallocated': { total: 0, items: [], catBreakdown: {} }, 'Sold': { total: 0, items: [], catBreakdown: {} } };
@@ -537,7 +546,6 @@
             db.forEach(i => {
                 const count = i.photos && i.photos.length > 0 ? i.photos.length : (parseInt(i.quantity)||1);
                 
-                // Count category
                 const cat = i.category || 'Unknown';
                 catStats[cat] = (catStats[cat] || 0) + count;
 
@@ -662,7 +670,6 @@
         function renderCategoryBadges(stats) {
             const container = document.getElementById('category-stats-container');
             container.innerHTML = '';
-            // Sort keys so Settings come first, then others
             const keys = Object.keys(stats).sort((a,b) => {
                 const idxA = appSettings.categories.indexOf(a);
                 const idxB = appSettings.categories.indexOf(b);
@@ -727,7 +734,6 @@
             allocChart.update();
 
             const months = [...new Set(db.map(i => i.month))]; 
-            // FIXED: Use distinct categories from BOTH Settings AND DB
             const distinctCategories = [...new Set([...appSettings.categories, ...db.map(i => i.category)])].filter(Boolean);
             
             const datasets = distinctCategories.map((cat, idx) => {
