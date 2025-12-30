@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weiweiwei ERP (v11.19.2 Final Fix)</title>
+    <title>Weiweiwei ERP (v11.19.3 Final)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -95,7 +95,7 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center gap-4">
                     <div class="flex-shrink-0 flex items-center">
-                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.19.2</span></span>
+                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.19.3</span></span>
                         <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] status-loading transition-colors duration-500">Connecting...</span>
                     </div>
                     <div class="hidden sm:ml-6 sm:flex sm:space-x-4">
@@ -400,18 +400,18 @@
         import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
-        // ==========================================
-        // ⚠️⚠️⚠️ 警告：請務必將下方的 CONFIG 換回妳原本的 ⚠️⚠️⚠️
-        // ==========================================
+        // ======================================================
+        // 🔴🔴🔴 請把妳真正的 Config 貼在這裡 🔴🔴🔴
+        // ======================================================
         const firebaseConfig = {
-            apiKey: "YOUR_API_KEY_HERE", // <--- 這裡要貼上妳的 API KEY (e.g., AIzaSy...)
-            authDomain: "stock-planner-7ca50.firebaseapp.com",
-            projectId: "stock-planner-7ca50",
-            storageBucket: "stock-planner-7ca50.firebasestorage.app",
-            messagingSenderId: "150326512952",
-            appId: "1:150326512952:web:0396231677d9841929c5cd"
+            apiKey: "YOUR_REAL_API_KEY_FROM_GITHUB_HISTORY",
+            authDomain: "YOUR_PROJECT.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT.firebasestorage.app",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:abcdefg"
         };
-        // ==========================================
+        // ======================================================
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
