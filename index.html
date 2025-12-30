@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weiweiwei ERP (v11.10.3 Debugger)</title>
+    <title>Weiweiwei ERP (v11.11.0 Location Filter)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -71,7 +71,7 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center gap-4">
                     <div class="flex-shrink-0 flex items-center">
-                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.10.3</span></span>
+                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.11.0</span></span>
                         <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] bg-stone-100 text-stone-400">Loading...</span>
                     </div>
                     <div class="hidden sm:ml-6 sm:flex sm:space-x-4">
@@ -218,6 +218,15 @@
                 <p class="text-stone-500 text-sm mt-1">
                     <span class="bg-gray-200 border text-gray-500 text-[10px] px-1 rounded">未分配</span> 代表尚未入庫。點擊照片可標記售出或轉移地點。
                 </p>
+            </div>
+
+            <div class="flex items-center gap-2 bg-white p-3 rounded-lg shadow-sm">
+                <span class="text-sm font-medium text-stone-600 flex-shrink-0">顯示地點:</span>
+                <select id="alloc-filter-location" onchange="window.renderAllocationList()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5">
+                    <option value="all">全部庫存 (All)</option>
+                    <option value="Sold">已售出 (Sold)</option>
+                    <option value="Unallocated">未分配 (Unallocated)</option>
+                    </select>
             </div>
             
             <div class="bg-white rounded-lg shadow-sm overflow-hidden border border-stone-200">
@@ -529,7 +538,6 @@
         // STRICT HELPER: Remove duplicates, trim, capitalize, handle non-breaking spaces
         function getCleanCategory(catName) {
             if (!catName) return "Unknown";
-            // Replace non-breaking space with normal space, trim, capitalize
             const str = String(catName).replace(/\u00A0/g, ' ').trim();
             if (!str) return "Unknown";
             return str.charAt(0).toUpperCase() + str.slice(1);
@@ -558,7 +566,6 @@
             db.forEach(i => {
                 const count = i.photos && i.photos.length > 0 ? i.photos.length : (parseInt(i.quantity)||1);
                 
-                // NORMALIZE usage
                 const cat = getCleanCategory(i.category);
                 catStats[cat] = (catStats[cat] || 0) + count;
 
@@ -746,7 +753,7 @@
             categoryChart.update();
         }
 
-        // --- PRODUCTION (FIXED FILTER LOGIC) ---
+        // --- PRODUCTION ---
         window.renderProductionList = function() {
             const tbody = document.getElementById('production-table-body');
             const makerFilter = document.getElementById('prod-filter-maker').value;
@@ -755,8 +762,6 @@
             
             let data = db;
             if (makerFilter !== 'all') data = data.filter(i => i.maker === makerFilter);
-            
-            // FIXED: Use getCleanCategory for filtering to match "Top" with "Top "
             if (catFilter !== 'all') data = data.filter(i => getCleanCategory(i.category) === catFilter);
 
             data.forEach(item => {
@@ -796,18 +801,34 @@
             lucide.createIcons();
         };
 
-        // --- ALLOCATION ---
+        // --- ALLOCATION (UPDATED WITH FILTER) ---
         window.renderAllocationList = function() {
             const tbody = document.getElementById('allocation-table-body');
+            const locFilter = document.getElementById('alloc-filter-location').value;
             tbody.innerHTML = '';
             
             const relevant = db.filter(i => i.status === 'Ready' || i.status === 'In Studio' || i.status === 'Sold' || i.status === 'Partial Sold');
 
             relevant.forEach(item => {
+                const photos = normalizePhotos(item);
+
+                // FILTER LOGIC
+                if (locFilter !== 'all') {
+                    if (locFilter === 'Sold') {
+                        // Show item if at least one piece is sold
+                        if (!photos.some(p => p.status === 'Sold')) return;
+                    } else if (locFilter === 'Unallocated') {
+                        // Show item if at least one piece is Unallocated
+                        if (!photos.some(p => p.status !== 'Sold' && p.locations.length === 0)) return;
+                    } else {
+                        // Specific location (Studio, Bev C...)
+                        if (!photos.some(p => p.locations.includes(locFilter))) return;
+                    }
+                }
+
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-stone-50 transition-colors border-b border-stone-50';
                 
-                const photos = normalizePhotos(item);
                 let gridHTML = `<div class="photo-grid">`;
                 
                 if(photos.length === 0) gridHTML = `<span class="text-xs text-stone-400">無照片資料</span>`;
@@ -967,7 +988,6 @@
                     } 
                 } 
                 
-                // STRICT CLEANING on Add
                 const cleanCat = getCleanCategory(form.get('category'));
                 
                 await addDoc(collection(dbFirestore, "stock_items"), { 
@@ -1052,12 +1072,11 @@
         window.handleDelete = async () => { if(confirm('確定刪除此工單？(無法復原)')) { await deleteDoc(doc(dbFirestore, "stock_items", document.getElementById('edit-id').value)); window.closeEditModal(); } };
         window.renderSettingsView = function() { const render = (type) => (appSettings[type]||[]).map(i => `<span class="bg-stone-100 px-2 py-1 rounded text-xs mr-1 mb-1 inline-block border cursor-pointer hover:bg-red-50 hover:text-red-500" onclick="window.removeSetting('${type}','${i}')">${i} &times;</span>`).join(''); document.getElementById('settings-makers-list').innerHTML = render('makers'); document.getElementById('settings-locations-list').innerHTML = render('locations'); document.getElementById('settings-categories-list').innerHTML = render('categories'); };
         
-        // STRICT CLEANING on Add Setting
         window.addSetting = async function(type) { 
             const map = {'makers':'new-maker-input', 'locations':'new-location-input', 'categories':'new-category-input'}; 
             let val = document.getElementById(map[type]).value;
             
-            if (type === 'categories') val = getCleanCategory(val); // Clean logic
+            if (type === 'categories') val = getCleanCategory(val); 
             else val = val.trim();
             
             if(val) { 
@@ -1069,12 +1088,21 @@
         
         window.updateDropdowns = function() { 
             const distinctMakers = [...new Set([...appSettings.makers, ...db.map(i => i.maker)])].filter(Boolean).sort();
-            
-            // STRICT CLEANING for Dropdown Display
             const distinctCategories = [...new Set([
                 ...appSettings.categories.map(c => getCleanCategory(c)), 
                 ...db.map(i => getCleanCategory(i.category))
             ])].filter(Boolean).sort();
+            
+            // Populate Location Dropdown in Allocation View
+            const locSelect = document.getElementById('alloc-filter-location');
+            if(locSelect) {
+                 const currentVal = locSelect.value;
+                 locSelect.innerHTML = `<option value="all">全部庫存 (All)</option><option value="Sold">已售出 (Sold)</option><option value="Unallocated">未分配 (Unallocated)</option>`;
+                 appSettings.locations.forEach(l => {
+                     locSelect.innerHTML += `<option value="${l}">${l}</option>`;
+                 });
+                 locSelect.value = currentVal; // Maintain selection
+            }
             
             const fill = (cls, list) => document.querySelectorAll(cls).forEach(s => { const old = s.value; s.innerHTML = (s.id.includes('filter')?'<option value="all">全部</option>':'') + list.map(i=>`<option value="${i}">${i}</option>`).join(''); if(list.includes(old)) s.value = old; }); 
             fill('.dynamic-maker-select', distinctMakers); 
