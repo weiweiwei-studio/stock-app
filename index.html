@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weiweiwei ERP (v11.11.1 Fix Sold Loc)</title>
+    <title>Weiweiwei ERP (v11.12.0 Sold Date)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -71,7 +71,7 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center gap-4">
                     <div class="flex-shrink-0 flex items-center">
-                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.11.1</span></span>
+                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.12.0</span></span>
                         <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] bg-stone-100 text-stone-400">Loading...</span>
                     </div>
                     <div class="hidden sm:ml-6 sm:flex sm:space-x-4">
@@ -226,7 +226,7 @@
                     <option value="all">全部庫存 (All)</option>
                     <option value="Sold">已售出 (Sold)</option>
                     <option value="Unallocated">未分配 (Unallocated)</option>
-                    </select>
+                </select>
             </div>
             
             <div class="bg-white rounded-lg shadow-sm overflow-hidden border border-stone-200">
@@ -366,11 +366,15 @@
     <div id="sold-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden z-[70] flex items-center justify-center p-4">
         <div class="bg-white rounded-lg shadow-xl max-w-xs w-full p-6">
             <h3 class="text-lg font-bold text-stone-800 mb-2">確認售出價格</h3>
-            <p class="text-xs text-stone-500 mb-4">請輸入最終成交金額（含折扣後）</p>
+            <p class="text-xs text-stone-500 mb-4">請輸入最終成交金額與日期</p>
             <div class="space-y-4">
                 <div>
                     <label class="text-xs font-bold text-stone-700">成交價 (RM)</label>
                     <input type="number" id="sold-price-input" class="w-full border p-2 rounded text-lg font-bold text-stone-800">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-stone-700">售出日期 (Sold Date)</label>
+                    <input type="date" id="sold-date-input" class="w-full border p-2 rounded text-sm text-stone-600">
                 </div>
                 <div>
                     <label class="text-xs text-stone-500">備註 (折扣原因等)</label>
@@ -535,7 +539,6 @@
             });
         }
         
-        // STRICT HELPER: Remove duplicates, trim, capitalize, handle non-breaking spaces
         function getCleanCategory(catName) {
             if (!catName) return "Unknown";
             const str = String(catName).replace(/\u00A0/g, ' ').trim();
@@ -801,7 +804,7 @@
             lucide.createIcons();
         };
 
-        // --- ALLOCATION (UPDATED WITH FILTER) ---
+        // --- ALLOCATION ---
         window.renderAllocationList = function() {
             const tbody = document.getElementById('allocation-table-body');
             const locFilter = document.getElementById('alloc-filter-location').value;
@@ -815,13 +818,10 @@
                 // FILTER LOGIC
                 if (locFilter !== 'all') {
                     if (locFilter === 'Sold') {
-                        // Show item if at least one piece is sold
                         if (!photos.some(p => p.status === 'Sold')) return;
                     } else if (locFilter === 'Unallocated') {
-                        // Show item if at least one piece is Unallocated
                         if (!photos.some(p => p.status !== 'Sold' && p.locations.length === 0)) return;
                     } else {
-                        // Specific location (Studio, Bev C...)
                         if (!photos.some(p => p.locations.includes(locFilter))) return;
                     }
                 }
@@ -939,21 +939,24 @@
             } else {
                 document.getElementById('sold-price-input').value = currentDetailItem.price || '';
                 document.getElementById('sold-note-input').value = '';
+                document.getElementById('sold-date-input').valueAsDate = new Date(); // Default to Today
                 document.getElementById('sold-modal').classList.remove('hidden');
             }
         };
 
-        // FIXED: Now ensures current locations (tempLocations) are saved even if user didn't click "Save" first
         window.confirmSoldAction = function() {
             const soldPrice = document.getElementById('sold-price-input').value;
             const note = document.getElementById('sold-note-input').value;
+            const dateVal = document.getElementById('sold-date-input').value;
             
             let photos = normalizePhotos(currentDetailItem);
             photos[currentDetailPhotoIdx].status = 'Sold';
             photos[currentDetailPhotoIdx].soldPrice = soldPrice;
-            photos[currentDetailPhotoIdx].soldAt = new Date();
             
-            // KEY FIX: Use tempLocations (UI state) instead of old DB data
+            // MANUAL DATE or TODAY
+            photos[currentDetailPhotoIdx].soldAt = dateVal ? new Date(dateVal) : new Date();
+            
+            // ENSURE LOCATIONS ARE SAVED (Fixing previous bug)
             photos[currentDetailPhotoIdx].locations = tempLocations;
 
             if(note) photos[currentDetailPhotoIdx].notes = (photos[currentDetailPhotoIdx].notes ? photos[currentDetailPhotoIdx].notes + " | " : "") + note;
