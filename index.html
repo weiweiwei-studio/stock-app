@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weiweiwei ERP (v11.10.0 Pricing & Clean)</title>
+    <title>Weiweiwei ERP (v11.10.2 Strict Clean)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -71,7 +71,7 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center gap-4">
                     <div class="flex-shrink-0 flex items-center">
-                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.10.0</span></span>
+                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.10.2</span></span>
                         <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] bg-stone-100 text-stone-400">Loading...</span>
                     </div>
                     <div class="hidden sm:ml-6 sm:flex sm:space-x-4">
@@ -482,12 +482,10 @@
                 updateDropdowns();
             });
 
-            // Using default collection 'stock_items' in (default) db
             const q = collection(dbFirestore, "stock_items");
             
             onSnapshot(q, (snapshot) => {
                 db = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-                // Sort by createdAt desc, nulls last
                 db.sort((a, b) => {
                     if (a.createdAt && b.createdAt) return b.createdAt.seconds - a.createdAt.seconds;
                     if (!a.createdAt) return 1;
@@ -528,11 +526,13 @@
             });
         }
         
-        // Helper to merge duplicate categories (e.g. "Top " vs "Top")
+        // STRICT HELPER: Remove duplicates, trim, capitalize, handle non-breaking spaces
         function getCleanCategory(catName) {
             if (!catName) return "Unknown";
-            // Capitalize first letter, trim spaces
-            return catName.trim().charAt(0).toUpperCase() + catName.trim().slice(1);
+            // Replace non-breaking space with normal space, trim, capitalize
+            const str = String(catName).replace(/\u00A0/g, ' ').trim();
+            if (!str) return "Unknown";
+            return str.charAt(0).toUpperCase() + str.slice(1);
         }
 
         // --- DASHBOARD & CALENDAR ---
@@ -548,7 +548,6 @@
             const catStats = {};
             const locStats = { 'Unallocated': 0, 'Sold': 0 };
             
-            // Initializing stats objects
             appSettings.locations.forEach(l => {
                 locStats[l] = 0;
                 locationBreakdownData[l] = { total: 0, items: [], catBreakdown: {} };
@@ -559,7 +558,7 @@
             db.forEach(i => {
                 const count = i.photos && i.photos.length > 0 ? i.photos.length : (parseInt(i.quantity)||1);
                 
-                // FIXED: Normalize Category to prevent duplicates
+                // NORMALIZE usage
                 const cat = getCleanCategory(i.category);
                 catStats[cat] = (catStats[cat] || 0) + count;
 
@@ -677,7 +676,6 @@
         function renderCategoryBadges(stats) {
             const container = document.getElementById('category-stats-container');
             container.innerHTML = '';
-            // Sort by count desc
             const sortedKeys = Object.keys(stats).sort((a,b) => stats[b] - stats[a]);
 
             sortedKeys.forEach(c => {
@@ -722,7 +720,6 @@
         }
 
         function updateCharts(locStats, catStats) {
-            // Allocation Chart
             const labels = [...appSettings.locations, 'Unallocated', 'Sold'];
             const data = [...appSettings.locations.map(l => locStats[l]), locStats['Unallocated'], locStats['Sold']];
             const bgColors = [...appSettings.locations.map((_, i) => locColors[i % locColors.length]), '#e5e7eb', '#1c1917'];
@@ -731,7 +728,6 @@
             allocChart.data.datasets[0].backgroundColor = bgColors;
             allocChart.update();
 
-            // Category Monthly Chart
             const months = [...new Set(db.map(i => i.month))]; 
             const distinctCategories = Object.keys(catStats);
             
@@ -750,7 +746,7 @@
             categoryChart.update();
         }
 
-        // --- PRODUCTION ---
+        // --- PRODUCTION (FIXED FILTER LOGIC) ---
         window.renderProductionList = function() {
             const tbody = document.getElementById('production-table-body');
             const makerFilter = document.getElementById('prod-filter-maker').value;
@@ -759,7 +755,9 @@
             
             let data = db;
             if (makerFilter !== 'all') data = data.filter(i => i.maker === makerFilter);
-            if (catFilter !== 'all') data = data.filter(i => i.category === catFilter);
+            
+            // FIXED: Use getCleanCategory for filtering to match "Top" with "Top "
+            if (catFilter !== 'all') data = data.filter(i => getCleanCategory(i.category) === catFilter);
 
             data.forEach(item => {
                 const tr = document.createElement('tr');
@@ -870,7 +868,6 @@
             document.getElementById('detail-title').innerText = currentDetailItem.itemName;
             document.getElementById('detail-sku').innerText = `${getCleanCategory(currentDetailItem.category)} / ${currentDetailItem.color}`;
             
-            // Show price
             let priceText = currentDetailItem.price ? `RM${currentDetailItem.price}` : '未定價';
             if(p.status === 'Sold' && p.soldPrice) priceText += ` (Sold: RM${p.soldPrice})`;
             document.getElementById('detail-price-display').innerText = `Price: ${priceText}`;
@@ -908,12 +905,10 @@
         window.toggleDetailLocation = function(loc) { if(tempLocations.includes(loc)) { tempLocations = tempLocations.filter(l => l !== loc); } else { tempLocations.push(loc); } renderDetailLocationButtons(); };
         window.saveItemDetails = async function() { if(!currentDetailItem) return; let photos = normalizePhotos(currentDetailItem); photos[currentDetailPhotoIdx].notes = document.getElementById('detail-notes').value; photos[currentDetailPhotoIdx].locations = tempLocations; try { await updateDoc(doc(dbFirestore, "stock_items", currentDetailItem.id), { photos: photos }); window.closeDetailModal(); } catch(e) { alert("Save failed"); } };
         
-        // --- NEW SOLD LOGIC ---
         window.triggerSoldFlow = function() {
             let photos = normalizePhotos(currentDetailItem);
             const currentStatus = photos[currentDetailPhotoIdx].status;
             
-            // If currently Sold -> Cancel Sold
             if (currentStatus === 'Sold') {
                 if(confirm("確認取消售出？物品將回到庫存中。")) {
                     photos[currentDetailPhotoIdx].status = 'Available';
@@ -921,7 +916,6 @@
                     updateItemStatus(photos);
                 }
             } else {
-                // If currently Available -> Ask for Price
                 document.getElementById('sold-price-input').value = currentDetailItem.price || '';
                 document.getElementById('sold-note-input').value = '';
                 document.getElementById('sold-modal').classList.remove('hidden');
@@ -953,7 +947,40 @@
         window.closeDetailModal = () => document.getElementById('detail-modal').classList.add('hidden');
 
         // --- UTILS ---
-        window.handleAddItem = async function(e) { e.preventDefault(); const btn = document.getElementById('btn-submit'); btn.innerText = '處理中...'; btn.disabled = true; const form = new FormData(e.target); const fileInput = document.querySelector('input[name="initialPhotos"]'); let photoObjs = []; if(fileInput.files.length > 0) { for(let i=0; i<fileInput.files.length; i++) { const file = fileInput.files[i]; const sRef = ref(storage, 'photos/'+Date.now()+'_'+file.name); const snap = await uploadBytes(sRef, file); const url = await getDownloadURL(snap.ref); photoObjs.push({ url: url, status: 'Available', locations: [], notes: '', soldPrice: null }); } } await addDoc(collection(dbFirestore, "stock_items"), { month: form.get('month'), itemName: form.get('itemName'), category: form.get('category'), maker: form.get('maker'), color: form.get('color'), size: form.get('size'), quantity: parseInt(form.get('quantity')) || 1, price: form.get('price'), status: 'To Make', photos: photoObjs, createdAt: serverTimestamp() }); window.closeModal(); e.target.reset(); btn.innerText = '確認新增'; btn.disabled = false; };
+        window.handleAddItem = async function(e) { 
+            e.preventDefault(); 
+            const btn = document.getElementById('btn-submit'); btn.innerText = '處理中...'; btn.disabled = true; 
+            const form = new FormData(e.target); 
+            const fileInput = document.querySelector('input[name="initialPhotos"]'); 
+            let photoObjs = []; 
+            if(fileInput.files.length > 0) { 
+                for(let i=0; i<fileInput.files.length; i++) { 
+                    const file = fileInput.files[i]; 
+                    const sRef = ref(storage, 'photos/'+Date.now()+'_'+file.name); 
+                    const snap = await uploadBytes(sRef, file); 
+                    const url = await getDownloadURL(snap.ref); 
+                    photoObjs.push({ url: url, status: 'Available', locations: [], notes: '', soldPrice: null }); 
+                } 
+            } 
+            
+            // STRICT CLEANING on Add
+            const cleanCat = getCleanCategory(form.get('category'));
+            
+            await addDoc(collection(dbFirestore, "stock_items"), { 
+                month: form.get('month'), 
+                itemName: form.get('itemName'), 
+                category: cleanCat, 
+                maker: form.get('maker'), 
+                color: form.get('color'), 
+                size: form.get('size'), 
+                quantity: parseInt(form.get('quantity')) || 1, 
+                price: form.get('price'), 
+                status: 'To Make', 
+                photos: photoObjs, 
+                createdAt: serverTimestamp() 
+            }); 
+            window.closeModal(); e.target.reset(); btn.innerText = '確認新增'; btn.disabled = false; 
+        };
         
         window.openEditModal = (id) => { 
             const item = db.find(i=>i.id===id); 
@@ -1005,12 +1032,31 @@
 
         window.handleDelete = async () => { if(confirm('確定刪除此工單？(無法復原)')) { await deleteDoc(doc(dbFirestore, "stock_items", document.getElementById('edit-id').value)); window.closeEditModal(); } };
         window.renderSettingsView = function() { const render = (type) => (appSettings[type]||[]).map(i => `<span class="bg-stone-100 px-2 py-1 rounded text-xs mr-1 mb-1 inline-block border cursor-pointer hover:bg-red-50 hover:text-red-500" onclick="window.removeSetting('${type}','${i}')">${i} &times;</span>`).join(''); document.getElementById('settings-makers-list').innerHTML = render('makers'); document.getElementById('settings-locations-list').innerHTML = render('locations'); document.getElementById('settings-categories-list').innerHTML = render('categories'); };
-        window.addSetting = async function(type) { const map = {'makers':'new-maker-input', 'locations':'new-location-input', 'categories':'new-category-input'}; const val = document.getElementById(map[type]).value.trim(); if(val) { await updateDoc(doc(dbFirestore, "settings", "config"), { [type]: [...appSettings[type], val] }); document.getElementById(map[type]).value = ''; } };
+        
+        // STRICT CLEANING on Add Setting
+        window.addSetting = async function(type) { 
+            const map = {'makers':'new-maker-input', 'locations':'new-location-input', 'categories':'new-category-input'}; 
+            let val = document.getElementById(map[type]).value;
+            
+            if (type === 'categories') val = getCleanCategory(val); // Clean logic
+            else val = val.trim();
+            
+            if(val) { 
+                await updateDoc(doc(dbFirestore, "settings", "config"), { [type]: [...appSettings[type], val] }); 
+                document.getElementById(map[type]).value = ''; 
+            } 
+        };
         window.removeSetting = async function(type, val) { if(confirm(`Remove ${val}?`)) await updateDoc(doc(dbFirestore, "settings", "config"), { [type]: appSettings[type].filter(x => x !== val) }); }
         
         window.updateDropdowns = function() { 
-            const distinctMakers = [...new Set([...appSettings.makers, ...db.map(i => i.maker)])].filter(Boolean);
-            const distinctCategories = [...new Set([...appSettings.categories, ...db.map(i => getCleanCategory(i.category))])].filter(Boolean);
+            const distinctMakers = [...new Set([...appSettings.makers, ...db.map(i => i.maker)])].filter(Boolean).sort();
+            
+            // STRICT CLEANING for Dropdown Display
+            const distinctCategories = [...new Set([
+                ...appSettings.categories.map(c => getCleanCategory(c)), 
+                ...db.map(i => getCleanCategory(i.category))
+            ])].filter(Boolean).sort();
+            
             const fill = (cls, list) => document.querySelectorAll(cls).forEach(s => { const old = s.value; s.innerHTML = (s.id.includes('filter')?'<option value="all">全部</option>':'') + list.map(i=>`<option value="${i}">${i}</option>`).join(''); if(list.includes(old)) s.value = old; }); 
             fill('.dynamic-maker-select', distinctMakers); 
             fill('.dynamic-category-select', distinctCategories); 
