@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weiweiwei ERP (v11.11.0 Location Filter)</title>
+    <title>Weiweiwei ERP (v11.11.1 Fix Sold Loc)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -71,7 +71,7 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center gap-4">
                     <div class="flex-shrink-0 flex items-center">
-                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.11.0</span></span>
+                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.11.1</span></span>
                         <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] bg-stone-100 text-stone-400">Loading...</span>
                     </div>
                     <div class="hidden sm:ml-6 sm:flex sm:space-x-4">
@@ -943,6 +943,7 @@
             }
         };
 
+        // FIXED: Now ensures current locations (tempLocations) are saved even if user didn't click "Save" first
         window.confirmSoldAction = function() {
             const soldPrice = document.getElementById('sold-price-input').value;
             const note = document.getElementById('sold-note-input').value;
@@ -951,6 +952,10 @@
             photos[currentDetailPhotoIdx].status = 'Sold';
             photos[currentDetailPhotoIdx].soldPrice = soldPrice;
             photos[currentDetailPhotoIdx].soldAt = new Date();
+            
+            // KEY FIX: Use tempLocations (UI state) instead of old DB data
+            photos[currentDetailPhotoIdx].locations = tempLocations;
+
             if(note) photos[currentDetailPhotoIdx].notes = (photos[currentDetailPhotoIdx].notes ? photos[currentDetailPhotoIdx].notes + " | " : "") + note;
 
             document.getElementById('sold-modal').classList.add('hidden');
@@ -1093,7 +1098,6 @@
                 ...db.map(i => getCleanCategory(i.category))
             ])].filter(Boolean).sort();
             
-            // Populate Location Dropdown in Allocation View
             const locSelect = document.getElementById('alloc-filter-location');
             if(locSelect) {
                  const currentVal = locSelect.value;
@@ -1101,7 +1105,7 @@
                  appSettings.locations.forEach(l => {
                      locSelect.innerHTML += `<option value="${l}">${l}</option>`;
                  });
-                 locSelect.value = currentVal; // Maintain selection
+                 locSelect.value = currentVal; 
             }
             
             const fill = (cls, list) => document.querySelectorAll(cls).forEach(s => { const old = s.value; s.innerHTML = (s.id.includes('filter')?'<option value="all">全部</option>':'') + list.map(i=>`<option value="${i}">${i}</option>`).join(''); if(list.includes(old)) s.value = old; }); 
