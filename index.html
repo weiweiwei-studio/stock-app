@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weiweiwei ERP (v11.19.6 Debug)</title>
+    <title>Weiweiwei ERP (v11.19.7 Strict Fix)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -95,8 +95,9 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center gap-4">
                     <div class="flex-shrink-0 flex items-center">
-                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.19.6</span></span>
+                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.19.7</span></span>
                         <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] status-loading transition-colors duration-500">Connecting...</span>
+                        <span id="db-count-debug" class="text-[10px] text-stone-400 font-mono ml-2">DB: ...</span>
                     </div>
                     <div class="hidden sm:ml-6 sm:flex sm:space-x-4">
                         <button onclick="window.switchView('dashboard')" id="nav-dashboard" class="nav-item px-3 py-2 rounded-md text-sm font-medium hover:bg-stone-100 transition-colors nav-active">總覽</button>
@@ -400,9 +401,6 @@
         import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
-        // ==========================================
-        // 🟢 已填入您的正確 Config
-        // ==========================================
         const firebaseConfig = {
             apiKey: "AIzaSyAlB24yzUmGCqsPofuoYhWBiIUj7IWjybc",
             authDomain: "stock-planner-7ca50.firebaseapp.com",
@@ -411,14 +409,10 @@
             messagingSenderId: "150326512952",
             appId: "1:150326512952:web:0396231677d9841929c5cd"
         };
-        // ==========================================
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
-        
-        // 🟢 讀取 (default) 資料庫
         const dbFirestore = getFirestore(app);
-        
         const storage = getStorage(app);
 
         let db = [];
@@ -454,7 +448,6 @@
         });
 
         function startListeners() {
-            // 監聽設定檔
             onSnapshot(doc(dbFirestore, "settings", "config"), (snap) => {
                 if(snap.exists()) {
                     const data = snap.data();
@@ -464,12 +457,13 @@
                 renderCalendar(); 
             });
 
-            // 🟢 讀取 stock_items
-            // ⚠️ 診斷版：加入報錯功能
             const q = collection(dbFirestore, "stock_items");
             
             onSnapshot(q, (snapshot) => {
                 db = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                
+                // Debug Counter
+                document.getElementById('db-count-debug').innerText = `DB: ${db.length} items`;
                 
                 // Safe Sort
                 db.sort((a, b) => {
@@ -483,9 +477,8 @@
                 renderAllocationList();
                 renderCalendar(); 
             }, (error) => {
-                // 🔥🔥🔥 這裡會告訴我們為什麼讀不到！ 🔥🔥🔥
                 console.error("Snapshot Error:", error);
-                alert("讀取資料庫失敗！\n錯誤代碼: " + error.code + "\n錯誤訊息: " + error.message + "\n\n請檢查 Firestore Rules (權限) 設定。");
+                alert("讀取資料庫失敗！\n錯誤代碼: " + error.code + "\n錯誤訊息: " + error.message);
             });
         }
 
@@ -519,7 +512,7 @@
             locationBreakdownData['Unallocated'] = { total: 0, items: [], catBreakdown: {} };
             
             db.forEach(i => {
-                if(i.status === 'Planned') return; // Don't count planned in inventory stats
+                if(i.status === 'Planned') return; 
                 const count = i.photos && i.photos.length > 0 ? i.photos.length : (parseInt(i.quantity)||1);
                 const cat = getCleanCategory(i.category);
                 catStats[cat] = (catStats[cat] || 0) + count;
@@ -535,8 +528,6 @@
             document.getElementById('kpi-studio').textContent = studioCount;
             document.getElementById('kpi-unallocated').textContent = unallocatedCount;
             document.getElementById('kpi-sold').textContent = soldCount;
-
-            // Update Charts/Badges (omitted generic render code for brevity)
             updateCharts(locStats, catStats);
         }
 
@@ -553,9 +544,7 @@
             const year = currentCalDate.getFullYear();
             const month = currentCalDate.getMonth();
             const date = new Date(year, month, day);
-            // Compensate timezone to ensure saving correct date
             const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
-            
             document.getElementById('plan-date').value = localDate;
             document.getElementById('quick-plan-modal').classList.remove('hidden');
         };
@@ -566,14 +555,12 @@
             const cat = document.getElementById('plan-category').value;
             const qty = document.getElementById('plan-qty').value;
             
-            // Create Ghost Ticket
             await addDoc(collection(dbFirestore, "stock_items"), {
                 itemName: `${cat} (Planned)`,
                 category: cat,
                 quantity: parseInt(qty),
                 status: 'Planned',
                 createdAt: serverTimestamp(),
-                // If in production mode, set start date. If arrival, set completed date.
                 makingAt: calendarMode === 'production' ? new Date(dateVal) : null,
                 completedAt: calendarMode === 'arrival' ? new Date(dateVal) : null,
                 month: new Date(dateVal).toLocaleString('en-US', { month: 'short' })
@@ -603,9 +590,7 @@
 
             const firstDay = new Date(year, month, 1).getDay();
             const daysInMonth = new Date(year, month + 1, 0).getDate();
-            
-            // Weekly Stats Trackers
-            let weeklyStats = {}; // { 1: {real: 0, planned: 0} }
+            let weeklyStats = {}; 
 
             for(let i=0; i<firstDay; i++) grid.innerHTML += `<div class="calendar-cell bg-stone-50"></div>`;
 
@@ -624,12 +609,10 @@
                 items.forEach(i => {
                     const isPlanned = i.status === 'Planned';
                     const qty = parseInt(i.quantity)||1;
-                    
                     if(calendarMode === 'arrival') {
                         if(isPlanned) weeklyStats[weekNum].planned += qty;
                         else weeklyStats[weekNum].real += qty;
                     }
-
                     const styleClass = isPlanned ? 'status-planned' : (i.maker?.includes('Kim') ? 'maker-kim' : (i.maker?.includes('Kelly') ? 'maker-kelly' : 'maker-other'));
                     const label = `${getCleanCategory(i.category)}${qty>1 ? ' x'+qty : ''}`;
                     cellContent += `<div class="cal-item ${styleClass}" onclick="window.openEditModal('${i.id}')">${label}</div>`;
@@ -644,29 +627,22 @@
                     </div>`;
             }
 
-            // Render Goals (Arrival Mode Only)
             if(calendarMode === 'arrival') {
                 for(let w=1; w<=5; w++) {
                     const stats = weeklyStats[w] || { real: 0, planned: 0 };
                     if(stats.real === 0 && stats.planned === 0 && w > 4) continue;
-                    
                     const goalKey = `y${year}m${month}w${w}`;
                     const target = appSettings.weekly_goals[goalKey] || 0;
-                    
-                    // Calc widths
                     const totalBar = Math.max(target, stats.real + stats.planned);
                     const scale = totalBar > 0 ? 100 / totalBar : 0;
-                    
-                    const realPct = Math.min((stats.real / (target||1)) * 100, 100); 
-                    
                     const realW = target > 0 ? (stats.real / target)*100 : 0;
                     const planW = target > 0 ? (stats.planned / target)*100 : 0;
                     
-                    let barColor = 'fill-blue'; // Default
+                    let barColor = 'fill-blue'; 
                     if(target > 0) {
                          if(stats.real >= target) barColor = 'fill-green';
-                         else if(stats.real + stats.planned >= target) barColor = 'fill-yellow'; // Reachable with plan
-                         else barColor = 'fill-red'; // Behind
+                         else if(stats.real + stats.planned >= target) barColor = 'fill-yellow'; 
+                         else barColor = 'fill-red'; 
                     }
 
                     weeklyGoals.innerHTML += `
@@ -685,7 +661,7 @@
             }
         }
 
-        // --- UTILS (Shortened) ---
+        // --- UTILS ---
         function updateCharts(locStats, catStats) {
             if(!allocChart || !categoryChart) return;
             const labels = [...appSettings.locations, 'Unallocated', 'Sold'];
@@ -732,7 +708,7 @@
             fill('.dynamic-maker-select', distinctMakers); 
             fill('.dynamic-category-select', distinctCategories); 
         };
-        // Add, Edit, Delete handlers remain mostly same, just ensuring Edit Modal handles 'Planned' status correctly
+        
         window.openEditModal = (id) => { 
             const item = db.find(i=>i.id===id); 
             document.getElementById('edit-id').value=id; 
@@ -752,7 +728,6 @@
              if(cDate) updateData.completedAt = new Date(cDate);
              const photoInput = document.getElementById('edit-addPhotos');
              if(photoInput.files.length > 0) {
-                 // Upload logic...
                  let existingPhotos = db.find(i=>i.id===id).photos || [];
                  for(let i=0; i<photoInput.files.length; i++) {
                      const file = photoInput.files[i];
@@ -762,13 +737,12 @@
                      existingPhotos.push({ url: url, status: 'Available', locations: [], notes: '', soldPrice: null });
                  }
                  updateData.photos = existingPhotos;
-                 // Auto-switch status if currently Planned
                  if(status === 'Planned') updateData.status = 'Making';
              }
              await updateDoc(doc(dbFirestore, "stock_items", id), updateData);
              document.getElementById('edit-modal').classList.add('hidden');
         };
-        // Other standard utils...
+
         window.renderProductionList = function() {
             const tbody = document.getElementById('production-table-body');
             const makerFilter = document.getElementById('prod-filter-maker').value;
@@ -796,40 +770,50 @@
             });
             lucide.createIcons();
         };
+
+        // 🟢 修復：改為只要不是 Planned 就顯示，不管 Status 是什麼
         window.renderAllocationList = function() {
             const tbody = document.getElementById('allocation-table-body');
             const locFilter = document.getElementById('alloc-filter-location').value;
             tbody.innerHTML = '';
-            const relevant = db.filter(i => i.status === 'Ready' || i.status === 'In Studio' || i.status === 'Sold' || i.status === 'Partial Sold');
+            
+            // 🔥 關鍵修改：不再限制 Status 必須是 Ready/Sold，只要不是 Planned 就全部顯示
+            const relevant = db.filter(i => i.status !== 'Planned');
+            
             relevant.forEach(item => {
-                const photos = normalizePhotos(item);
-                if (locFilter !== 'all') {
-                    if (locFilter === 'Sold') { if (!photos.some(p => p.status === 'Sold')) return; }
-                    else if (locFilter === 'Unallocated') { if (!photos.some(p => p.status !== 'Sold' && p.locations.length === 0)) return; }
-                    else { if (!photos.some(p => p.locations.includes(locFilter))) return; }
+                // 🛡️ 防當機機制：就算一筆資料壞掉，也不會卡住整個頁面
+                try {
+                    const photos = normalizePhotos(item);
+                    if (locFilter !== 'all') {
+                        if (locFilter === 'Sold') { if (!photos.some(p => p.status === 'Sold')) return; }
+                        else if (locFilter === 'Unallocated') { if (!photos.some(p => p.status !== 'Sold' && p.locations.length === 0)) return; }
+                        else { if (!photos.some(p => p.locations.includes(locFilter))) return; }
+                    }
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-stone-50 transition-colors border-b border-stone-50';
+                    let gridHTML = `<div class="photo-grid">`;
+                    if(photos.length === 0) gridHTML = `<span class="text-xs text-stone-400">無照片資料</span>`;
+                    else {
+                        photos.forEach((p, idx) => {
+                            const isSold = p.status === 'Sold';
+                            const hasNote = p.notes && p.notes.length > 0;
+                            const hasImg = p.url && p.url.length > 0;
+                            let badgeText = '', badgeClass = '';
+                            if (isSold) { badgeText = p.soldPrice ? `SOLD (RM${p.soldPrice})` : 'SOLD'; badgeClass = 'badge-sold'; } 
+                            else {
+                                if (p.locations.length > 1) { badgeText = 'MULTI'; badgeClass = 'badge-multi'; } 
+                                else if (p.locations.length === 1) { badgeText = p.locations[0].substring(0,6).toUpperCase(); badgeClass = p.locations[0] === 'Studio' ? 'badge-studio' : 'badge-multi'; } 
+                                else { badgeText = '未分配 (None)'; badgeClass = 'badge-none'; }
+                            }
+                            gridHTML += `<div class="grid-item" onclick="window.openDetailModal('${item.id}', ${idx})">${hasImg ? `<img src="${p.url}" class="grid-img ${isSold ? 'opacity-50 grayscale' : ''}">` : `<div class="grid-img bg-stone-100 flex items-center justify-center text-[8px] text-stone-400">No Img</div>`}<div class="status-badge ${badgeClass}">${badgeText}</div>${isSold ? `<div class="sold-overlay"><i data-lucide="check" class="text-white w-5 h-5"></i></div>` : ''}${hasNote ? `<div class="has-note-dot"></div>` : ''}</div>`;
+                        });
+                    }
+                    gridHTML += `</div>`;
+                    tr.innerHTML = `<td class="px-6 py-4">${gridHTML}</td><td class="px-6 py-4"><div class="font-bold text-stone-800">${item.itemName}</div><div class="text-xs text-stone-500">${item.color||''} ${item.size||''}</div></td><td class="px-6 py-4 text-xs text-stone-500">${getCleanCategory(item.category)}</td>`;
+                    tbody.appendChild(tr);
+                } catch (e) {
+                    console.error("Render error for item:", item, e);
                 }
-                const tr = document.createElement('tr');
-                tr.className = 'hover:bg-stone-50 transition-colors border-b border-stone-50';
-                let gridHTML = `<div class="photo-grid">`;
-                if(photos.length === 0) gridHTML = `<span class="text-xs text-stone-400">無照片資料</span>`;
-                else {
-                    photos.forEach((p, idx) => {
-                        const isSold = p.status === 'Sold';
-                        const hasNote = p.notes && p.notes.length > 0;
-                        const hasImg = p.url && p.url.length > 0;
-                        let badgeText = '', badgeClass = '';
-                        if (isSold) { badgeText = p.soldPrice ? `SOLD (RM${p.soldPrice})` : 'SOLD'; badgeClass = 'badge-sold'; } 
-                        else {
-                            if (p.locations.length > 1) { badgeText = 'MULTI'; badgeClass = 'badge-multi'; } 
-                            else if (p.locations.length === 1) { badgeText = p.locations[0].substring(0,6).toUpperCase(); badgeClass = p.locations[0] === 'Studio' ? 'badge-studio' : 'badge-multi'; } 
-                            else { badgeText = '未分配 (None)'; badgeClass = 'badge-none'; }
-                        }
-                        gridHTML += `<div class="grid-item" onclick="window.openDetailModal('${item.id}', ${idx})">${hasImg ? `<img src="${p.url}" class="grid-img ${isSold ? 'opacity-50 grayscale' : ''}">` : `<div class="grid-img bg-stone-100 flex items-center justify-center text-[8px] text-stone-400">No Img</div>`}<div class="status-badge ${badgeClass}">${badgeText}</div>${isSold ? `<div class="sold-overlay"><i data-lucide="check" class="text-white w-5 h-5"></i></div>` : ''}${hasNote ? `<div class="has-note-dot"></div>` : ''}</div>`;
-                    });
-                }
-                gridHTML += `</div>`;
-                tr.innerHTML = `<td class="px-6 py-4">${gridHTML}</td><td class="px-6 py-4"><div class="font-bold text-stone-800">${item.itemName}</div><div class="text-xs text-stone-500">${item.color||''} ${item.size||''}</div></td><td class="px-6 py-4 text-xs text-stone-500">${getCleanCategory(item.category)}</td>`;
-                tbody.appendChild(tr);
             });
             lucide.createIcons();
         };
@@ -843,11 +827,9 @@
                     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } } } }
                 });
             }
-            // Category chart placeholder logic...
             categoryChart = { data: { labels: [], datasets: [] }, update: ()=>{} }; 
         }
 
-        // Re-declaring key modals handlers
         window.openDetailModal = function(id, idx) {
             currentDetailItem = db.find(i => i.id === id); currentDetailPhotoIdx = idx;
             const p = normalizePhotos(currentDetailItem)[idx];
