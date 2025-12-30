@@ -3,423 +3,240 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weiweiwei ERP (v11.18.0 Month Nav)</title>
+    <title>Weiweiwei ERP v12.0 - Upcycling Strategy Mode</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <style>
-        /* BASE STYLES */
         body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #fafaf9; color: #44403c; min-height: 100vh; display: flex; flex-direction: column; }
         .nav-active { background-color: #e7e5e4; color: #1c1917; font-weight: 700; }
         .custom-scrollbar::-webkit-scrollbar { height: 4px; width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #d6d3d1; border-radius: 3px; }
 
-        /* Photo Reel & Grid */
-        .photo-reel { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; max-width: 180px; scrollbar-width: thin; scrollbar-color: #d6d3d1 transparent; }
-        .reel-img { width: 36px; height: 48px; object-fit: cover; border-radius: 4px; border: 1px solid #e7e5e4; flex-shrink: 0; background: #fff; }
-        .photo-grid { display: flex; flex-wrap: wrap; gap: 8px; max-width: 400px; }
-        .grid-item { position: relative; width: 52px; height: 68px; cursor: pointer; transition: transform 0.1s; background: white; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-        .grid-img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; border: 1px solid #e7e5e4; }
-        
-        /* Badges */
-        .status-badge { position: absolute; bottom: 0; right: 0; left: 0; padding: 2px 0; font-size: 8px; font-weight: bold; color: white; text-align: center; border-radius: 0 0 4px 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .badge-sold { background-color: #1c1917; } 
-        .badge-multi { background-color: #3b82f6; } 
-        .badge-studio { background-color: #10b981; } 
-        .badge-none { background-color: #e5e7eb; color: #9ca3af; border-top: 1px solid #d1d5db; }
-        .sold-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; border-radius: 4px; }
-        .has-note-dot { position: absolute; top: -3px; right: -3px; width: 8px; height: 8px; background-color: #ef4444; border-radius: 50%; border: 1px solid white; z-index: 20; }
-
         /* CALENDAR STYLES */
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background-color: #e7e5e4; border: 1px solid #e7e5e4; width: 100%; }
-        .calendar-header { background-color: #f5f5f4; color: #78716c; font-size: 11px; font-weight: bold; text-align: center; padding: 8px 0; text-transform: uppercase; position: sticky; top: 0; z-index: 10; }
-        .calendar-cell { background-color: white; min-height: 120px; padding: 4px; display: flex; flex-direction: column; gap: 2px; transition: background 0.2s; position: relative; }
-        .calendar-cell:hover { background-color: #fafaf9; }
-        .cal-items-wrapper { flex-grow: 1; overflow-y: auto; max-height: 160px; padding-right: 2px; }
-        .cal-items-wrapper::-webkit-scrollbar { width: 2px; }
-        .cal-items-wrapper::-webkit-scrollbar-thumb { background: #d6d3d1; }
-        .cal-date-num { font-size: 12px; font-weight: bold; color: #a8a29e; margin-bottom: 4px; display: block; padding-left: 2px; }
+        .calendar-header { background-color: #f5f5f4; color: #78716c; font-size: 11px; font-weight: bold; text-align: center; padding: 8px 0; text-transform: uppercase; }
+        .calendar-cell { background-color: white; min-height: 120px; padding: 4px; display: flex; flex-direction: column; gap: 2px; position: relative; transition: all 0.2s; }
+        .calendar-cell:hover { background-color: #fdfdfd; }
+        
+        /* 產能預警顏色 */
+        .cap-warning { background-color: #fff7ed !important; } /* 接近滿載 */
+        .cap-overload { background-color: #fef2f2 !important; border: 1px inset #fee2e2; } /* 超載 */
+
+        .cal-items-wrapper { flex-grow: 1; overflow-y: auto; max-height: 160px; }
+        .cal-date-num { font-size: 11px; font-weight: bold; color: #a8a29e; margin-bottom: 2px; }
         .cal-today .cal-date-num { color: #f59e0b; font-size: 14px; }
-        .cal-item { font-size: 9px; padding: 3px 4px; border-radius: 3px; color: white; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; box-shadow: 0 1px 1px rgba(0,0,0,0.1); }
+        
+        .cal-item { font-size: 9px; padding: 2px 4px; border-radius: 3px; color: white; margin-bottom: 2px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
         .maker-kim { background-color: #f472b6; }
         .maker-kelly { background-color: #60a5fa; }
         .maker-other { background-color: #a8a29e; }
-        .mode-arrival .maker-kim { background-color: #ec4899; border-left: 2px solid #831843; } 
-        .mode-arrival .maker-kelly { background-color: #3b82f6; border-left: 2px solid #1e3a8a; } 
 
-        /* PROGRESS BARS for GOALS */
-        .goal-card { background: white; border: 1px solid #e7e5e4; border-radius: 6px; padding: 8px; min-width: 140px; flex: 1; display: flex; flex-direction: column; gap: 4px; }
-        .progress-track { height: 6px; background: #f5f5f4; border-radius: 3px; overflow: hidden; position: relative; }
-        .progress-fill { height: 100%; border-radius: 3px; transition: width 0.3s ease; }
-        .fill-red { background: #f87171; }
-        .fill-yellow { background: #fbbf24; }
-        .fill-green { background: #34d399; }
-        .fill-blue { background: #60a5fa; }
+        /* GOAL CARDS */
+        .goal-card { background: white; border: 1px solid #e7e5e4; border-radius: 8px; padding: 10px; min-width: 180px; flex: 1; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .progress-track { height: 6px; background: #f5f5f4; border-radius: 10px; overflow: hidden; margin: 6px 0; }
+        .progress-fill { height: 100%; transition: width 0.5s ease; }
+        
+        .photo-reel { display: flex; gap: 4px; overflow-x: auto; max-width: 150px; }
+        .reel-img { width: 30px; height: 40px; object-fit: cover; border-radius: 2px; border: 1px solid #eee; }
 
-        .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+        .animate-fade-in { animation: fadeIn 0.4s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
-<body class="flex flex-col min-h-screen">
+<body>
 
-    <nav class="bg-white border-b border-stone-200 shadow-sm sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
-                <div class="flex items-center gap-4">
-                    <div class="flex-shrink-0 flex items-center">
-                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.18.0</span></span>
-                        <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] bg-stone-100 text-stone-400">Loading...</span>
-                    </div>
-                    <div class="hidden sm:ml-6 sm:flex sm:space-x-4">
-                        <button onclick="window.switchView('dashboard')" id="nav-dashboard" class="nav-item px-3 py-2 rounded-md text-sm font-medium hover:bg-stone-100 transition-colors nav-active">總覽</button>
-                        <button onclick="window.switchView('production')" id="nav-production" class="nav-item px-3 py-2 rounded-md text-sm font-medium hover:bg-stone-100 transition-colors text-stone-500">生產排程</button>
-                        <button onclick="window.switchView('allocation')" id="nav-allocation" class="nav-item px-3 py-2 rounded-md text-sm font-medium hover:bg-stone-100 transition-colors text-stone-500">庫存管理</button>
-                        <button onclick="window.switchView('settings')" id="nav-settings" class="nav-item px-3 py-2 rounded-md text-sm font-medium hover:bg-stone-100 transition-colors text-stone-500 hidden flex items-center gap-1 border border-stone-200 bg-stone-50">設定</button>
-                    </div>
-                </div>
-                <div class="flex items-center">
-                    <select id="role-select" onchange="window.updateRole()" class="block w-full pl-3 pr-10 py-2 text-base border-stone-300 focus:outline-none focus:ring-stone-500 sm:text-sm rounded-md bg-stone-100">
-                        <option value="admin" selected>Admin (Rie & Raina)</option>
-                        <option value="maker_kim">Maker (Kim)</option>
-                        <option value="maker_kelly">Maker (Kelly)</option>
-                    </select>
+    <nav class="bg-white border-b border-stone-200 sticky top-0 z-50 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 h-16 flex justify-between items-center">
+            <div class="flex items-center gap-6">
+                <span class="text-xl font-bold tracking-tighter text-stone-800">WEIWEIWEI <span class="text-[10px] text-stone-400 font-normal">v12.0 PRO</span></span>
+                <div class="hidden sm:flex space-x-1">
+                    <button onclick="switchView('dashboard')" id="nav-dashboard" class="nav-item px-3 py-2 rounded-md text-sm font-medium nav-active">總覽</button>
+                    <button onclick="switchView('production')" id="nav-production" class="nav-item px-3 py-2 rounded-md text-sm font-medium text-stone-500">生產排程</button>
+                    <button onclick="switchView('allocation')" id="nav-allocation" class="nav-item px-3 py-2 rounded-md text-sm font-medium text-stone-500">庫存與分銷</button>
                 </div>
             </div>
-        </div>
-        <div class="sm:hidden bg-white border-t border-stone-200 flex justify-around p-2">
-             <button onclick="window.switchView('dashboard')" class="text-xs font-medium p-2">總覽</button>
-             <button onclick="window.switchView('production')" class="text-xs font-medium p-2">生產</button>
-             <button onclick="window.switchView('allocation')" class="text-xs font-medium p-2">庫存</button>
-             <button onclick="window.switchView('settings')" id="mobile-nav-settings" class="text-xs font-medium p-2 hidden">設定</button>
+            <div class="flex items-center gap-3">
+                <select id="role-select" onchange="updateRole()" class="text-xs border-stone-200 rounded bg-stone-50 p-1">
+                    <option value="admin">Admin View</option>
+                    <option value="maker_kim">Kim View</option>
+                    <option value="maker_kelly">Kelly View</option>
+                </select>
+                <span id="connection-status" class="text-[10px] px-2 py-0.5 rounded bg-green-50 text-green-600 border border-green-100">Online</span>
+            </div>
         </div>
     </nav>
 
-    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 py-6">
 
-        <section id="view-dashboard" class="space-y-8 animate-fade-in pb-10">
-            <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
-                 <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-stone-800">
-                    <div class="text-stone-500 text-xs font-bold uppercase tracking-wider">總生產件數 (Total)</div>
-                    <div class="mt-2 text-3xl font-bold text-stone-800" id="kpi-total">0</div>
+        <section id="view-dashboard" class="space-y-6 animate-fade-in">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="bg-white p-4 rounded-lg border border-stone-200 shadow-sm">
+                    <div class="text-stone-400 text-[10px] font-bold uppercase">總生產件數</div>
+                    <div class="text-2xl font-bold text-stone-800" id="kpi-total">0</div>
                 </div>
-                <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-amber-500">
-                    <div class="text-amber-600 text-xs font-bold uppercase">製作中 (件)</div>
-                    <div class="mt-2 text-3xl font-bold text-stone-800" id="kpi-making">0</div>
+                <div class="bg-white p-4 rounded-lg border border-stone-200 shadow-sm border-l-4 border-amber-400">
+                    <div class="text-amber-600 text-[10px] font-bold uppercase">製作中 (Work In Progress)</div>
+                    <div class="text-2xl font-bold text-stone-800" id="kpi-making">0</div>
                 </div>
-                <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-emerald-500">
-                    <div class="text-emerald-600 text-xs font-bold uppercase">在庫 (件)</div>
-                    <div class="mt-2 text-3xl font-bold text-stone-800" id="kpi-studio">0</div>
+                <div class="bg-white p-4 rounded-lg border border-stone-200 shadow-sm border-l-4 border-blue-400">
+                    <div class="text-blue-600 text-[10px] font-bold uppercase">在庫件數</div>
+                    <div class="text-2xl font-bold text-stone-800" id="kpi-studio">0</div>
                 </div>
-                <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-gray-400">
-                    <div class="text-gray-500 text-xs font-bold uppercase">未分配 (件)</div>
-                    <div class="mt-2 text-3xl font-bold text-stone-800" id="kpi-unallocated">0</div>
-                </div>
-                <div class="bg-stone-800 p-6 rounded-lg shadow-md border-l-4 border-yellow-500 text-white">
-                    <div class="text-yellow-500 text-xs font-bold uppercase">已售出 (件)</div>
-                    <div class="mt-2 text-3xl font-bold" id="kpi-sold">0</div>
+                <div class="bg-stone-800 p-4 rounded-lg shadow-inner text-white">
+                    <div class="text-stone-400 text-[10px] font-bold uppercase">累計售出</div>
+                    <div class="text-2xl font-bold text-yellow-500" id="kpi-sold">0</div>
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                
-                <div class="bg-white p-6 rounded-lg shadow-sm md:col-span-2 flex flex-col relative h-auto">
-                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-                        <div class="flex bg-stone-100 p-1 rounded-lg">
-                            <button onclick="window.setCalendarMode('production')" id="btn-mode-production" class="px-3 py-1.5 text-xs font-bold rounded-md shadow bg-white text-stone-800 transition-all flex items-center gap-1">
-                                📅 製作排程
-                            </button>
-                            <button onclick="window.setCalendarMode('arrival')" id="btn-mode-arrival" class="px-3 py-1.5 text-xs font-bold rounded-md text-stone-500 hover:text-stone-800 transition-all flex items-center gap-1">
-                                🚀 完工上新
-                            </button>
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                <div class="lg:col-span-3 space-y-4">
+                    <div class="bg-white p-4 rounded-xl border border-stone-200 shadow-sm">
+                        <div class="flex justify-between items-center mb-4">
+                            <div class="flex bg-stone-100 p-1 rounded-lg">
+                                <button onclick="setCalendarMode('production')" id="btn-mode-production" class="px-4 py-1.5 text-xs font-bold rounded-md bg-white shadow-sm text-stone-800 transition-all">📅 生產調度</button>
+                                <button onclick="setCalendarMode('arrival')" id="btn-mode-arrival" class="px-4 py-1.5 text-xs font-bold rounded-md text-stone-500 hover:text-stone-800 transition-all">🚀 完工上新計畫</button>
+                            </div>
+                            <div class="flex items-center gap-4">
+                                <button onclick="changeMonth(-1)" class="p-1 hover:bg-stone-100 rounded-full"><i data-lucide="chevron-left"></i></button>
+                                <span class="text-sm font-bold text-stone-700 min-w-[120px] text-center" id="calendar-month-label">Month Year</span>
+                                <button onclick="changeMonth(1)" class="p-1 hover:bg-stone-100 rounded-full"><i data-lucide="chevron-right"></i></button>
+                            </div>
                         </div>
-                        <div class="flex items-center gap-3">
-                            <button onclick="window.changeMonth(-1)" class="w-8 h-8 flex items-center justify-center rounded-full bg-stone-100 hover:bg-stone-200 text-stone-600 transition">
-                                <i data-lucide="chevron-left" class="w-4 h-4"></i>
-                            </button>
-                            <span class="text-sm font-bold text-stone-700 min-w-[100px] text-center" id="calendar-month-label">Current</span>
-                            <button onclick="window.changeMonth(1)" class="w-8 h-8 flex items-center justify-center rounded-full bg-stone-100 hover:bg-stone-200 text-stone-600 transition">
-                                <i data-lucide="chevron-right" class="w-4 h-4"></i>
-                            </button>
+
+                        <div id="weekly-achievement-row" class="flex gap-3 overflow-x-auto pb-4 mb-2 custom-scrollbar">
+                            </div>
+
+                        <div id="calendar-wrapper" class="calendar-grid rounded-lg overflow-hidden border border-stone-200">
+                            <div class="calendar-header">Sun</div>
+                            <div class="calendar-header">Mon</div>
+                            <div class="calendar-header">Tue</div>
+                            <div class="calendar-header">Wed</div>
+                            <div class="calendar-header">Thu</div>
+                            <div class="calendar-header">Fri</div>
+                            <div class="calendar-header">Sat</div>
+                            <div id="calendar-days-container" class="contents"></div>
                         </div>
-                    </div>
-
-                    <div id="unscheduled-container" class="mb-4 bg-stone-50 p-3 rounded border border-stone-100 transition-all">
-                        <h5 class="text-[10px] font-bold text-stone-400 uppercase tracking-wide mb-2 flex items-center gap-2">
-                            <span id="unscheduled-month-label">本月</span> 待定日期 <span class="text-[9px] bg-stone-200 px-1 rounded text-stone-500" id="unscheduled-count">0</span>
-                        </h5>
-                        <div id="cal-unscheduled-list" class="flex flex-wrap gap-2 min-h-[24px]"></div>
-                    </div>
-
-                    <div id="weekly-stats-container" class="mb-4 bg-stone-50 p-4 rounded border border-stone-200 hidden transition-all">
-                        <div class="flex justify-between items-center mb-2">
-                            <h5 class="text-[10px] font-bold text-stone-600 uppercase tracking-wide flex items-center gap-2">
-                                <i data-lucide="target" class="w-3 h-3 text-red-500"></i> 每週上新目標 (點擊數字修改)
-                            </h5>
-                        </div>
-                        <div id="weekly-goals-list" class="flex flex-wrap gap-3"></div>
-                    </div>
-
-                    <div id="calendar-wrapper" class="calendar-grid rounded-lg overflow-hidden border border-stone-200 shadow-sm w-full">
-                        <div class="calendar-header">Sun</div>
-                        <div class="calendar-header">Mon</div>
-                        <div class="calendar-header">Tue</div>
-                        <div class="calendar-header">Wed</div>
-                        <div class="calendar-header">Thu</div>
-                        <div class="calendar-header">Fri</div>
-                        <div class="calendar-header">Sat</div>
-                        <div id="calendar-days-container" class="contents"></div>
                     </div>
                 </div>
 
-                <div class="space-y-6">
-                    <div class="bg-white p-4 rounded-lg shadow-sm">
-                        <h3 class="font-bold text-stone-700 mb-2 text-xs uppercase tracking-wide">庫存分佈</h3>
-                        <div id="location-stats-container" class="flex flex-wrap gap-2"></div>
-                         <div id="location-breakdown-panel" class="mt-4 hidden bg-stone-50 border border-stone-100 rounded p-3 shadow-inner">
-                            <h4 class="text-xs font-bold text-stone-800 mb-2 border-b border-stone-200 pb-1" id="breakdown-title">Location</h4>
-                            <ul class="text-[10px] text-stone-600 space-y-1 max-h-32 overflow-y-auto custom-scrollbar" id="breakdown-list"></ul>
-                        </div>
+                <div class="space-y-4">
+                    <div class="bg-white p-4 rounded-xl border border-stone-200 shadow-sm">
+                        <h3 class="text-xs font-bold text-stone-500 uppercase mb-4 tracking-widest">庫存分佈 (Locations)</h3>
+                        <div id="location-stats-container" class="space-y-2"></div>
                     </div>
-                    <div class="bg-white p-4 rounded-lg shadow-sm">
-                        <h3 class="font-bold text-stone-700 mb-2 text-xs uppercase tracking-wide">類別總計</h3>
-                        <div id="category-stats-container" class="flex flex-wrap gap-2"></div>
-                    </div>
-                    <div class="bg-white p-4 rounded-lg shadow-sm">
-                        <h4 class="text-xs font-bold text-stone-500 mb-2 uppercase">類別生產趨勢</h4>
-                        <div class="relative w-full h-40"><canvas id="categoryChart"></canvas></div>
-                    </div>
-                    <div class="bg-white p-4 rounded-lg shadow-sm">
-                        <h4 class="text-xs font-bold text-stone-500 mb-2 uppercase">庫存佔比</h4>
-                        <div class="relative w-full h-40"><canvas id="allocationChart"></canvas></div>
+                    <div class="bg-white p-4 rounded-xl border border-stone-200 shadow-sm">
+                        <h3 class="text-xs font-bold text-stone-500 uppercase mb-4 tracking-widest">類別產能分析</h3>
+                        <div class="h-48"><canvas id="categoryChart"></canvas></div>
                     </div>
                 </div>
             </div>
         </section>
 
-        <section id="view-production" class="space-y-6 hidden animate-fade-in pb-10">
-            <div class="bg-white rounded-lg p-6 shadow-sm border-l-4 border-amber-500 flex justify-between items-center">
+        <section id="view-production" class="hidden space-y-6 animate-fade-in">
+            <div class="flex justify-between items-center bg-white p-6 rounded-xl border-l-4 border-amber-400 shadow-sm">
                 <div>
-                    <h2 class="text-xl font-bold text-stone-800">生產排程</h2>
-                    <p class="text-stone-500 text-sm mt-1">Pending &rarr; Making &rarr; QC &rarr; Ready</p>
+                    <h2 class="text-xl font-bold text-stone-800">生產排程工單</h2>
+                    <p class="text-xs text-stone-500 mt-1">管理從舊衣拆解到成品完工的每一個環節</p>
                 </div>
-                <button onclick="window.openModal()" class="bg-stone-800 text-white px-4 py-2 rounded-md text-sm shadow-md flex items-center gap-2">
-                    <span>&#43;</span> 新增工單
+                <button onclick="openModal()" class="bg-stone-800 text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-lg hover:bg-stone-700 transition-all flex items-center gap-2">
+                    <i data-lucide="plus" class="w-4 h-4"></i> 新增生產工單
                 </button>
             </div>
-            <div class="flex items-center gap-2 bg-white p-3 rounded-lg shadow-sm">
-                <span class="text-sm font-medium text-stone-600 flex-shrink-0">過濾:</span>
-                <select id="prod-filter-maker" onchange="window.renderProductionList()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5 dynamic-maker-select"><option value="all">全部製作人</option></select>
-                <select id="prod-filter-category" onchange="window.renderProductionList()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5 dynamic-category-select"><option value="all">全部類別</option></select>
-            </div>
-            <div class="bg-white rounded-lg shadow-sm overflow-hidden border border-stone-200">
-                <div class="overflow-x-auto custom-scrollbar">
-                    <table class="min-w-full text-left text-sm">
-                        <thead class="bg-stone-100 text-stone-600 uppercase font-semibold">
-                            <tr>
-                                <th class="px-6 py-3">Month</th>
-                                <th class="px-6 py-3">Photos</th>
-                                <th class="px-6 py-3">Item Info</th>
-                                <th class="px-6 py-3">Qty</th>
-                                <th class="px-6 py-3">Maker</th>
-                                <th class="px-6 py-3">Status</th>
-                                <th class="px-6 py-3">Price</th>
-                                <th class="px-6 py-3">Edit</th>
-                            </tr>
-                        </thead>
-                        <tbody id="production-table-body" class="divide-y divide-stone-100"></tbody>
-                    </table>
-                </div>
+            
+            <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden">
+                <table class="min-w-full text-left text-sm">
+                    <thead class="bg-stone-50 border-b border-stone-100 text-stone-500 font-bold uppercase text-[10px]">
+                        <tr>
+                            <th class="px-6 py-4">月份</th>
+                            <th class="px-6 py-4">預計去向</th>
+                            <th class="px-6 py-4">品項細節</th>
+                            <th class="px-6 py-4">製作人</th>
+                            <th class="px-6 py-4">狀態</th>
+                            <th class="px-6 py-4">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="production-table-body" class="divide-y divide-stone-50"></tbody>
+                </table>
             </div>
         </section>
 
-        <section id="view-allocation" class="space-y-6 hidden animate-fade-in pb-10">
-            <div class="bg-white rounded-lg p-6 shadow-sm border-l-4 border-blue-500">
-                <h2 class="text-xl font-bold text-stone-800">庫存與去向</h2>
-                <p class="text-stone-500 text-sm mt-1"><span class="bg-gray-200 border text-gray-500 text-[10px] px-1 rounded">未分配</span> 代表尚未入庫。點擊照片可標記售出或轉移地點。</p>
+        <section id="view-allocation" class="hidden space-y-6 animate-fade-in">
+             <div class="bg-white p-6 rounded-xl border-l-4 border-blue-400 shadow-sm">
+                <h2 class="text-xl font-bold text-stone-800">庫存與分銷去向</h2>
+                <p class="text-xs text-stone-500 mt-1">追蹤 Upcycling 成品流向哪些選物店或官網上新</p>
             </div>
-            <div class="flex items-center gap-2 bg-white p-3 rounded-lg shadow-sm">
-                <span class="text-sm font-medium text-stone-600 flex-shrink-0">顯示地點:</span>
-                <select id="alloc-filter-location" onchange="window.renderAllocationList()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5"><option value="all">全部庫存 (All)</option><option value="Sold">已售出 (Sold)</option><option value="Unallocated">未分配 (Unallocated)</option></select>
-            </div>
-            <div class="bg-white rounded-lg shadow-sm overflow-hidden border border-stone-200">
-                <div class="overflow-x-auto custom-scrollbar">
-                    <table class="min-w-full text-left text-sm">
-                        <thead class="bg-stone-100 text-stone-600 uppercase font-semibold">
-                            <tr><th class="px-6 py-3 w-[450px]">Unique Pieces (Inventory)</th><th class="px-6 py-3">Item Detail</th><th class="px-6 py-3">Category</th></tr>
-                        </thead>
-                        <tbody id="allocation-table-body" class="divide-y divide-stone-100"></tbody>
-                    </table>
-                </div>
-            </div>
-        </section>
-
-        <section id="view-settings" class="space-y-6 hidden pb-10">
-             <div class="bg-white p-6 rounded-lg shadow-sm border border-stone-200"><h2 class="text-xl font-bold text-stone-800">系統設定</h2></div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="bg-white p-6 rounded-lg shadow-sm"><h3 class="font-bold text-stone-700 mb-2">製作人</h3><div id="settings-makers-list" class="flex flex-wrap gap-1 mb-2"></div><div class="flex gap-2"><input id="new-maker-input" placeholder="新增..." class="flex-1 border text-sm rounded px-2"><button onclick="window.addSetting('makers')" class="bg-stone-800 text-white px-2 rounded">+</button></div></div>
-                <div class="bg-white p-6 rounded-lg shadow-sm"><h3 class="font-bold text-stone-700 mb-2">地點</h3><div id="settings-locations-list" class="flex flex-wrap gap-1 mb-2"></div><div class="flex gap-2"><input id="new-location-input" placeholder="新增..." class="flex-1 border text-sm rounded px-2"><button onclick="window.addSetting('locations')" class="bg-stone-800 text-white px-2 rounded">+</button></div></div>
-                 <div class="bg-white p-6 rounded-lg shadow-sm"><h3 class="font-bold text-stone-700 mb-2">類別</h3><div id="settings-categories-list" class="flex flex-wrap gap-1 mb-2"></div><div class="flex gap-2"><input id="new-category-input" placeholder="新增..." class="flex-1 border text-sm rounded px-2"><button onclick="window.addSetting('categories')" class="bg-stone-800 text-white px-2 rounded">+</button></div></div>
-            </div>
+            <div id="allocation-grid" class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6"></div>
         </section>
 
     </main>
 
-    <div id="add-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-lg shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
-            <h3 class="text-lg font-bold mb-4">新增工單</h3>
-            <form id="add-item-form" onsubmit="window.handleAddItem(event)" class="space-y-4">
+    <div id="add-modal" class="fixed inset-0 bg-stone-900/60 hidden z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-8 animate-fade-in">
+            <h3 class="text-lg font-bold text-stone-800 mb-6 flex items-center gap-2"><i data-lucide="plus-circle" class="text-amber-500"></i> 新增生產工單</h3>
+            <form id="add-item-form" onsubmit="handleAddItem(event)" class="space-y-4">
                 <div class="grid grid-cols-2 gap-4">
-                    <input type="text" name="month" id="form-month-input" class="border p-2 rounded text-sm" placeholder="月份 (例: Oct)">
-                    <input type="text" name="itemName" required class="border p-2 rounded text-sm" placeholder="品名">
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <select name="category" class="border p-2 rounded text-sm dynamic-category-select"></select>
-                    <select name="maker" class="border p-2 rounded text-sm dynamic-maker-select"></select>
-                </div>
-                 <div class="grid grid-cols-2 gap-4">
-                    <input type="text" name="color" class="border p-2 rounded text-sm" placeholder="顏色">
-                    <select name="size" class="border p-2 rounded text-sm bg-white"><option value="F">F</option><option value="S">S</option><option value="M">M</option><option value="L">L</option></select>
-                </div>
-                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-xs font-medium text-stone-500 mb-1">數量</label>
-                        <input type="number" name="quantity" value="1" min="1" class="w-full border-stone-300 rounded-md shadow-sm text-sm p-2 border">
+                        <label class="block text-[10px] font-bold text-stone-400 uppercase mb-1">對應月份 (例: Oct)</label>
+                        <input type="text" name="month" id="form-month-input" class="w-full border-stone-200 rounded-lg p-2.5 text-sm bg-stone-50" required>
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-stone-500 mb-1">定價 (Price)</label>
-                        <input type="number" name="price" placeholder="RM" class="w-full border-stone-300 rounded-md shadow-sm text-sm p-2 border">
+                        <label class="block text-[10px] font-bold text-stone-400 uppercase mb-1">預計去向 (Planned For)</label>
+                        <select name="plannedLocation" class="w-full border-stone-200 rounded-lg p-2.5 text-sm bg-stone-50">
+                            <option value="Online">Online Website</option>
+                            <option value="Studio">Studio Inventory</option>
+                            <option value="Bev C">Stockist: Bev C</option>
+                            <option value="Pop-Up">Event: Pop-Up</option>
+                        </select>
                     </div>
                 </div>
-                <div class="bg-stone-50 p-3 rounded border border-dashed border-stone-300">
-                    <label class="text-xs font-bold text-stone-700 block mb-2">單品照片 (多選)</label>
-                    <input type="file" name="initialPhotos" accept="image/*" multiple class="block w-full text-xs">
+                <div>
+                    <label class="block text-[10px] font-bold text-stone-400 uppercase mb-1">品名與類別</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="text" name="itemName" placeholder="例如: 拼貼單寧夾克" class="border-stone-200 rounded-lg p-2.5 text-sm w-full" required>
+                        <select name="category" class="dynamic-category-select border-stone-200 rounded-lg p-2.5 text-sm bg-stone-50"></select>
+                    </div>
                 </div>
-                <div class="flex justify-end pt-2 gap-2">
-                    <button type="button" onclick="window.closeModal()" class="text-stone-500 text-sm">取消</button>
-                    <button type="submit" id="btn-submit" class="bg-stone-800 text-white px-4 py-2 rounded text-sm">確認新增</button>
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-[10px] font-bold text-stone-400 uppercase mb-1">製作人</label>
+                        <select name="maker" class="dynamic-maker-select border-stone-200 rounded-lg p-2.5 text-sm bg-stone-50 w-full"></select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-stone-400 uppercase mb-1">數量</label>
+                        <input type="number" name="quantity" value="1" min="1" class="border-stone-200 rounded-lg p-2.5 text-sm w-full">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-stone-400 uppercase mb-1">預計單價</label>
+                        <input type="number" name="price" placeholder="RM" class="border-stone-200 rounded-lg p-2.5 text-sm w-full">
+                    </div>
+                </div>
+                <div class="flex justify-end gap-3 pt-4 border-t border-stone-100">
+                    <button type="button" onclick="closeModal()" class="px-6 py-2 text-stone-400 text-sm font-bold">取消</button>
+                    <button type="submit" class="bg-stone-800 text-white px-8 py-2.5 rounded-lg text-sm font-bold shadow-lg hover:bg-stone-900 transition-all">確認發布工單</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <div id="edit-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-lg shadow-xl max-w-sm w-full p-6 max-h-[90vh] overflow-y-auto">
-            <h3 class="text-lg font-bold text-stone-800 mb-4">編輯工單</h3>
-            <input type="hidden" id="edit-id">
-            <div class="space-y-3">
-                <div>
-                    <label class="text-xs text-stone-500">品名</label>
-                    <input type="text" id="edit-itemName" class="w-full border p-2 rounded text-sm">
-                </div>
-                <div class="grid grid-cols-2 gap-2">
-                      <div>
-                        <label class="text-xs text-stone-500">月份</label>
-                        <input type="text" id="edit-month" class="w-full border p-2 rounded text-sm">
-                      </div>
-                      <div>
-                        <label class="text-xs text-stone-500">生產階段</label>
-                        <select id="edit-status" class="w-full border p-2 rounded text-sm bg-white">
-                            <option value="Pending">Pending</option>
-                            <option value="To Make">To Make</option>
-                            <option value="Making">Making</option>
-                            <option value="QC">QC</option>
-                            <option value="Ready">Ready</option>
-                        </select>
-                      </div>
-                </div>
-                 <div>
-                    <label class="text-xs text-stone-500 font-bold">定價 (RM)</label>
-                    <input type="number" id="edit-price" class="w-full border p-2 rounded text-sm font-bold text-stone-700">
-                </div>
-                <div class="grid grid-cols-2 gap-2 pt-2 border-t border-stone-100">
-                    <div>
-                        <label class="text-xs text-stone-500 font-bold">開始製作日</label>
-                        <input type="date" id="edit-startDate" class="w-full border p-2 rounded text-xs text-stone-600">
-                    </div>
-                    <div>
-                        <label class="text-xs text-stone-500 font-bold">完成日</label>
-                        <input type="date" id="edit-completedDate" class="w-full border p-2 rounded text-xs text-stone-600">
-                    </div>
-                </div>
-                <div class="pt-2 border-t border-stone-100">
-                    <label class="text-xs text-stone-700 font-bold block mb-2">追加照片</label>
-                    <input type="file" id="edit-addPhotos" accept="image/*" multiple class="block w-full text-xs text-stone-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-stone-100">
-                    <p class="text-[10px] text-stone-400 mt-1">上傳後將取代預設的空圖片。</p>
-                </div>
-            </div>
-            <div class="flex justify-between mt-6">
-                <button onclick="window.handleDelete()" class="text-red-500 text-xs flex items-center gap-1"><i data-lucide="trash-2" class="w-3 h-3"></i> 刪除</button>
-                <div class="flex gap-2">
-                    <button onclick="window.closeEditModal()" class="px-3 py-1 text-sm bg-gray-100 rounded">取消</button>
-                    <button onclick="window.handleEditSubmit()" id="btn-edit-save" class="px-3 py-1 text-sm bg-stone-800 text-white rounded">儲存變更</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="sold-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden z-[70] flex items-center justify-center p-4">
-        <div class="bg-white rounded-lg shadow-xl max-w-xs w-full p-6">
-            <h3 class="text-lg font-bold text-stone-800 mb-2">確認售出價格</h3>
-            <p class="text-xs text-stone-500 mb-4">請輸入最終成交金額與日期</p>
+    <div id="goal-modal" class="fixed inset-0 bg-stone-900/60 hidden z-[110] flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl p-8 max-w-sm w-full">
+            <h3 class="text-lg font-bold text-stone-800 mb-4">設定週上新目標</h3>
             <div class="space-y-4">
                 <div>
-                    <label class="text-xs font-bold text-stone-700">成交價 (RM)</label>
-                    <input type="number" id="sold-price-input" class="w-full border p-2 rounded text-lg font-bold text-stone-800">
+                    <label class="text-[10px] font-bold text-stone-400 uppercase">總件數目標 (Total Units)</label>
+                    <input type="number" id="goal-total-input" class="w-full border-stone-200 rounded-lg p-3 mt-1 font-bold text-lg">
                 </div>
                 <div>
-                    <label class="text-xs font-bold text-stone-700">售出日期 (Sold Date)</label>
-                    <input type="date" id="sold-date-input" class="w-full border p-2 rounded text-sm text-stone-600">
-                </div>
-                <div>
-                    <label class="text-xs text-stone-500">備註 (折扣原因等)</label>
-                    <input type="text" id="sold-note-input" placeholder="例: VIP 9折" class="w-full border p-2 rounded text-sm">
+                    <label class="text-[10px] font-bold text-stone-400 uppercase">官網比例 (Web Items)</label>
+                    <input type="number" id="goal-web-input" class="w-full border-stone-200 rounded-lg p-3 mt-1">
                 </div>
                 <div class="flex gap-2 justify-end">
-                    <button onclick="document.getElementById('sold-modal').classList.add('hidden')" class="px-4 py-2 text-sm text-stone-500">取消</button>
-                    <button onclick="window.confirmSoldAction()" class="bg-stone-800 text-white px-4 py-2 rounded text-sm font-bold">確認售出</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="detail-modal" class="fixed inset-0 bg-black bg-opacity-80 hidden z-[60] flex items-center justify-center p-4">
-        <div class="bg-white rounded-lg shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col md:flex-row max-h-[90vh]">
-            <div class="w-full md:w-1/2 bg-stone-100 flex items-center justify-center p-4 relative">
-                <img id="detail-img" src="" class="max-w-full max-h-[300px] md:max-h-full object-contain rounded shadow-sm">
-                <div id="detail-sold-badge" class="absolute top-4 right-4 bg-stone-900 text-white px-3 py-1 text-xs font-bold hidden shadow-lg border border-white">SOLD</div>
-            </div>
-            <div class="w-full md:w-1/2 p-6 flex flex-col">
-                <div class="flex justify-between items-start mb-4">
-                    <div>
-                        <h3 class="text-lg font-bold text-stone-800" id="detail-title">Name</h3>
-                        <p class="text-xs text-stone-500" id="detail-sku">SKU</p>
-                        <p class="text-sm font-bold text-stone-700 mt-1" id="detail-price-display">Price: -</p>
-                    </div>
-                    <button onclick="window.closeDetailModal()" class="text-stone-400 hover:text-stone-800 text-2xl">&times;</button>
-                </div>
-
-                <div class="space-y-6 flex-grow overflow-y-auto pr-2">
-                    <div>
-                        <label class="text-xs font-bold text-stone-600 uppercase tracking-wider mb-2 block">庫存地點 (可複選)</label>
-                        <div class="grid grid-cols-2 gap-2" id="detail-location-options"></div>
-                        <p class="text-[10px] text-stone-400 mt-1">* 若未選擇，將顯示為「未分配 (None)」</p>
-                    </div>
-                    <div>
-                        <label class="text-xs font-bold text-stone-600 uppercase tracking-wider mb-2 block">單品備註</label>
-                        <textarea id="detail-notes" rows="3" class="w-full border border-stone-200 rounded p-2 text-sm bg-stone-50" placeholder="備註..."></textarea>
-                    </div>
-                </div>
-
-                <div class="pt-4 border-t border-stone-100 mt-4 flex justify-between items-center gap-2">
-                    <button id="btn-toggle-sold" onclick="window.triggerSoldFlow()" class="bg-stone-800 hover:bg-stone-700 text-white px-4 py-2 rounded text-sm w-full font-bold">
-                        標記為已售出
-                    </button>
-                    <button onclick="window.saveItemDetails()" class="bg-stone-200 text-stone-600 px-4 py-2 rounded text-sm font-bold w-1/3 hover:bg-stone-300">
-                        儲存
-                    </button>
+                    <button onclick="document.getElementById('goal-modal').classList.add('hidden')" class="text-stone-400 text-sm">關閉</button>
+                    <button onclick="saveWeeklyGoalAction()" class="bg-stone-800 text-white px-6 py-2 rounded-lg text-sm font-bold">儲存目標</button>
                 </div>
             </div>
         </div>
@@ -441,533 +258,243 @@
         };
 
         const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
         const dbFirestore = getFirestore(app);
-        const storage = getStorage(app);
+        const auth = getAuth(app);
 
+        // --- GLOBAL STATE ---
         let db = [];
-        let currentRole = 'admin';
-        let calendarMode = 'production'; 
-        let currentCalDate = new Date(); // State for selected month
-        let categoryChart = null, allocChart = null;
         let appSettings = { makers: ['Kim', 'Kelly', 'Lijin'], locations: ['Studio', 'Online', 'Bev C', 'Pop-Up'], categories: ['Top', 'Dress', 'Pants'], weekly_goals: {} };
-        let currentDetailItem = null, currentDetailPhotoIdx = -1, tempLocations = []; 
-        const catColors = ['#f472b6', '#60a5fa', '#a78bfa', '#34d399', '#fbbf24', '#9ca3af'];
-        const locColors = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#6366f1', '#14b8a6'];
-        let locationBreakdownData = {}; 
+        let currentCalDate = new Date();
+        let calendarMode = 'production';
+        let currentTargetKey = '';
+        const DAILY_CAPACITY = 4; // 一天上限 4 件 Upcycling 工量
 
-        document.addEventListener('DOMContentLoaded', () => {
-            const statusEl = document.getElementById('connection-status');
-            statusEl.innerText = "Initializing...";
+        window.onload = () => {
+            lucide.createIcons();
+            signInAnonymously(auth);
+            onAuthStateChanged(auth, (user) => { if(user) startApp(); });
             document.getElementById('form-month-input').value = new Date().toLocaleString('en-US', { month: 'short', year: 'numeric' });
+        };
 
-            if (!auth) return;
-
-            signInAnonymously(auth).catch((error) => {
-                statusEl.innerText = "Login Fail";
-                statusEl.className = "ml-2 px-2 py-0.5 rounded text-[10px] bg-red-100 text-red-600";
-            });
-
-            onAuthStateChanged(auth, (user) => {
-                if (user) {
-                    statusEl.innerText = "Connected";
-                    statusEl.className = "ml-2 px-2 py-0.5 rounded text-[10px] bg-green-100 text-green-600";
-                    startListeners();
-                }
-            });
-
-            initCharts();
-            window.updateRole();
-        });
-
-        function startListeners() {
+        function startApp() {
+            // Listen to settings
             onSnapshot(doc(dbFirestore, "settings", "config"), (snap) => {
-                if(snap.exists()) {
-                    const data = snap.data();
-                    appSettings = {
-                        makers: data.makers || appSettings.makers,
-                        locations: data.locations || appSettings.locations,
-                        categories: data.categories || appSettings.categories,
-                        weekly_goals: data.weekly_goals || {} 
-                    };
-                }
-                renderSettingsView();
+                if(snap.exists()) appSettings = { ...appSettings, ...snap.data() };
                 updateDropdowns();
-                renderCalendar(); 
+                renderCalendar();
             });
 
-            const q = collection(dbFirestore, "stock_items");
-            
-            onSnapshot(q, (snapshot) => {
-                db = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-                db.sort((a, b) => {
-                    if (a.createdAt && b.createdAt) return b.createdAt.seconds - a.createdAt.seconds;
-                    if (!a.createdAt) return 1;
-                    if (!b.createdAt) return -1;
-                    return 0; 
-                });
-                
+            // Listen to data
+            onSnapshot(collection(dbFirestore, "stock_items"), (snap) => {
+                db = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 updateDashboard();
                 renderProductionList();
-                renderAllocationList();
-                updateDropdowns(); 
+                renderAllocationGrid();
+                renderCalendar();
             });
         }
 
-        function normalizePhotos(item) {
-            let raw = [];
-            if (item.photos && Array.isArray(item.photos)) raw = item.photos;
-            else if (item.photo) raw = [item.photo];
-
-            if (raw.length === 0 && item.quantity > 0) {
-                 return Array(item.quantity).fill({ url: '', status: 'Available', locations: [], notes: '', soldPrice: null }); 
-            }
-
-            return raw.map(p => {
-                if (typeof p === 'string') return { url: p, status: 'Available', locations: [], notes: '', soldPrice: null };
-                let locs = [];
-                if (Array.isArray(p.locations)) locs = p.locations;
-                else if (p.location && p.location !== 'Studio') locs = [p.location]; 
-                
-                return {
-                    url: p.url || '',
-                    status: p.status || 'Available',
-                    locations: locs, 
-                    notes: p.notes || '',
-                    soldPrice: p.soldPrice || null,
-                    soldAt: p.soldAt || null 
-                };
-            });
-        }
-        
-        function getCleanCategory(catName) {
-            if (!catName) return "Unknown";
-            const str = String(catName).replace(/\u00A0/g, ' ').trim();
-            if (!str) return "Unknown";
-            return str.charAt(0).toUpperCase() + str.slice(1);
-        }
-
-        // --- DASHBOARD & CALENDAR ---
-        function updateDashboard() {
-            const totalPieces = db.reduce((sum, item) => sum + (parseInt(item.quantity)||1), 0);
-            document.getElementById('kpi-total').textContent = totalPieces;
-
-            const making = db
-                .filter(i => i.status === 'Making')
-                .reduce((sum, item) => sum + (parseInt(item.quantity) || 1), 0);
-
-            let soldCount = 0, studioCount = 0, unallocatedCount = 0;
-            const catStats = {};
-            const locStats = { 'Unallocated': 0, 'Sold': 0 };
-            
-            appSettings.locations.forEach(l => {
-                locStats[l] = 0;
-                locationBreakdownData[l] = { total: 0, items: [], catBreakdown: {} };
-            });
-            locationBreakdownData['Unallocated'] = { total: 0, items: [], catBreakdown: {} };
-            locationBreakdownData['Sold'] = { total: 0, items: [], catBreakdown: {} };
-
-            db.forEach(i => {
-                const count = i.photos && i.photos.length > 0 ? i.photos.length : (parseInt(i.quantity)||1);
-                
-                const cat = getCleanCategory(i.category);
-                catStats[cat] = (catStats[cat] || 0) + count;
-
-                const photos = normalizePhotos(i);
-                photos.forEach((p, idx) => {
-                    const itemName = `${i.itemName} (${i.color})`;
-                    if (p.status === 'Sold') {
-                        soldCount++; locStats['Sold']++; addToBreakdown('Sold', itemName, cat);
-                    } else {
-                        if (p.locations.length > 0) {
-                            studioCount++;
-                            p.locations.forEach(loc => {
-                                if(locStats[loc] !== undefined) locStats[loc]++;
-                                addToBreakdown(loc, itemName, cat);
-                            });
-                        } else {
-                            unallocatedCount++; locStats['Unallocated']++; addToBreakdown('Unallocated', itemName, cat);
-                        }
-                    }
-                });
-            });
-
-            document.getElementById('kpi-making').textContent = making;
-            document.getElementById('kpi-studio').textContent = studioCount;
-            document.getElementById('kpi-unallocated').textContent = unallocatedCount;
-            document.getElementById('kpi-sold').textContent = soldCount;
-
-            renderCategoryBadges(catStats);
-            renderLocationButtons(locStats);
-            updateCharts(locStats, catStats);
-            renderCalendar(); 
-        }
-        
-        window.setCalendarMode = function(mode) {
-            calendarMode = mode;
-            const btnProd = document.getElementById('btn-mode-production');
-            const btnArr = document.getElementById('btn-mode-arrival');
-            const calendarWrapper = document.getElementById('calendar-wrapper');
-            
-            if(mode === 'production') {
-                btnProd.className = "px-3 py-1.5 text-xs font-bold rounded-md shadow bg-white text-stone-800 transition-all flex items-center gap-1";
-                btnArr.className = "px-3 py-1.5 text-xs font-bold rounded-md text-stone-500 hover:text-stone-800 transition-all flex items-center gap-1";
-                document.getElementById('unscheduled-container').classList.remove('hidden');
-                document.getElementById('weekly-stats-container').classList.add('hidden');
-                calendarWrapper.classList.remove('mode-arrival');
-            } else {
-                btnProd.className = "px-3 py-1.5 text-xs font-bold rounded-md text-stone-500 hover:text-stone-800 transition-all flex items-center gap-1";
-                btnArr.className = "px-3 py-1.5 text-xs font-bold rounded-md shadow bg-emerald-100 text-emerald-800 transition-all flex items-center gap-1";
-                document.getElementById('unscheduled-container').classList.add('hidden');
-                document.getElementById('weekly-stats-container').classList.remove('hidden');
-                calendarWrapper.classList.add('mode-arrival');
-            }
-            renderCalendar();
-        };
-
-        window.changeMonth = function(delta) {
-            currentCalDate.setMonth(currentCalDate.getMonth() + delta);
-            renderCalendar();
-        };
-
-        window.setWeeklyGoal = async function(year, month, week) {
-            const key = `y${year}m${month}w${week}`;
-            const current = appSettings.weekly_goals[key] || 0;
-            const val = prompt(`Set Target for ${year}/${month+1} Week ${week}:`, current);
-            if (val !== null) {
-                const num = parseInt(val) || 0;
-                const newGoals = { ...appSettings.weekly_goals, [key]: num };
-                await updateDoc(doc(dbFirestore, "settings", "config"), { weekly_goals: newGoals });
-            }
-        };
-
-        function renderCalendar() {
-            const displayDate = currentCalDate;
-            const year = displayDate.getFullYear();
-            const month = displayDate.getMonth();
-            const today = new Date();
-
-            const monthName = displayDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
-            document.getElementById('calendar-month-label').innerText = monthName;
-            
-            const unscheduledContainer = document.getElementById('cal-unscheduled-list');
-            const gridContainer = document.getElementById('calendar-days-container');
-            const weeklyGoalsList = document.getElementById('weekly-goals-list');
-            
-            unscheduledContainer.innerHTML = '';
-            gridContainer.innerHTML = '';
-            weeklyGoalsList.innerHTML = '';
-
-            // 1. UNSCHEDULED (Matches Displayed Month)
-            if (calendarMode === 'production') {
-                const monthShort = displayDate.toLocaleString('en-US', { month: 'short' });
-                document.getElementById('unscheduled-month-label').innerText = monthShort;
-                
-                const unscheduled = db.filter(item => 
-                    !item.makingAt && item.month && item.month.includes(monthShort)
-                );
-                document.getElementById('unscheduled-count').innerText = unscheduled.length;
-                if(unscheduled.length === 0) unscheduledContainer.innerHTML = '<span class="text-[10px] text-stone-300 italic">None</span>';
-                else {
-                    unscheduled.forEach(i => {
-                        let color = 'bg-stone-300';
-                        if(i.maker && i.maker.toLowerCase().includes('kim')) color = 'bg-pink-300';
-                        if(i.maker && i.maker.toLowerCase().includes('kelly')) color = 'bg-blue-300';
-                        unscheduledContainer.innerHTML += `
-                            <div onclick="window.openEditModal('${i.id}')" class="${color} text-white text-[10px] px-2 py-1 rounded cursor-pointer hover:opacity-80 transition shadow-sm">
-                                ${getCleanCategory(i.category)}: ${i.itemName}
-                            </div>`;
-                    });
-                }
-            }
-
-            const firstDay = new Date(year, month, 1).getDay(); 
+        // --- RENDER CALENDAR CORE ---
+        window.renderCalendar = function() {
+            const year = currentCalDate.getFullYear();
+            const month = currentCalDate.getMonth();
+            const firstDay = new Date(year, month, 1).getDay();
             const daysInMonth = new Date(year, month + 1, 0).getDate();
+            
+            document.getElementById('calendar-month-label').innerText = currentCalDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+            
+            const grid = document.getElementById('calendar-days-container');
+            const weeklyRow = document.getElementById('weekly-achievement-row');
+            grid.innerHTML = '';
+            weeklyRow.innerHTML = '';
+
             let weeklyActuals = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+            let weekCatBreakdown = { 1:{}, 2:{}, 3:{}, 4:{}, 5:{}, 6:{} };
 
-            for(let i=0; i<firstDay; i++) {
-                gridContainer.innerHTML += `<div class="calendar-cell bg-stone-50"></div>`;
-            }
+            // Render Empty Days
+            for(let i=0; i<firstDay; i++) grid.innerHTML += `<div class="calendar-cell bg-stone-50/50"></div>`;
 
+            // Render Days
             for(let d=1; d<=daysInMonth; d++) {
-                const isToday = (d === today.getDate() && month === today.getMonth() && year === today.getFullYear());
-                let cellHTML = `
-                    <div class="calendar-cell ${isToday ? 'cal-today border border-amber-300 bg-amber-50' : ''}">
-                        <span class="cal-date-num">${d}</span>
-                        <div class="cal-items-wrapper custom-scrollbar">
-                `;
-
-                const currentWeek = Math.ceil((d + firstDay) / 7);
-
+                const isToday = (d === new Date().getDate() && month === new Date().getMonth());
+                const weekNum = Math.ceil((d + firstDay) / 7);
+                
+                // Filter Items
                 const itemsToday = db.filter(item => {
-                    let targetDate = null;
-                    if (calendarMode === 'production' && item.makingAt) {
-                        targetDate = new Date(item.makingAt.seconds * 1000);
-                    } else if (calendarMode === 'arrival' && item.completedAt) {
-                        targetDate = new Date(item.completedAt.seconds * 1000);
-                    }
-
-                    if (targetDate) {
-                        return targetDate.getDate() === d && targetDate.getMonth() === month && targetDate.getFullYear() === year;
-                    }
-                    return false;
+                    const target = calendarMode === 'production' ? item.makingAt : item.completedAt;
+                    if(!target) return false;
+                    const dt = new Date(target.seconds * 1000);
+                    return dt.getDate() === d && dt.getMonth() === month && dt.getFullYear() === year;
                 });
 
-                if (calendarMode === 'arrival') {
-                     const quantity = itemsToday.reduce((sum, item) => sum + (parseInt(item.quantity)||1), 0);
-                     weeklyActuals[currentWeek] = (weeklyActuals[currentWeek] || 0) + quantity;
-                }
+                const dayQty = itemsToday.reduce((s, i) => s + (parseInt(i.quantity)||1), 0);
+                weeklyActuals[weekNum] += dayQty;
 
-                itemsToday.forEach(item => {
-                    let colorClass = 'maker-other';
-                    if(item.maker && item.maker.toLowerCase().includes('kim')) colorClass = 'maker-kim';
-                    if(item.maker && item.maker.toLowerCase().includes('kelly')) colorClass = 'maker-kelly';
-                    
-                    const catName = getCleanCategory(item.category);
-                    const qtyDisplay = item.quantity > 1 ? ` (${item.quantity})` : '';
-                    
-                    cellHTML += `<div class="cal-item ${colorClass}" onclick="window.openEditModal('${item.id}')" title="${item.itemName}">${catName}${qtyDisplay}</div>`;
+                // Category Achievement logic
+                itemsToday.forEach(i => {
+                    const cat = i.category || 'Other';
+                    weekCatBreakdown[weekNum][cat] = (weekCatBreakdown[weekNum][cat] || 0) + (parseInt(i.quantity)||1);
                 });
 
-                cellHTML += `</div></div>`;
-                gridContainer.innerHTML += cellHTML;
-            }
-            
-            // 2. RENDER WEEKLY GOALS (Arrival Mode) - SAVED PER MONTH
-            if (calendarMode === 'arrival') {
-                for (let w = 1; w <= 5; w++) {
-                    const goalKey = `y${year}m${month}w${w}`;
-                    const target = appSettings.weekly_goals[goalKey] || 0; // Default 0
-                    const actual = weeklyActuals[w] || 0;
-                    
-                    if (target === 0 && actual === 0 && w > 4) continue; // Skip empty late weeks
+                // Capacity Warning CSS
+                let capClass = "";
+                if(dayQty >= DAILY_CAPACITY) capClass = "cap-overload";
+                else if(dayQty > 0) capClass = "cap-warning";
 
-                    // Calc progress
-                    const pct = target > 0 ? Math.min((actual / target) * 100, 100) : 0;
-                    let fillClass = 'fill-red';
-                    if (actual >= target && target > 0) fillClass = 'fill-green';
-                    else if (actual >= target * 0.7) fillClass = 'fill-yellow';
-                    
-                    weeklyGoalsList.innerHTML += `
-                        <div class="goal-card cursor-pointer hover:shadow-md transition" onclick="window.setWeeklyGoal(${year}, ${month}, ${w})">
-                            <div class="flex justify-between items-center">
-                                <span class="text-[10px] font-bold text-stone-500 uppercase">Week ${w}</span>
-                                <span class="text-[10px] font-bold text-stone-700">${actual} / ${target}</span>
-                            </div>
-                            <div class="progress-track">
-                                <div class="progress-fill ${fillClass}" style="width: ${pct}%"></div>
-                            </div>
+                let itemsHTML = itemsToday.map(i => {
+                    const locTag = i.plannedLocation ? `[${i.plannedLocation[0]}]` : '';
+                    let mClass = i.maker?.toLowerCase().includes('kim') ? 'maker-kim' : (i.maker?.toLowerCase().includes('kelly') ? 'maker-kelly' : 'maker-other');
+                    return `<div class="cal-item ${mClass}" title="${i.itemName}">${locTag} ${i.category}</div>`;
+                }).join('');
+
+                grid.innerHTML += `
+                    <div class="calendar-cell ${isToday ? 'cal-today' : ''} ${capClass}">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="cal-date-num">${d}</span>
+                            ${dayQty > 0 ? `<span class="text-[8px] font-bold text-stone-400">${dayQty}件</span>` : ''}
                         </div>
-                    `;
-                }
+                        <div class="cal-items-wrapper custom-scrollbar">${itemsHTML}</div>
+                    </div>
+                `;
             }
+
+            // Render Weekly Summary (Achievement Rate)
+            for(let w=1; w<=5; w++) {
+                const key = `y${year}m${month}w${w}`;
+                const goal = appSettings.weekly_goals[key] || { total: 0, website: 0 };
+                const actual = weeklyActuals[w];
+                const pct = goal.total > 0 ? Math.min((actual / goal.total) * 100, 100) : 0;
+                
+                const cats = weekCatBreakdown[w];
+                const catSummary = Object.entries(cats).map(([c, q]) => `<span class="bg-stone-100 text-[8px] px-1 rounded">${c}:${q}</span>`).join(' ');
+
+                weeklyRow.innerHTML += `
+                    <div class="goal-card cursor-pointer border-l-4 ${pct >= 100 ? 'border-emerald-500' : 'border-amber-400'}" onclick="openGoalModal('${key}')">
+                        <div class="flex justify-between text-[9px] font-bold text-stone-400 uppercase">
+                            <span>Week ${w}</span>
+                            <span class="${actual >= goal.total ? 'text-emerald-500' : ''}">${actual} / ${goal.total}</span>
+                        </div>
+                        <div class="progress-track"><div class="progress-fill ${pct >= 100 ? 'bg-emerald-500' : 'bg-amber-400'}" style="width: ${pct}%"></div></div>
+                        <div class="flex justify-between mt-1">
+                             <div class="flex flex-wrap gap-1">${catSummary || '<span class="text-[8px] text-stone-300">無製作</span>'}</div>
+                             <div class="text-[8px] font-bold text-stone-400">Web: ${goal.website}</div>
+                        </div>
+                    </div>
+                `;
+            }
+        };
+
+        // --- DASHBOARD HELPERS ---
+        function updateDashboard() {
+            document.getElementById('kpi-total').innerText = db.reduce((s,i) => s + (parseInt(i.quantity)||1), 0);
+            document.getElementById('kpi-making').innerText = db.filter(i => i.status === 'Making').length;
+            document.getElementById('kpi-studio').innerText = db.filter(i => i.status === 'Ready' || i.status === 'In Studio').length;
+            document.getElementById('kpi-sold').innerText = db.filter(i => i.status === 'Sold').length;
+            renderLocationStats();
         }
 
-        function addToBreakdown(loc, name, cat) {
-            if(!locationBreakdownData[loc]) locationBreakdownData[loc] = { total: 0, items: [], catBreakdown: {} };
-            locationBreakdownData[loc].total++;
-            locationBreakdownData[loc].items.push(name);
-            locationBreakdownData[loc].catBreakdown[cat] = (locationBreakdownData[loc].catBreakdown[cat] || 0) + 1;
-        }
-
-        function renderCategoryBadges(stats) {
-            const container = document.getElementById('category-stats-container');
-            container.innerHTML = '';
-            const sortedKeys = Object.keys(stats).sort((a,b) => stats[b] - stats[a]);
-
-            sortedKeys.forEach(c => {
-                if(stats[c] > 0) container.innerHTML += `<div class="bg-white px-3 py-1 rounded shadow-sm border border-stone-200 text-xs text-stone-600">${c}: <b class="text-stone-800">${stats[c]}</b></div>`;
-            });
-        }
-
-        function renderLocationButtons(stats) {
+        function renderLocationStats() {
+            const locMap = {};
+            db.forEach(i => { if(i.plannedLocation) locMap[i.plannedLocation] = (locMap[i.plannedLocation]||0) + 1; });
             const container = document.getElementById('location-stats-container');
-            container.innerHTML = '';
-            appSettings.locations.forEach(l => {
-                if(stats[l] > 0) container.innerHTML += `<button onclick="window.showLocationBreakdown('${l}')" class="bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded shadow-sm border border-blue-100 text-xs text-blue-800 transition-colors">${l}: <b>${stats[l]}</b></button>`;
-            });
-            if(stats['Unallocated'] > 0) container.innerHTML += `<button onclick="window.showLocationBreakdown('Unallocated')" class="bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded shadow-sm border border-gray-200 text-xs text-gray-600">Unallocated: <b>${stats['Unallocated']}</b></button>`;
+            container.innerHTML = Object.entries(locMap).map(([loc, count]) => `
+                <div class="flex justify-between items-center p-2 bg-stone-50 rounded border border-stone-100">
+                    <span class="text-xs font-medium text-stone-600">${loc}</span>
+                    <span class="text-xs font-bold text-stone-800">${count} 件</span>
+                </div>
+            `).join('');
         }
 
-        window.showLocationBreakdown = function(loc) {
-            const data = locationBreakdownData[loc];
-            if(!data) return;
-            const panel = document.getElementById('location-breakdown-panel');
-            document.getElementById('breakdown-title').innerText = `${loc} (Total: ${data.total})`;
-            document.getElementById('breakdown-list').innerHTML = data.items.map(i => `<li class="border-b border-stone-200 pb-1 last:border-0">${i}</li>`).join('');
-            panel.classList.remove('hidden');
-        };
-
-        function initCharts() {
-            categoryChart = new Chart(document.getElementById('categoryChart'), {
-                type: 'bar',
-                data: { labels: [], datasets: [] },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
-                    plugins: { legend: { display: false } }
-                }
-            });
-            allocChart = new Chart(document.getElementById('allocationChart'), {
-                type: 'doughnut',
-                data: { labels: [], datasets: [{ data: [], backgroundColor: [] }] },
-                options: { maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: {size: 10} } } } }
-            });
-        }
-
-        function updateCharts(locStats, catStats) {
-            const labels = [...appSettings.locations, 'Unallocated', 'Sold'];
-            const data = [...appSettings.locations.map(l => locStats[l]), locStats['Unallocated'], locStats['Sold']];
-            const bgColors = [...appSettings.locations.map((_, i) => locColors[i % locColors.length]), '#e5e7eb', '#1c1917'];
-            allocChart.data.labels = labels;
-            allocChart.data.datasets[0].data = data;
-            allocChart.data.datasets[0].backgroundColor = bgColors;
-            allocChart.update();
-
-            const months = [...new Set(db.map(i => i.month))]; 
-            const distinctCategories = Object.keys(catStats);
-            
-            const datasets = distinctCategories.map((cat, idx) => {
-                return {
-                    label: cat,
-                    data: months.map(m => {
-                        return db.filter(i => i.month === m && getCleanCategory(i.category) === cat)
-                                 .reduce((sum, item) => sum + (item.photos && item.photos.length > 0 ? item.photos.length : parseInt(item.quantity)||1), 0);
-                    }),
-                    backgroundColor: catColors[idx % catColors.length]
-                }
-            });
-            categoryChart.data.labels = months;
-            categoryChart.data.datasets = datasets;
-            categoryChart.update();
-        }
-
-        window.renderProductionList = function() {
-            const tbody = document.getElementById('production-table-body');
-            const makerFilter = document.getElementById('prod-filter-maker').value;
-            const catFilter = document.getElementById('prod-filter-category').value;
-            tbody.innerHTML = '';
-            let data = db;
-            if (makerFilter !== 'all') data = data.filter(i => i.maker === makerFilter);
-            if (catFilter !== 'all') data = data.filter(i => getCleanCategory(i.category) === catFilter);
-            data.forEach(item => {
-                const tr = document.createElement('tr');
-                tr.className = 'hover:bg-stone-50 transition-colors border-b border-stone-50';
-                const photos = normalizePhotos(item);
-                let reelHTML = `<div class="photo-reel">`;
-                if(photos.length === 0 || !photos[0].url) reelHTML += `<div class="w-8 h-10 bg-stone-100 flex items-center justify-center text-[10px] text-stone-300 rounded border">No Img</div>`;
-                else { photos.forEach(p => { reelHTML += `<img src="${p.url}" class="reel-img" onclick="window.open('${p.url}')">`; }); }
-                reelHTML += `</div>`;
-                let statusColor = 'bg-gray-100 text-gray-600';
-                if(item.status === 'Making') statusColor = 'bg-amber-100 text-amber-700';
-                if(item.status === 'QC') statusColor = 'bg-purple-100 text-purple-700';
-                if(item.status === 'Ready') statusColor = 'bg-emerald-100 text-emerald-700';
-                tr.innerHTML = `<td class="px-6 py-4 font-mono text-xs text-stone-500">${item.month}</td><td class="px-6 py-4">${reelHTML}</td><td class="px-6 py-4"><div class="font-medium text-stone-800">${item.itemName}</div><div class="text-xs text-stone-400">${item.color||'-'} ${item.size||'-'}</div></td><td class="px-6 py-4">${item.quantity}</td><td class="px-6 py-4 text-xs">${item.maker}</td><td class="px-6 py-4"><span class="px-2 py-1 rounded-full text-xs font-bold ${statusColor}">${item.status}</span></td><td class="px-6 py-4 text-xs text-stone-600 font-bold">${item.price ? 'RM'+item.price : '-'}</td><td class="px-6 py-4"><button onclick="window.openEditModal('${item.id}')" class="text-stone-400 hover:text-stone-800"><i data-lucide="pencil" class="w-4 h-4"></i></button></td>`;
-                tbody.appendChild(tr);
-            });
-            lucide.createIcons();
-        };
-
-        window.renderAllocationList = function() {
-            const tbody = document.getElementById('allocation-table-body');
-            const locFilter = document.getElementById('alloc-filter-location').value;
-            tbody.innerHTML = '';
-            const relevant = db.filter(i => i.status === 'Ready' || i.status === 'In Studio' || i.status === 'Sold' || i.status === 'Partial Sold');
-            relevant.forEach(item => {
-                const photos = normalizePhotos(item);
-                if (locFilter !== 'all') {
-                    if (locFilter === 'Sold') { if (!photos.some(p => p.status === 'Sold')) return; }
-                    else if (locFilter === 'Unallocated') { if (!photos.some(p => p.status !== 'Sold' && p.locations.length === 0)) return; }
-                    else { if (!photos.some(p => p.locations.includes(locFilter))) return; }
-                }
-                const tr = document.createElement('tr');
-                tr.className = 'hover:bg-stone-50 transition-colors border-b border-stone-50';
-                let gridHTML = `<div class="photo-grid">`;
-                if(photos.length === 0) gridHTML = `<span class="text-xs text-stone-400">無照片資料</span>`;
-                else {
-                    photos.forEach((p, idx) => {
-                        const isSold = p.status === 'Sold';
-                        const hasNote = p.notes && p.notes.length > 0;
-                        const hasImg = p.url && p.url.length > 0;
-                        let badgeText = '', badgeClass = '';
-                        if (isSold) { badgeText = p.soldPrice ? `SOLD (RM${p.soldPrice})` : 'SOLD'; badgeClass = 'badge-sold'; } 
-                        else {
-                            if (p.locations.length > 1) { badgeText = 'MULTI'; badgeClass = 'badge-multi'; } 
-                            else if (p.locations.length === 1) { badgeText = p.locations[0].substring(0,6).toUpperCase(); badgeClass = p.locations[0] === 'Studio' ? 'badge-studio' : 'badge-multi'; } 
-                            else { badgeText = '未分配 (None)'; badgeClass = 'badge-none'; }
-                        }
-                        gridHTML += `<div class="grid-item" onclick="window.openDetailModal('${item.id}', ${idx})">${hasImg ? `<img src="${p.url}" class="grid-img ${isSold ? 'opacity-50 grayscale' : ''}">` : `<div class="grid-img bg-stone-100 flex items-center justify-center text-[8px] text-stone-400">No Img</div>`}<div class="status-badge ${badgeClass}">${badgeText}</div>${isSold ? `<div class="sold-overlay"><i data-lucide="check" class="text-white w-5 h-5"></i></div>` : ''}${hasNote ? `<div class="has-note-dot"></div>` : ''}</div>`;
-                    });
-                }
-                gridHTML += `</div>`;
-                tr.innerHTML = `<td class="px-6 py-4">${gridHTML}</td><td class="px-6 py-4"><div class="font-bold text-stone-800">${item.itemName}</div><div class="text-xs text-stone-500">${item.color||''} ${item.size||''}</div></td><td class="px-6 py-4 text-xs text-stone-500">${getCleanCategory(item.category)}</td>`;
-                tbody.appendChild(tr);
-            });
-            lucide.createIcons();
-        };
-
-        window.openDetailModal = function(id, idx) {
-            currentDetailItem = db.find(i => i.id === id); currentDetailPhotoIdx = idx;
-            const p = normalizePhotos(currentDetailItem)[idx];
-            const imgEl = document.getElementById('detail-img');
-            if(p.url) { imgEl.src = p.url; imgEl.classList.remove('hidden'); } else { imgEl.classList.add('hidden'); }
-            document.getElementById('detail-title').innerText = currentDetailItem.itemName;
-            document.getElementById('detail-sku').innerText = `${getCleanCategory(currentDetailItem.category)} / ${currentDetailItem.color}`;
-            let priceText = currentDetailItem.price ? `RM${currentDetailItem.price}` : '未定價';
-            if(p.status === 'Sold') {
-                const soldPrice = p.soldPrice || '-';
-                let dateStr = '';
-                if(p.soldAt) { const dateObj = p.soldAt.seconds ? new Date(p.soldAt.seconds * 1000) : new Date(p.soldAt); dateStr = ` @ ${dateObj.toLocaleDateString()}`; }
-                priceText += ` (Sold: RM${soldPrice}${dateStr})`;
-            }
-            document.getElementById('detail-price-display').innerText = `Price: ${priceText}`;
-            document.getElementById('detail-notes').value = p.notes;
-            tempLocations = [...p.locations]; 
-            const btnSold = document.getElementById('btn-toggle-sold');
-            const badgeSold = document.getElementById('detail-sold-badge');
-            if(p.status === 'Sold') { btnSold.innerText = "取消售出 (Return to Stock)"; btnSold.className = "bg-red-50 text-red-600 hover:bg-red-100 px-4 py-2 rounded text-sm w-full font-bold border border-red-200"; badgeSold.classList.remove('hidden'); } 
-            else { btnSold.innerText = "標記為已售出 (SOLD)"; btnSold.className = "bg-stone-800 text-white hover:bg-stone-700 px-4 py-2 rounded text-sm w-full font-bold"; badgeSold.classList.add('hidden'); }
-            renderDetailLocationButtons();
-            document.getElementById('detail-modal').classList.remove('hidden');
-        };
-        window.renderDetailLocationButtons = function() {
-            const container = document.getElementById('detail-location-options'); container.innerHTML = '';
-            const p = normalizePhotos(currentDetailItem)[currentDetailPhotoIdx];
-            if(p.status === 'Sold') { container.innerHTML = `<div class="col-span-2 text-center text-stone-400 text-xs py-2 bg-stone-50 rounded">已售出商品無法編輯地點</div>`; return; }
-            appSettings.locations.forEach(loc => {
-                const isSelected = tempLocations.includes(loc);
-                const btnClass = isSelected ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-stone-500 border-stone-200 hover:border-blue-300';
-                container.innerHTML += `<button onclick="window.toggleDetailLocation('${loc}')" class="border rounded py-2 text-xs font-bold transition-colors ${btnClass}">${loc} ${isSelected ? '✓' : ''}</button>`;
-            });
-        };
-        window.toggleDetailLocation = function(loc) { if(tempLocations.includes(loc)) { tempLocations = tempLocations.filter(l => l !== loc); } else { tempLocations.push(loc); } renderDetailLocationButtons(); };
-        window.saveItemDetails = async function() { if(!currentDetailItem) return; let photos = normalizePhotos(currentDetailItem); photos[currentDetailPhotoIdx].notes = document.getElementById('detail-notes').value; photos[currentDetailPhotoIdx].locations = tempLocations; try { await updateDoc(doc(dbFirestore, "stock_items", currentDetailItem.id), { photos: photos }); window.closeDetailModal(); } catch(e) { alert("Save failed"); } };
-        window.triggerSoldFlow = function() {
-            let photos = normalizePhotos(currentDetailItem); const currentStatus = photos[currentDetailPhotoIdx].status;
-            if (currentStatus === 'Sold') { if(confirm("確認取消售出？物品將回到庫存中。")) { photos[currentDetailPhotoIdx].status = 'Available'; photos[currentDetailPhotoIdx].soldPrice = null; updateItemStatus(photos); } } 
-            else { document.getElementById('sold-price-input').value = currentDetailItem.price || ''; document.getElementById('sold-note-input').value = ''; document.getElementById('sold-date-input').valueAsDate = new Date(); document.getElementById('sold-modal').classList.remove('hidden'); }
-        };
-        window.confirmSoldAction = function() {
-            const soldPrice = document.getElementById('sold-price-input').value; const note = document.getElementById('sold-note-input').value; const dateVal = document.getElementById('sold-date-input').value;
-            let photos = normalizePhotos(currentDetailItem); photos[currentDetailPhotoIdx].status = 'Sold'; photos[currentDetailPhotoIdx].soldPrice = soldPrice; photos[currentDetailPhotoIdx].soldAt = dateVal ? new Date(dateVal) : new Date(); photos[currentDetailPhotoIdx].locations = tempLocations;
-            if(note) photos[currentDetailPhotoIdx].notes = (photos[currentDetailPhotoIdx].notes ? photos[currentDetailPhotoIdx].notes + " | " : "") + note;
-            document.getElementById('sold-modal').classList.add('hidden'); updateItemStatus(photos);
-        };
-        async function updateItemStatus(photos) { const allSold = photos.every(p => p.status === 'Sold'); const anySold = photos.some(p => p.status === 'Sold'); let globalStatus = allSold ? 'Sold' : (anySold ? 'Partial Sold' : 'Ready'); await updateDoc(doc(dbFirestore, "stock_items", currentDetailItem.id), { photos: photos, status: globalStatus }); window.closeDetailModal(); }
-        window.closeDetailModal = () => document.getElementById('detail-modal').classList.add('hidden');
-        window.handleAddItem = async function(e) { e.preventDefault(); const btn = document.getElementById('btn-submit'); btn.innerText = '處理中...'; btn.disabled = true; try { const form = new FormData(e.target); const fileInput = document.querySelector('input[name="initialPhotos"]'); let photoObjs = []; if(fileInput.files.length > 0) { for(let i=0; i<fileInput.files.length; i++) { const file = fileInput.files[i]; const sRef = ref(storage, 'photos/'+Date.now()+'_'+file.name); const snap = await uploadBytes(sRef, file); const url = await getDownloadURL(snap.ref); photoObjs.push({ url: url, status: 'Available', locations: [], notes: '', soldPrice: null }); } } const cleanCat = getCleanCategory(form.get('category')); await addDoc(collection(dbFirestore, "stock_items"), { month: form.get('month'), itemName: form.get('itemName'), category: cleanCat, maker: form.get('maker'), color: form.get('color'), size: form.get('size'), quantity: parseInt(form.get('quantity')) || 1, price: form.get('price'), status: 'To Make', photos: photoObjs, createdAt: serverTimestamp() }); window.closeModal(); e.target.reset(); } catch (error) { console.error(error); alert("Error: " + error.message); } finally { btn.innerText = '確認新增'; btn.disabled = false; } };
-        window.openEditModal = (id) => { const item = db.find(i=>i.id===id); document.getElementById('edit-id').value=id; document.getElementById('edit-itemName').value=item.itemName; document.getElementById('edit-month').value=item.month; document.getElementById('edit-status').value=item.status; document.getElementById('edit-price').value=item.price || ''; document.getElementById('edit-addPhotos').value = ''; document.getElementById('edit-startDate').value = item.makingAt ? new Date(item.makingAt.seconds*1000).toISOString().split('T')[0] : ''; document.getElementById('edit-completedDate').value = item.completedAt ? new Date(item.completedAt.seconds*1000).toISOString().split('T')[0] : ''; document.getElementById('edit-modal').classList.remove('hidden'); };
-        window.closeEditModal = () => document.getElementById('edit-modal').classList.add('hidden');
-        window.handleEditSubmit = async () => { const id = document.getElementById('edit-id').value; const btn = document.getElementById('btn-edit-save'); btn.innerText = 'Saving...'; btn.disabled = true; try { const sDateVal = document.getElementById('edit-startDate').value; const cDateVal = document.getElementById('edit-completedDate').value; let data = { status: document.getElementById('edit-status').value, itemName: document.getElementById('edit-itemName').value, month: document.getElementById('edit-month').value, price: document.getElementById('edit-price').value }; if(sDateVal) data.makingAt = new Date(sDateVal); if(cDateVal) data.completedAt = new Date(cDateVal); const photoInput = document.getElementById('edit-addPhotos'); if(photoInput.files.length > 0) { const item = db.find(i=>i.id===id); let existingPhotos = item.photos || []; for(let i=0; i<photoInput.files.length; i++) { const file = photoInput.files[i]; const sRef = ref(storage, 'photos/'+Date.now()+'_added_'+file.name); const snap = await uploadBytes(sRef, file); const url = await getDownloadURL(snap.ref); existingPhotos.push({ url: url, status: 'Available', locations: [], notes: '', soldPrice: null }); } data.photos = existingPhotos; } await updateDoc(doc(dbFirestore, "stock_items", id), data); window.closeEditModal(); } catch(error) { console.error(error); alert("Error: " + error.message); } finally { btn.innerText = '儲存變更'; btn.disabled = false; } };
-        window.handleDelete = async () => { if(confirm('確定刪除此工單？')) { await deleteDoc(doc(dbFirestore, "stock_items", document.getElementById('edit-id').value)); window.closeEditModal(); } };
-        window.renderSettingsView = function() { const render = (type) => (appSettings[type]||[]).map(i => `<span class="bg-stone-100 px-2 py-1 rounded text-xs mr-1 mb-1 inline-block border cursor-pointer hover:bg-red-50 hover:text-red-500" onclick="window.removeSetting('${type}','${i}')">${i} &times;</span>`).join(''); document.getElementById('settings-makers-list').innerHTML = render('makers'); document.getElementById('settings-locations-list').innerHTML = render('locations'); document.getElementById('settings-categories-list').innerHTML = render('categories'); };
-        window.addSetting = async function(type) { const map = {'makers':'new-maker-input', 'locations':'new-location-input', 'categories':'new-category-input'}; let val = document.getElementById(map[type]).value; if (type === 'categories') val = getCleanCategory(val); else val = val.trim(); if(val) { await updateDoc(doc(dbFirestore, "settings", "config"), { [type]: [...appSettings[type], val] }); document.getElementById(map[type]).value = ''; } };
-        window.removeSetting = async function(type, val) { if(confirm(`Remove ${val}?`)) await updateDoc(doc(dbFirestore, "settings", "config"), { [type]: appSettings[type].filter(x => x !== val) }); }
-        window.updateDropdowns = function() { const distinctMakers = [...new Set([...appSettings.makers, ...db.map(i => i.maker)])].filter(Boolean).sort(); const distinctCategories = [...new Set([...appSettings.categories.map(c => getCleanCategory(c)), ...db.map(i => getCleanCategory(i.category))])].filter(Boolean).sort(); const locSelect = document.getElementById('alloc-filter-location'); if(locSelect) { const currentVal = locSelect.value; locSelect.innerHTML = `<option value="all">全部庫存 (All)</option><option value="Sold">已售出 (Sold)</option><option value="Unallocated">未分配 (Unallocated)</option>`; appSettings.locations.forEach(l => { locSelect.innerHTML += `<option value="${l}">${l}</option>`; }); locSelect.value = currentVal; } const fill = (cls, list) => document.querySelectorAll(cls).forEach(s => { const old = s.value; s.innerHTML = (s.id.includes('filter')?'<option value="all">全部</option>':'') + list.map(i=>`<option value="${i}">${i}</option>`).join(''); if(list.includes(old)) s.value = old; }); fill('.dynamic-maker-select', distinctMakers); fill('.dynamic-category-select', distinctCategories); };
-        window.switchView = (v) => { document.querySelectorAll('section[id^="view-"]').forEach(el => el.classList.add('hidden')); document.getElementById(`view-${v}`).classList.remove('hidden'); document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('nav-active')); document.getElementById(`nav-${v}`)?.classList.add('nav-active'); };
-        window.updateRole = () => { currentRole = document.getElementById('role-select').value; const isAdmin = currentRole === 'admin'; document.getElementById('nav-settings').classList.toggle('hidden', !isAdmin); window.switchView(currentRole.startsWith('maker') ? 'production' : 'dashboard'); };
+        // --- ACTIONS ---
         window.openModal = () => document.getElementById('add-modal').classList.remove('hidden');
         window.closeModal = () => document.getElementById('add-modal').classList.add('hidden');
+        
+        window.openGoalModal = (key) => {
+            currentTargetKey = key;
+            const current = appSettings.weekly_goals[key] || { total: 0, website: 0 };
+            document.getElementById('goal-total-input').value = current.total;
+            document.getElementById('goal-web-input').value = current.website;
+            document.getElementById('goal-modal').classList.remove('hidden');
+        };
+
+        window.saveWeeklyGoalAction = async function() {
+            const total = parseInt(document.getElementById('goal-total-input').value) || 0;
+            const web = parseInt(document.getElementById('goal-web-input').value) || 0;
+            const newGoals = { ...appSettings.weekly_goals, [currentTargetKey]: { total, website: web } };
+            await updateDoc(doc(dbFirestore, "settings", "config"), { weekly_goals: newGoals });
+            document.getElementById('goal-modal').classList.add('hidden');
+        };
+
+        window.handleAddItem = async function(e) {
+            e.preventDefault();
+            const f = new FormData(e.target);
+            await addDoc(collection(dbFirestore, "stock_items"), {
+                month: f.get('month'),
+                itemName: f.get('itemName'),
+                category: f.get('category'),
+                maker: f.get('maker'),
+                quantity: parseInt(f.get('quantity')),
+                price: f.get('price'),
+                plannedLocation: f.get('plannedLocation'),
+                status: 'To Make',
+                createdAt: serverTimestamp(),
+                makingAt: serverTimestamp() // Default to today in calendar
+            });
+            closeModal();
+            e.target.reset();
+        };
+
+        window.setCalendarMode = (m) => { calendarMode = m; renderCalendar(); };
+        window.changeMonth = (d) => { currentCalDate.setMonth(currentCalDate.getMonth() + d); renderCalendar(); };
+        
+        window.switchView = (v) => {
+            document.querySelectorAll('section').forEach(s => s.classList.add('hidden'));
+            document.getElementById(`view-${v}`).classList.remove('hidden');
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('nav-active'));
+            document.getElementById(`nav-${v}`).classList.add('nav-active');
+        };
+
+        function updateDropdowns() {
+            const fill = (cls, list) => document.querySelectorAll(cls).forEach(s => {
+                s.innerHTML = list.map(i => `<option value="${i}">${i}</option>`).join('');
+            });
+            fill('.dynamic-maker-select', appSettings.makers);
+            fill('.dynamic-category-select', appSettings.categories);
+        }
+
+        // Placeholder for list renders (similar to your v11.18 version)
+        function renderProductionList() {
+            const body = document.getElementById('production-table-body');
+            body.innerHTML = db.map(i => `
+                <tr class="hover:bg-stone-50 transition-colors">
+                    <td class="px-6 py-4 font-mono text-[10px] text-stone-400">${i.month}</td>
+                    <td class="px-6 py-4"><span class="px-2 py-1 bg-stone-100 rounded text-[10px] font-bold text-stone-600">${i.plannedLocation || '未定'}</span></td>
+                    <td class="px-6 py-4">
+                        <div class="font-bold text-stone-800">${i.itemName}</div>
+                        <div class="text-[10px] text-stone-400">${i.category}</div>
+                    </td>
+                    <td class="px-6 py-4 text-xs">${i.maker}</td>
+                    <td class="px-6 py-4"><span class="px-2 py-0.5 rounded-full text-[10px] bg-amber-100 text-amber-700 font-bold">${i.status}</span></td>
+                    <td class="px-6 py-4"><button class="text-stone-300 hover:text-stone-800"><i data-lucide="edit-3" class="w-4 h-4"></i></button></td>
+                </tr>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        function renderAllocationGrid() {
+            const grid = document.getElementById('allocation-grid');
+            grid.innerHTML = db.filter(i => i.status === 'Ready' || i.status === 'In Studio').map(i => `
+                <div class="bg-white rounded-xl border border-stone-200 overflow-hidden shadow-sm p-4">
+                    <div class="aspect-[3/4] bg-stone-100 rounded-lg mb-3 flex items-center justify-center text-stone-300 text-xs">No Photo</div>
+                    <div class="text-xs font-bold text-stone-400 uppercase">${i.category}</div>
+                    <div class="font-bold text-stone-800 mb-2">${i.itemName}</div>
+                    <div class="flex justify-between items-center border-t border-stone-50 pt-2">
+                        <span class="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded">Destination: ${i.plannedLocation}</span>
+                        <span class="text-xs font-bold text-stone-800">RM ${i.price || '-'}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
     </script>
 </body>
 </html>
