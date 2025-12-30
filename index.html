@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weiweiwei ERP (v11.19.0 Ghost Tickets)</title>
+    <title>Weiweiwei ERP (v11.19.2 Final Fix)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -22,6 +22,7 @@
         .reel-img { width: 36px; height: 48px; object-fit: cover; border-radius: 4px; border: 1px solid #e7e5e4; flex-shrink: 0; background: #fff; }
         .photo-grid { display: flex; flex-wrap: wrap; gap: 8px; max-width: 400px; }
         .grid-item { position: relative; width: 52px; height: 68px; cursor: pointer; transition: transform 0.1s; background: white; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .grid-item:hover { transform: scale(1.05); z-index: 10; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         .grid-img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; border: 1px solid #e7e5e4; }
         
         /* Badges */
@@ -38,8 +39,9 @@
         .calendar-header { background-color: #f5f5f4; color: #78716c; font-size: 11px; font-weight: bold; text-align: center; padding: 8px 0; text-transform: uppercase; position: sticky; top: 0; z-index: 10; }
         .calendar-cell { background-color: white; min-height: 120px; padding: 4px; display: flex; flex-direction: column; gap: 2px; transition: background 0.2s; position: relative; group; }
         .calendar-cell:hover { background-color: #fafaf9; }
-        .calendar-cell:hover .btn-quick-add { opacity: 1; }
         
+        /* Quick Add Button */
+        .calendar-cell:hover .btn-quick-add { opacity: 1; }
         .btn-quick-add { 
             position: absolute; top: 2px; right: 2px; 
             width: 16px; height: 16px; border-radius: 4px; 
@@ -62,37 +64,28 @@
         .mode-arrival .maker-kim { background-color: #ec4899; border-left: 2px solid #831843; } 
         .mode-arrival .maker-kelly { background-color: #3b82f6; border-left: 2px solid #1e3a8a; } 
         
-        /* GHOST TICKET STYLE (Planned) */
-        .status-planned { 
-            background-color: #f5f5f4; color: #78716c; 
-            border: 1px dashed #a8a29e; 
-            box-shadow: none;
-        }
+        /* GHOST TICKET STYLE */
+        .status-planned { background-color: #f5f5f4; color: #78716c; border: 1px dashed #a8a29e; box-shadow: none; }
         .status-planned:hover { background-color: #e7e5e4; border-color: #78716c; }
 
         /* PROGRESS BARS */
         .goal-card { background: white; border: 1px solid #e7e5e4; border-radius: 6px; padding: 8px; min-width: 140px; flex: 1; display: flex; flex-direction: column; gap: 4px; }
         .progress-track { height: 8px; background: #f5f5f4; border-radius: 4px; overflow: hidden; position: relative; display: flex; }
-        
-        /* Solid bar for Real items */
         .progress-fill-real { height: 100%; transition: width 0.3s ease; }
-        /* Striped bar for Planned items */
-        .progress-fill-planned { 
-            height: 100%; 
-            background-image: linear-gradient(45deg, rgba(255,255,255,.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,.15) 50%, rgba(255,255,255,.15) 75%, transparent 75%, transparent);
-            background-size: 1rem 1rem;
-            opacity: 0.6;
-            transition: width 0.3s ease;
-        }
+        .progress-fill-planned { height: 100%; background-image: linear-gradient(45deg, rgba(255,255,255,.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,.15) 50%, rgba(255,255,255,.15) 75%, transparent 75%, transparent); background-size: 1rem 1rem; opacity: 0.6; transition: width 0.3s ease; }
         
         .fill-red { background-color: #f87171; }
         .fill-yellow { background-color: #fbbf24; }
         .fill-green { background-color: #34d399; }
         .fill-blue { background-color: #60a5fa; }
-        .fill-gray { background-color: #a8a29e; }
 
         .animate-fade-in { animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* Utility for status connection */
+        .status-connected { background-color: #dcfce7 !important; color: #15803d !important; border: 1px solid #bbf7d0; }
+        .status-loading { background-color: #f5f5f4 !important; color: #a8a29e !important; }
+        .status-error { background-color: #fee2e2 !important; color: #b91c1c !important; }
     </style>
 </head>
 <body class="flex flex-col min-h-screen">
@@ -102,8 +95,8 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center gap-4">
                     <div class="flex-shrink-0 flex items-center">
-                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.19.0</span></span>
-                        <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] bg-stone-100 text-stone-400">Loading...</span>
+                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.19.2</span></span>
+                        <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] status-loading transition-colors duration-500">Connecting...</span>
                     </div>
                     <div class="hidden sm:ml-6 sm:flex sm:space-x-4">
                         <button onclick="window.switchView('dashboard')" id="nav-dashboard" class="nav-item px-3 py-2 rounded-md text-sm font-medium hover:bg-stone-100 transition-colors nav-active">總覽</button>
@@ -174,6 +167,13 @@
                                 <i data-lucide="chevron-right" class="w-4 h-4"></i>
                             </button>
                         </div>
+                    </div>
+
+                    <div id="unscheduled-container" class="mb-4 bg-stone-50 p-3 rounded border border-stone-100 transition-all">
+                        <h5 class="text-[10px] font-bold text-stone-400 uppercase tracking-wide mb-2 flex items-center gap-2">
+                            <span id="unscheduled-month-label">本月</span> 待定日期 <span class="text-[9px] bg-stone-200 px-1 rounded text-stone-500" id="unscheduled-count">0</span>
+                        </h5>
+                        <div id="cal-unscheduled-list" class="flex flex-wrap gap-2 min-h-[24px]"></div>
                     </div>
 
                     <div id="weekly-stats-container" class="mb-4 bg-stone-50 p-4 rounded border border-stone-200 hidden transition-all">
@@ -400,14 +400,18 @@
         import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
+        // ==========================================
+        // ⚠️⚠️⚠️ 警告：請務必將下方的 CONFIG 換回妳原本的 ⚠️⚠️⚠️
+        // ==========================================
         const firebaseConfig = {
-            apiKey: "AIzaSyAlB24yzUmGCqsPofuoYhWBiIUj7IWjybc",
+            apiKey: "YOUR_API_KEY_HERE", // <--- 這裡要貼上妳的 API KEY (e.g., AIzaSy...)
             authDomain: "stock-planner-7ca50.firebaseapp.com",
             projectId: "stock-planner-7ca50",
             storageBucket: "stock-planner-7ca50.firebasestorage.app",
             messagingSenderId: "150326512952",
             appId: "1:150326512952:web:0396231677d9841929c5cd"
         };
+        // ==========================================
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -429,8 +433,19 @@
             const statusEl = document.getElementById('connection-status');
             statusEl.innerText = "Initializing...";
             if (!auth) return;
-            signInAnonymously(auth).catch((error) => { statusEl.innerText = "Login Fail"; });
-            onAuthStateChanged(auth, (user) => { if (user) { statusEl.innerText = "Connected"; startListeners(); } });
+            signInAnonymously(auth).catch((error) => { 
+                statusEl.innerText = "Login Fail"; 
+                statusEl.classList.remove('status-loading');
+                statusEl.classList.add('status-error');
+            });
+            onAuthStateChanged(auth, (user) => { 
+                if (user) { 
+                    statusEl.innerText = "Connected"; 
+                    statusEl.classList.remove('status-loading');
+                    statusEl.classList.add('status-connected'); // Force green class
+                    startListeners(); 
+                } 
+            });
             initCharts(); window.updateRole();
         });
 
@@ -447,6 +462,14 @@
             const q = collection(dbFirestore, "stock_items");
             onSnapshot(q, (snapshot) => {
                 db = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                
+                // Safe Sort
+                db.sort((a, b) => {
+                    const timeA = a.createdAt && a.createdAt.seconds ? a.createdAt.seconds : 0;
+                    const timeB = b.createdAt && b.createdAt.seconds ? b.createdAt.seconds : 0;
+                    return timeB - timeA;
+                });
+                
                 updateDashboard();
                 renderProductionList();
                 renderAllocationList();
@@ -530,7 +553,14 @@
             const dateVal = document.getElementById('plan-date').value;
             const cat = document.getElementById('plan-category').value;
             const qty = document.getElementById('plan-qty').value;
-            
+            const firebaseConfig = {
+  apiKey: "AIzaSyAlB24yzUmGCqsPofuoYhWBiIUj7IWjybc",
+  authDomain: "stock-planner-7ca50.firebaseapp.com",
+  projectId: "stock-planner-7ca50",
+  storageBucket: "stock-planner-7ca50.firebasestorage.app",
+  messagingSenderId: "150326512952",
+  appId: "1:150326512952:web:0396231677d9841929c5cd"
+};
             // Create Ghost Ticket
             await addDoc(collection(dbFirestore, "stock_items"), {
                 itemName: `${cat} (Planned)`,
@@ -623,8 +653,6 @@
                     const scale = totalBar > 0 ? 100 / totalBar : 0;
                     
                     const realPct = Math.min((stats.real / (target||1)) * 100, 100); 
-                    // If target is 0, bar just fills up based on items. If target exists, scale relative to target.
-                    // Simplified Visual: Just 100% width container representing Target.
                     
                     const realW = target > 0 ? (stats.real / target)*100 : 0;
                     const planW = target > 0 ? (stats.planned / target)*100 : 0;
@@ -653,11 +681,50 @@
         }
 
         // --- UTILS (Shortened) ---
-        function updateCharts(locStats, catStats) { /* Same as before */ }
-        function addToBreakdown(l,n,c) { /* Same as before */ }
-        window.updateDropdowns = () => { /* Same as before */ 
+        function updateCharts(locStats, catStats) {
+            const labels = [...appSettings.locations, 'Unallocated', 'Sold'];
+            const data = [...appSettings.locations.map(l => locStats[l]), locStats['Unallocated'], locStats['Sold']];
+            const bgColors = [...appSettings.locations.map((_, i) => locColors[i % locColors.length]), '#e5e7eb', '#1c1917'];
+            allocChart.data.labels = labels;
+            allocChart.data.datasets[0].data = data;
+            allocChart.data.datasets[0].backgroundColor = bgColors;
+            allocChart.update();
+
+            const months = [...new Set(db.map(i => i.month))]; 
+            const distinctCategories = Object.keys(catStats);
+            const datasets = distinctCategories.map((cat, idx) => {
+                return {
+                    label: cat,
+                    data: months.map(m => {
+                        return db.filter(i => i.month === m && getCleanCategory(i.category) === cat && i.status !== 'Planned')
+                                 .reduce((sum, item) => sum + (item.photos && item.photos.length > 0 ? item.photos.length : parseInt(item.quantity)||1), 0);
+                    }),
+                    backgroundColor: catColors[idx % catColors.length]
+                }
+            });
+            categoryChart.data.labels = months;
+            categoryChart.data.datasets = datasets;
+            categoryChart.update();
+        }
+        function addToBreakdown(loc, name, cat) {
+            if(!locationBreakdownData[loc]) locationBreakdownData[loc] = { total: 0, items: [], catBreakdown: {} };
+            locationBreakdownData[loc].total++;
+            locationBreakdownData[loc].items.push(name);
+            locationBreakdownData[loc].catBreakdown[cat] = (locationBreakdownData[loc].catBreakdown[cat] || 0) + 1;
+        }
+        window.updateDropdowns = () => { 
+            const distinctMakers = [...new Set([...appSettings.makers, ...db.map(i => i.maker)])].filter(Boolean).sort();
             const distinctCategories = [...new Set([...appSettings.categories.map(c => getCleanCategory(c)), ...db.map(i => getCleanCategory(i.category))])].filter(Boolean).sort();
-            document.querySelectorAll('.dynamic-category-select').forEach(s => { s.innerHTML = distinctCategories.map(i=>`<option value="${i}">${i}</option>`).join(''); });
+            const locSelect = document.getElementById('alloc-filter-location');
+            if(locSelect) {
+                 const currentVal = locSelect.value;
+                 locSelect.innerHTML = `<option value="all">全部庫存 (All)</option><option value="Sold">已售出 (Sold)</option><option value="Unallocated">未分配 (Unallocated)</option>`;
+                 appSettings.locations.forEach(l => { locSelect.innerHTML += `<option value="${l}">${l}</option>`; });
+                 locSelect.value = currentVal; 
+            }
+            const fill = (cls, list) => document.querySelectorAll(cls).forEach(s => { const old = s.value; s.innerHTML = (s.id.includes('filter')?'<option value="all">全部</option>':'') + list.map(i=>`<option value="${i}">${i}</option>`).join(''); if(list.includes(old)) s.value = old; }); 
+            fill('.dynamic-maker-select', distinctMakers); 
+            fill('.dynamic-category-select', distinctCategories); 
         };
         // Add, Edit, Delete handlers remain mostly same, just ensuring Edit Modal handles 'Planned' status correctly
         window.openEditModal = (id) => { 
@@ -671,33 +738,155 @@
         };
         window.handleEditSubmit = async () => {
              const id = document.getElementById('edit-id').value;
-             // ... gather inputs ...
              const sDate = document.getElementById('edit-startDate').value;
              const cDate = document.getElementById('edit-completedDate').value;
              const status = document.getElementById('edit-status').value;
-             
-             let updateData = { 
-                 status: status, 
-                 itemName: document.getElementById('edit-itemName').value
-             };
+             let updateData = { status: status, itemName: document.getElementById('edit-itemName').value };
              if(sDate) updateData.makingAt = new Date(sDate);
              if(cDate) updateData.completedAt = new Date(cDate);
-             
-             // Handle Photo Uploads (if any) -> if uploading photos, usually means shifting from Planned to Making
              const photoInput = document.getElementById('edit-addPhotos');
              if(photoInput.files.length > 0) {
                  // Upload logic...
-                 // If status was Planned, maybe auto-switch to Making? Let user decide via dropdown.
+                 let existingPhotos = db.find(i=>i.id===id).photos || [];
+                 for(let i=0; i<photoInput.files.length; i++) {
+                     const file = photoInput.files[i];
+                     const sRef = ref(storage, 'photos/'+Date.now()+'_added_'+file.name);
+                     const snap = await uploadBytes(sRef, file);
+                     const url = await getDownloadURL(snap.ref);
+                     existingPhotos.push({ url: url, status: 'Available', locations: [], notes: '', soldPrice: null });
+                 }
+                 updateData.photos = existingPhotos;
+                 // Auto-switch status if currently Planned
+                 if(status === 'Planned') updateData.status = 'Making';
              }
              await updateDoc(doc(dbFirestore, "stock_items", id), updateData);
              document.getElementById('edit-modal').classList.add('hidden');
         };
         // Other standard utils...
+        window.renderProductionList = function() {
+            const tbody = document.getElementById('production-table-body');
+            const makerFilter = document.getElementById('prod-filter-maker').value;
+            const catFilter = document.getElementById('prod-filter-category').value;
+            tbody.innerHTML = '';
+            let data = db;
+            if (makerFilter !== 'all') data = data.filter(i => i.maker === makerFilter);
+            if (catFilter !== 'all') data = data.filter(i => getCleanCategory(i.category) === catFilter);
+            data.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-stone-50 transition-colors border-b border-stone-50';
+                const photos = normalizePhotos(item);
+                let reelHTML = `<div class="photo-reel">`;
+                if(item.status === 'Planned') reelHTML += `<div class="w-8 h-10 bg-stone-50 border-dashed border-2 border-stone-200 flex items-center justify-center text-[10px] text-stone-300 rounded">Plan</div>`;
+                else if(photos.length === 0 || !photos[0].url) reelHTML += `<div class="w-8 h-10 bg-stone-100 flex items-center justify-center text-[10px] text-stone-300 rounded border">No Img</div>`;
+                else { photos.forEach(p => { reelHTML += `<img src="${p.url}" class="reel-img" onclick="window.open('${p.url}')">`; }); }
+                reelHTML += `</div>`;
+                let statusColor = 'bg-gray-100 text-gray-600';
+                if(item.status === 'Making') statusColor = 'bg-amber-100 text-amber-700';
+                if(item.status === 'QC') statusColor = 'bg-purple-100 text-purple-700';
+                if(item.status === 'Ready') statusColor = 'bg-emerald-100 text-emerald-700';
+                if(item.status === 'Planned') statusColor = 'bg-stone-50 text-stone-400 border border-dashed border-stone-300';
+                tr.innerHTML = `<td class="px-6 py-4 font-mono text-xs text-stone-500">${item.month||'-'}</td><td class="px-6 py-4">${reelHTML}</td><td class="px-6 py-4"><div class="font-medium text-stone-800">${item.itemName}</div><div class="text-xs text-stone-400">${item.color||'-'} ${item.size||'-'}</div></td><td class="px-6 py-4">${item.quantity}</td><td class="px-6 py-4 text-xs">${item.maker||'-'}</td><td class="px-6 py-4"><span class="px-2 py-1 rounded-full text-xs font-bold ${statusColor}">${item.status}</span></td><td class="px-6 py-4"><button onclick="window.openEditModal('${item.id}')" class="text-stone-400 hover:text-stone-800"><i data-lucide="pencil" class="w-4 h-4"></i></button></td>`;
+                tbody.appendChild(tr);
+            });
+            lucide.createIcons();
+        };
+        window.renderAllocationList = function() {
+            const tbody = document.getElementById('allocation-table-body');
+            const locFilter = document.getElementById('alloc-filter-location').value;
+            tbody.innerHTML = '';
+            const relevant = db.filter(i => i.status === 'Ready' || i.status === 'In Studio' || i.status === 'Sold' || i.status === 'Partial Sold');
+            relevant.forEach(item => {
+                const photos = normalizePhotos(item);
+                if (locFilter !== 'all') {
+                    if (locFilter === 'Sold') { if (!photos.some(p => p.status === 'Sold')) return; }
+                    else if (locFilter === 'Unallocated') { if (!photos.some(p => p.status !== 'Sold' && p.locations.length === 0)) return; }
+                    else { if (!photos.some(p => p.locations.includes(locFilter))) return; }
+                }
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-stone-50 transition-colors border-b border-stone-50';
+                let gridHTML = `<div class="photo-grid">`;
+                if(photos.length === 0) gridHTML = `<span class="text-xs text-stone-400">無照片資料</span>`;
+                else {
+                    photos.forEach((p, idx) => {
+                        const isSold = p.status === 'Sold';
+                        const hasNote = p.notes && p.notes.length > 0;
+                        const hasImg = p.url && p.url.length > 0;
+                        let badgeText = '', badgeClass = '';
+                        if (isSold) { badgeText = p.soldPrice ? `SOLD (RM${p.soldPrice})` : 'SOLD'; badgeClass = 'badge-sold'; } 
+                        else {
+                            if (p.locations.length > 1) { badgeText = 'MULTI'; badgeClass = 'badge-multi'; } 
+                            else if (p.locations.length === 1) { badgeText = p.locations[0].substring(0,6).toUpperCase(); badgeClass = p.locations[0] === 'Studio' ? 'badge-studio' : 'badge-multi'; } 
+                            else { badgeText = '未分配 (None)'; badgeClass = 'badge-none'; }
+                        }
+                        gridHTML += `<div class="grid-item" onclick="window.openDetailModal('${item.id}', ${idx})">${hasImg ? `<img src="${p.url}" class="grid-img ${isSold ? 'opacity-50 grayscale' : ''}">` : `<div class="grid-img bg-stone-100 flex items-center justify-center text-[8px] text-stone-400">No Img</div>`}<div class="status-badge ${badgeClass}">${badgeText}</div>${isSold ? `<div class="sold-overlay"><i data-lucide="check" class="text-white w-5 h-5"></i></div>` : ''}${hasNote ? `<div class="has-note-dot"></div>` : ''}</div>`;
+                    });
+                }
+                gridHTML += `</div>`;
+                tr.innerHTML = `<td class="px-6 py-4">${gridHTML}</td><td class="px-6 py-4"><div class="font-bold text-stone-800">${item.itemName}</div><div class="text-xs text-stone-500">${item.color||''} ${item.size||''}</div></td><td class="px-6 py-4 text-xs text-stone-500">${getCleanCategory(item.category)}</td>`;
+                tbody.appendChild(tr);
+            });
+            lucide.createIcons();
+        };
+        // Re-declaring key modals handlers
+        window.openDetailModal = function(id, idx) {
+            currentDetailItem = db.find(i => i.id === id); currentDetailPhotoIdx = idx;
+            const p = normalizePhotos(currentDetailItem)[idx];
+            const imgEl = document.getElementById('detail-img');
+            if(p.url) { imgEl.src = p.url; imgEl.classList.remove('hidden'); } else { imgEl.classList.add('hidden'); }
+            document.getElementById('detail-title').innerText = currentDetailItem.itemName;
+            document.getElementById('detail-sku').innerText = `${getCleanCategory(currentDetailItem.category)} / ${currentDetailItem.color}`;
+            let priceText = currentDetailItem.price ? `RM${currentDetailItem.price}` : '未定價';
+            if(p.status === 'Sold') {
+                const soldPrice = p.soldPrice || '-';
+                let dateStr = '';
+                if(p.soldAt) { const dateObj = p.soldAt.seconds ? new Date(p.soldAt.seconds * 1000) : new Date(p.soldAt); dateStr = ` @ ${dateObj.toLocaleDateString()}`; }
+                priceText += ` (Sold: RM${soldPrice}${dateStr})`;
+            }
+            document.getElementById('detail-price-display').innerText = `Price: ${priceText}`;
+            document.getElementById('detail-notes').value = p.notes;
+            tempLocations = [...p.locations]; 
+            const btnSold = document.getElementById('btn-toggle-sold');
+            const badgeSold = document.getElementById('detail-sold-badge');
+            if(p.status === 'Sold') { btnSold.innerText = "取消售出 (Return to Stock)"; btnSold.className = "bg-red-50 text-red-600 hover:bg-red-100 px-4 py-2 rounded text-sm w-full font-bold border border-red-200"; badgeSold.classList.remove('hidden'); } 
+            else { btnSold.innerText = "標記為已售出 (SOLD)"; btnSold.className = "bg-stone-800 text-white hover:bg-stone-700 px-4 py-2 rounded text-sm w-full font-bold"; badgeSold.classList.add('hidden'); }
+            renderDetailLocationButtons();
+            document.getElementById('detail-modal').classList.remove('hidden');
+        };
+        window.renderDetailLocationButtons = function() {
+            const container = document.getElementById('detail-location-options'); container.innerHTML = '';
+            const p = normalizePhotos(currentDetailItem)[currentDetailPhotoIdx];
+            if(p.status === 'Sold') { container.innerHTML = `<div class="col-span-2 text-center text-stone-400 text-xs py-2 bg-stone-50 rounded">已售出商品無法編輯地點</div>`; return; }
+            appSettings.locations.forEach(loc => {
+                const isSelected = tempLocations.includes(loc);
+                const btnClass = isSelected ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-stone-500 border-stone-200 hover:border-blue-300';
+                container.innerHTML += `<button onclick="window.toggleDetailLocation('${loc}')" class="border rounded py-2 text-xs font-bold transition-colors ${btnClass}">${loc} ${isSelected ? '✓' : ''}</button>`;
+            });
+        };
+        window.toggleDetailLocation = function(loc) { if(tempLocations.includes(loc)) { tempLocations = tempLocations.filter(l => l !== loc); } else { tempLocations.push(loc); } renderDetailLocationButtons(); };
+        window.saveItemDetails = async function() { if(!currentDetailItem) return; let photos = normalizePhotos(currentDetailItem); photos[currentDetailPhotoIdx].notes = document.getElementById('detail-notes').value; photos[currentDetailPhotoIdx].locations = tempLocations; try { await updateDoc(doc(dbFirestore, "stock_items", currentDetailItem.id), { photos: photos }); window.closeDetailModal(); } catch(e) { alert("Save failed"); } };
+        window.triggerSoldFlow = function() {
+            let photos = normalizePhotos(currentDetailItem); const currentStatus = photos[currentDetailPhotoIdx].status;
+            if (currentStatus === 'Sold') { if(confirm("確認取消售出？物品將回到庫存中。")) { photos[currentDetailPhotoIdx].status = 'Available'; photos[currentDetailPhotoIdx].soldPrice = null; updateItemStatus(photos); } } 
+            else { document.getElementById('sold-price-input').value = currentDetailItem.price || ''; document.getElementById('sold-note-input').value = ''; document.getElementById('sold-date-input').valueAsDate = new Date(); document.getElementById('sold-modal').classList.remove('hidden'); }
+        };
+        window.confirmSoldAction = function() {
+            const soldPrice = document.getElementById('sold-price-input').value; const note = document.getElementById('sold-note-input').value; const dateVal = document.getElementById('sold-date-input').value;
+            let photos = normalizePhotos(currentDetailItem); photos[currentDetailPhotoIdx].status = 'Sold'; photos[currentDetailPhotoIdx].soldPrice = soldPrice; photos[currentDetailPhotoIdx].soldAt = dateVal ? new Date(dateVal) : new Date(); photos[currentDetailPhotoIdx].locations = tempLocations;
+            if(note) photos[currentDetailPhotoIdx].notes = (photos[currentDetailPhotoIdx].notes ? photos[currentDetailPhotoIdx].notes + " | " : "") + note;
+            document.getElementById('sold-modal').classList.add('hidden'); updateItemStatus(photos);
+        };
+        async function updateItemStatus(photos) { const allSold = photos.every(p => p.status === 'Sold'); const anySold = photos.some(p => p.status === 'Sold'); let globalStatus = allSold ? 'Sold' : (anySold ? 'Partial Sold' : 'Ready'); await updateDoc(doc(dbFirestore, "stock_items", currentDetailItem.id), { photos: photos, status: globalStatus }); window.closeDetailModal(); }
+        window.closeDetailModal = () => document.getElementById('detail-modal').classList.add('hidden');
+        window.handleAddItem = async function(e) { e.preventDefault(); const btn = document.getElementById('btn-submit'); btn.innerText = '處理中...'; btn.disabled = true; try { const form = new FormData(e.target); const fileInput = document.querySelector('input[name="initialPhotos"]'); let photoObjs = []; if(fileInput.files.length > 0) { for(let i=0; i<fileInput.files.length; i++) { const file = fileInput.files[i]; const sRef = ref(storage, 'photos/'+Date.now()+'_'+file.name); const snap = await uploadBytes(sRef, file); const url = await getDownloadURL(snap.ref); photoObjs.push({ url: url, status: 'Available', locations: [], notes: '', soldPrice: null }); } } const cleanCat = getCleanCategory(form.get('category')); await addDoc(collection(dbFirestore, "stock_items"), { month: form.get('month'), itemName: form.get('itemName'), category: cleanCat, maker: form.get('maker'), color: form.get('color'), size: form.get('size'), quantity: parseInt(form.get('quantity')) || 1, price: form.get('price'), status: 'To Make', photos: photoObjs, createdAt: serverTimestamp() }); window.closeModal(); e.target.reset(); } catch (error) { console.error(error); alert("Error: " + error.message); } finally { btn.innerText = '確認新增'; btn.disabled = false; } };
+        window.handleDelete = async () => { if(confirm('確定刪除此工單？')) { await deleteDoc(doc(dbFirestore, "stock_items", document.getElementById('edit-id').value)); window.closeEditModal(); } };
+        window.renderSettingsView = function() { const render = (type) => (appSettings[type]||[]).map(i => `<span class="bg-stone-100 px-2 py-1 rounded text-xs mr-1 mb-1 inline-block border cursor-pointer hover:bg-red-50 hover:text-red-500" onclick="window.removeSetting('${type}','${i}')">${i} &times;</span>`).join(''); document.getElementById('settings-makers-list').innerHTML = render('makers'); document.getElementById('settings-locations-list').innerHTML = render('locations'); document.getElementById('settings-categories-list').innerHTML = render('categories'); };
+        window.addSetting = async function(type) { const map = {'makers':'new-maker-input', 'locations':'new-location-input', 'categories':'new-category-input'}; let val = document.getElementById(map[type]).value; if (type === 'categories') val = getCleanCategory(val); else val = val.trim(); if(val) { await updateDoc(doc(dbFirestore, "settings", "config"), { [type]: [...appSettings[type], val] }); document.getElementById(map[type]).value = ''; } };
+        window.removeSetting = async function(type, val) { if(confirm(`Remove ${val}?`)) await updateDoc(doc(dbFirestore, "settings", "config"), { [type]: appSettings[type].filter(x => x !== val) }); }
+        window.switchView = (v) => { document.querySelectorAll('section[id^="view-"]').forEach(el => el.classList.add('hidden')); document.getElementById(`view-${v}`).classList.remove('hidden'); document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('nav-active')); document.getElementById(`nav-${v}`)?.classList.add('nav-active'); };
+        window.updateRole = () => { currentRole = document.getElementById('role-select').value; const isAdmin = currentRole === 'admin'; document.getElementById('nav-settings').classList.toggle('hidden', !isAdmin); window.switchView(currentRole.startsWith('maker') ? 'production' : 'dashboard'); };
+        window.openModal = () => document.getElementById('add-modal').classList.remove('hidden');
         window.closeModal = () => document.getElementById('add-modal').classList.add('hidden');
         window.closeEditModal = () => document.getElementById('edit-modal').classList.add('hidden');
-        window.openModal = () => document.getElementById('add-modal').classList.remove('hidden');
-        window.switchView = (v) => { document.querySelectorAll('section[id^="view-"]').forEach(el => el.classList.add('hidden')); document.getElementById(`view-${v}`).classList.remove('hidden'); };
-        window.updateRole = () => { currentRole = document.getElementById('role-select').value; window.switchView('dashboard'); };
     </script>
 </body>
 </html>
