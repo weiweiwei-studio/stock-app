@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weiweiwei ERP (v11.17.0 Planning Goals)</title>
+    <title>Weiweiwei ERP (v11.18.0 Month Nav)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -70,7 +70,7 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center gap-4">
                     <div class="flex-shrink-0 flex items-center">
-                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.17.0</span></span>
+                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.18.0</span></span>
                         <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] bg-stone-100 text-stone-400">Loading...</span>
                     </div>
                     <div class="hidden sm:ml-6 sm:flex sm:space-x-4">
@@ -129,18 +129,26 @@
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
                         <div class="flex bg-stone-100 p-1 rounded-lg">
                             <button onclick="window.setCalendarMode('production')" id="btn-mode-production" class="px-3 py-1.5 text-xs font-bold rounded-md shadow bg-white text-stone-800 transition-all flex items-center gap-1">
-                                📅 製作排程 (Start)
+                                📅 製作排程
                             </button>
                             <button onclick="window.setCalendarMode('arrival')" id="btn-mode-arrival" class="px-3 py-1.5 text-xs font-bold rounded-md text-stone-500 hover:text-stone-800 transition-all flex items-center gap-1">
-                                🚀 完工上新 (Ready)
+                                🚀 完工上新
                             </button>
                         </div>
-                        <span class="text-sm font-bold text-stone-700" id="calendar-month-label">Current</span>
+                        <div class="flex items-center gap-3">
+                            <button onclick="window.changeMonth(-1)" class="w-8 h-8 flex items-center justify-center rounded-full bg-stone-100 hover:bg-stone-200 text-stone-600 transition">
+                                <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                            </button>
+                            <span class="text-sm font-bold text-stone-700 min-w-[100px] text-center" id="calendar-month-label">Current</span>
+                            <button onclick="window.changeMonth(1)" class="w-8 h-8 flex items-center justify-center rounded-full bg-stone-100 hover:bg-stone-200 text-stone-600 transition">
+                                <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                            </button>
+                        </div>
                     </div>
 
                     <div id="unscheduled-container" class="mb-4 bg-stone-50 p-3 rounded border border-stone-100 transition-all">
                         <h5 class="text-[10px] font-bold text-stone-400 uppercase tracking-wide mb-2 flex items-center gap-2">
-                            待定日期 (To Be Scheduled) <span class="text-[9px] bg-stone-200 px-1 rounded text-stone-500" id="unscheduled-count">0</span>
+                            <span id="unscheduled-month-label">本月</span> 待定日期 <span class="text-[9px] bg-stone-200 px-1 rounded text-stone-500" id="unscheduled-count">0</span>
                         </h5>
                         <div id="cal-unscheduled-list" class="flex flex-wrap gap-2 min-h-[24px]"></div>
                     </div>
@@ -148,12 +156,10 @@
                     <div id="weekly-stats-container" class="mb-4 bg-stone-50 p-4 rounded border border-stone-200 hidden transition-all">
                         <div class="flex justify-between items-center mb-2">
                             <h5 class="text-[10px] font-bold text-stone-600 uppercase tracking-wide flex items-center gap-2">
-                                <i data-lucide="target" class="w-3 h-3 text-red-500"></i> 每週上新目標 (Weekly Targets)
+                                <i data-lucide="target" class="w-3 h-3 text-red-500"></i> 每週上新目標 (點擊數字修改)
                             </h5>
-                            <span class="text-[9px] text-stone-400">Click number to edit goal</span>
                         </div>
-                        <div id="weekly-goals-list" class="flex flex-wrap gap-3">
-                            </div>
+                        <div id="weekly-goals-list" class="flex flex-wrap gap-3"></div>
                     </div>
 
                     <div id="calendar-wrapper" class="calendar-grid rounded-lg overflow-hidden border border-stone-200 shadow-sm w-full">
@@ -442,6 +448,7 @@
         let db = [];
         let currentRole = 'admin';
         let calendarMode = 'production'; 
+        let currentCalDate = new Date(); // State for selected month
         let categoryChart = null, allocChart = null;
         let appSettings = { makers: ['Kim', 'Kelly', 'Lijin'], locations: ['Studio', 'Online', 'Bev C', 'Pop-Up'], categories: ['Top', 'Dress', 'Pants'], weekly_goals: {} };
         let currentDetailItem = null, currentDetailPhotoIdx = -1, tempLocations = []; 
@@ -481,12 +488,12 @@
                         makers: data.makers || appSettings.makers,
                         locations: data.locations || appSettings.locations,
                         categories: data.categories || appSettings.categories,
-                        weekly_goals: data.weekly_goals || {} // New Field for Goals
+                        weekly_goals: data.weekly_goals || {} 
                     };
                 }
                 renderSettingsView();
                 updateDropdowns();
-                if(calendarMode === 'arrival') renderCalendar(); // Re-render to show goals
+                renderCalendar(); 
             });
 
             const q = collection(dbFirestore, "stock_items");
@@ -507,7 +514,6 @@
             });
         }
 
-        // --- NORMALIZE (Data Cleaning) ---
         function normalizePhotos(item) {
             let raw = [];
             if (item.photos && Array.isArray(item.photos)) raw = item.photos;
@@ -619,6 +625,11 @@
             renderCalendar();
         };
 
+        window.changeMonth = function(delta) {
+            currentCalDate.setMonth(currentCalDate.getMonth() + delta);
+            renderCalendar();
+        };
+
         window.setWeeklyGoal = async function(year, month, week) {
             const key = `y${year}m${month}w${week}`;
             const current = appSettings.weekly_goals[key] || 0;
@@ -631,9 +642,13 @@
         };
 
         function renderCalendar() {
+            const displayDate = currentCalDate;
+            const year = displayDate.getFullYear();
+            const month = displayDate.getMonth();
             const today = new Date();
-            const currentMonthName = today.toLocaleString('en-US', { month: 'long', year: 'numeric' });
-            document.getElementById('calendar-month-label').innerText = currentMonthName;
+
+            const monthName = displayDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+            document.getElementById('calendar-month-label').innerText = monthName;
             
             const unscheduledContainer = document.getElementById('cal-unscheduled-list');
             const gridContainer = document.getElementById('calendar-days-container');
@@ -643,13 +658,13 @@
             gridContainer.innerHTML = '';
             weeklyGoalsList.innerHTML = '';
 
-            const year = today.getFullYear();
-            const month = today.getMonth();
-
-            // 1. UNSCHEDULED (Production Mode)
+            // 1. UNSCHEDULED (Matches Displayed Month)
             if (calendarMode === 'production') {
+                const monthShort = displayDate.toLocaleString('en-US', { month: 'short' });
+                document.getElementById('unscheduled-month-label').innerText = monthShort;
+                
                 const unscheduled = db.filter(item => 
-                    !item.makingAt && item.month && item.month.includes(today.toLocaleString('en-US', { month: 'short' }))
+                    !item.makingAt && item.month && item.month.includes(monthShort)
                 );
                 document.getElementById('unscheduled-count').innerText = unscheduled.length;
                 if(unscheduled.length === 0) unscheduledContainer.innerHTML = '<span class="text-[10px] text-stone-300 italic">None</span>';
@@ -709,29 +724,30 @@
                     if(item.maker && item.maker.toLowerCase().includes('kelly')) colorClass = 'maker-kelly';
                     
                     const catName = getCleanCategory(item.category);
-                    cellHTML += `<div class="cal-item ${colorClass}" onclick="window.openEditModal('${item.id}')" title="${item.itemName}">${catName}</div>`;
+                    const qtyDisplay = item.quantity > 1 ? ` (${item.quantity})` : '';
+                    
+                    cellHTML += `<div class="cal-item ${colorClass}" onclick="window.openEditModal('${item.id}')" title="${item.itemName}">${catName}${qtyDisplay}</div>`;
                 });
 
                 cellHTML += `</div></div>`;
                 gridContainer.innerHTML += cellHTML;
             }
             
-            // 2. RENDER WEEKLY GOALS (Arrival Mode)
+            // 2. RENDER WEEKLY GOALS (Arrival Mode) - SAVED PER MONTH
             if (calendarMode === 'arrival') {
                 for (let w = 1; w <= 5; w++) {
                     const goalKey = `y${year}m${month}w${w}`;
-                    const target = appSettings.weekly_goals[goalKey] || 0;
+                    const target = appSettings.weekly_goals[goalKey] || 0; // Default 0
                     const actual = weeklyActuals[w] || 0;
                     
-                    if (target === 0 && actual === 0) continue; // Skip empty weeks
+                    if (target === 0 && actual === 0 && w > 4) continue; // Skip empty late weeks
 
                     // Calc progress
                     const pct = target > 0 ? Math.min((actual / target) * 100, 100) : 0;
                     let fillClass = 'fill-red';
-                    if (actual >= target) fillClass = 'fill-green';
+                    if (actual >= target && target > 0) fillClass = 'fill-green';
                     else if (actual >= target * 0.7) fillClass = 'fill-yellow';
-                    if (actual > target * 1.2) fillClass = 'fill-blue'; // Overachiever
-
+                    
                     weeklyGoalsList.innerHTML += `
                         <div class="goal-card cursor-pointer hover:shadow-md transition" onclick="window.setWeeklyGoal(${year}, ${month}, ${w})">
                             <div class="flex justify-between items-center">
@@ -744,16 +760,9 @@
                         </div>
                     `;
                 }
-                // Add "Add Goal" button if empty
-                if (weeklyGoalsList.innerHTML === '') {
-                     weeklyGoalsList.innerHTML = `<button onclick="window.setWeeklyGoal(${year}, ${month}, 1)" class="text-xs text-stone-400 border border-dashed border-stone-300 rounded px-3 py-2 hover:bg-stone-50">+ Set First Goal</button>`;
-                }
             }
         }
 
-        // ... [Rest of the helper functions: addToBreakdown, renderCategoryBadges, renderLocationButtons, showLocationBreakdown, initCharts, updateCharts, renderProductionList, renderAllocationList, openDetailModal, renderDetailLocationButtons, toggleDetailLocation, saveItemDetails, triggerSoldFlow, confirmSoldAction, updateItemStatus, closeDetailModal, handleAddItem, openEditModal, closeEditModal, handleEditSubmit, handleDelete, renderSettingsView, addSetting, removeSetting, updateDropdowns, switchView, updateRole, openModal, closeModal] ...
-        // (Keeping previous implementations for brevity, assume they are present)
-        
         function addToBreakdown(loc, name, cat) {
             if(!locationBreakdownData[loc]) locationBreakdownData[loc] = { total: 0, items: [], catBreakdown: {} };
             locationBreakdownData[loc].total++;
@@ -765,6 +774,7 @@
             const container = document.getElementById('category-stats-container');
             container.innerHTML = '';
             const sortedKeys = Object.keys(stats).sort((a,b) => stats[b] - stats[a]);
+
             sortedKeys.forEach(c => {
                 if(stats[c] > 0) container.innerHTML += `<div class="bg-white px-3 py-1 rounded shadow-sm border border-stone-200 text-xs text-stone-600">${c}: <b class="text-stone-800">${stats[c]}</b></div>`;
             });
@@ -896,8 +906,6 @@
             lucide.createIcons();
         };
 
-        // ... [Include other helper functions like openDetailModal, saveItemDetails, etc. as per previous version] ...
-        // Re-declaring key modals handlers for completeness in this snippet context
         window.openDetailModal = function(id, idx) {
             currentDetailItem = db.find(i => i.id === id); currentDetailPhotoIdx = idx;
             const p = normalizePhotos(currentDetailItem)[idx];
