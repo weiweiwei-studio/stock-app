@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weiweiwei ERP (v11.13.0 View Date)</title>
+    <title>Weiweiwei ERP (v11.14.0 Calendar View)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -51,14 +51,19 @@
         .sold-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; border-radius: 4px; flex-col }
         .has-note-dot { position: absolute; top: -3px; right: -3px; width: 8px; height: 8px; background-color: #ef4444; border-radius: 50%; border: 1px solid white; z-index: 20; }
 
-        /* Timeline Calendar Styles */
-        .timeline-container { position: relative; padding-left: 20px; border-left: 2px solid #e7e5e4; margin-left: 10px; }
-        .timeline-week { position: relative; margin-bottom: 24px; }
-        .timeline-dot { position: absolute; left: -27px; top: 0; width: 12px; height: 12px; background: #d6d3d1; border-radius: 50%; border: 2px solid #fff; }
-        .timeline-current .timeline-dot { background: #f59e0b; }
-        .cal-card { background: white; border: 1px solid #e7e5e4; padding: 8px; border-radius: 6px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.03); transition: transform 0.1s; }
-        .cal-card:hover { transform: translateX(2px); border-color: #d6d3d1; }
-        .maker-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+        /* Calendar Grid Styles */
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background-color: #e7e5e4; border: 1px solid #e7e5e4; }
+        .calendar-cell { background-color: white; min-height: 100px; padding: 4px; display: flex; flex-col; gap: 2px; transition: background 0.2s; }
+        .calendar-cell:hover { background-color: #fafaf9; }
+        .calendar-header { background-color: #f5f5f4; color: #78716c; font-size: 11px; font-weight: bold; text-align: center; padding: 6px 0; text-transform: uppercase; }
+        .cal-date-num { font-size: 10px; font-weight: bold; color: #a8a29e; margin-bottom: 4px; display: block; }
+        .cal-today .cal-date-num { color: #f59e0b; }
+        .cal-item { font-size: 9px; padding: 2px 4px; border-radius: 3px; color: white; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; box-shadow: 0 1px 1px rgba(0,0,0,0.1); }
+        .cal-item:hover { opacity: 0.9; transform: translateY(-1px); }
+
+        .maker-kim { background-color: #f472b6; }
+        .maker-kelly { background-color: #60a5fa; }
+        .maker-other { background-color: #a8a29e; }
 
         .animate-fade-in { animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
@@ -71,7 +76,7 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center gap-4">
                     <div class="flex-shrink-0 flex items-center">
-                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.13.0</span></span>
+                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.14.0</span></span>
                         <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] bg-stone-100 text-stone-400">Loading...</span>
                     </div>
                     <div class="hidden sm:ml-6 sm:flex sm:space-x-4">
@@ -124,47 +129,63 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                 <div>
-                    <h3 class="font-bold text-stone-700 mb-2 text-sm uppercase tracking-wide">現貨地點分佈 (點擊查看)</h3>
-                    <div id="location-stats-container" class="flex flex-wrap gap-2"></div>
-                    <div id="location-breakdown-panel" class="mt-4 hidden bg-white border border-stone-200 rounded p-4 shadow-sm animate-fade-in">
-                        <h4 class="text-sm font-bold text-stone-800 mb-2 border-b pb-1" id="breakdown-title">Location</h4>
-                        <div class="text-xs text-stone-500 mb-2" id="breakdown-categories"></div>
-                        <ul class="text-xs text-stone-700 space-y-1 max-h-40 overflow-y-auto custom-scrollbar" id="breakdown-list"></ul>
-                    </div>
-                 </div>
-                 <div>
-                    <h3 class="font-bold text-stone-700 mb-2 text-sm uppercase tracking-wide">類別生產總計 (件數)</h3>
-                    <div id="category-stats-container" class="flex flex-wrap gap-2"></div>
-                 </div>
-            </div>
-
             <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div class="bg-white p-6 rounded-lg shadow-sm md:col-span-2 space-y-8">
-                    <div class="h-64">
-                        <h4 class="text-sm font-bold text-stone-500 mb-4 uppercase">每月生產結構</h4>
-                        <div class="relative w-full h-full pb-8"><canvas id="categoryChart"></canvas></div>
+                
+                <div class="bg-white p-6 rounded-lg shadow-sm md:col-span-2 h-full flex flex-col">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="text-sm font-bold text-stone-800 uppercase flex items-center gap-2">
+                            <i data-lucide="calendar" class="w-4 h-4"></i> 本月排程 (Production Calendar)
+                        </h4>
+                        <span class="text-xs font-bold text-stone-500" id="calendar-month-label">Current</span>
                     </div>
-                    <div class="h-64 border-t border-stone-100 pt-8">
-                        <h4 class="text-sm font-bold text-stone-500 mb-4 uppercase">庫存版圖 (分佈)</h4>
-                        <div class="relative w-full h-full pb-8"><canvas id="allocationChart"></canvas></div>
+
+                    <div class="mb-4 bg-stone-50 p-3 rounded border border-stone-100">
+                        <h5 class="text-[10px] font-bold text-stone-400 uppercase tracking-wide mb-2 flex items-center gap-2">
+                            待定日期 (To Be Scheduled) <span class="text-[9px] bg-stone-200 px-1 rounded text-stone-500" id="unscheduled-count">0</span>
+                        </h5>
+                        <div id="cal-unscheduled-list" class="flex flex-wrap gap-2 min-h-[24px]"></div>
+                    </div>
+
+                    <div class="calendar-grid rounded-lg overflow-hidden border border-stone-200 shadow-sm flex-grow">
+                        <div class="calendar-header">Sun</div>
+                        <div class="calendar-header">Mon</div>
+                        <div class="calendar-header">Tue</div>
+                        <div class="calendar-header">Wed</div>
+                        <div class="calendar-header">Thu</div>
+                        <div class="calendar-header">Fri</div>
+                        <div class="calendar-header">Sat</div>
+                        <div id="calendar-days-container" class="contents"></div>
+                    </div>
+                    
+                    <div class="mt-3 flex gap-4 text-[10px] text-stone-500 font-bold justify-end">
+                        <div class="flex items-center gap-1"><span class="w-2 h-2 rounded bg-pink-400"></span> Kim</div>
+                        <div class="flex items-center gap-1"><span class="w-2 h-2 rounded bg-blue-400"></span> Kelly</div>
+                        <div class="flex items-center gap-1"><span class="w-2 h-2 rounded bg-stone-400"></span> Other</div>
                     </div>
                 </div>
 
-                <div class="bg-white p-6 rounded-lg shadow-sm h-full overflow-hidden flex flex-col">
-                    <div class="flex justify-between items-center mb-4">
-                        <h4 class="text-sm font-bold text-stone-800 uppercase flex items-center gap-2">
-                            <i data-lucide="calendar" class="w-4 h-4"></i> 本月排程
-                        </h4>
-                        <span class="text-xs text-stone-400" id="calendar-month-label">Current</span>
-                    </div>
-                    <div class="flex-grow overflow-y-auto custom-scrollbar pr-2">
-                        <div class="mb-4">
-                            <h5 class="text-[10px] font-bold text-stone-400 uppercase tracking-wide mb-2">待定日期 (To Be Scheduled)</h5>
-                            <div id="cal-unscheduled-list" class="space-y-1"></div>
+                <div class="space-y-6">
+                    <div class="bg-white p-4 rounded-lg shadow-sm">
+                        <h3 class="font-bold text-stone-700 mb-2 text-xs uppercase tracking-wide">庫存分佈</h3>
+                        <div id="location-stats-container" class="flex flex-wrap gap-2"></div>
+                         <div id="location-breakdown-panel" class="mt-4 hidden bg-stone-50 border border-stone-100 rounded p-3 shadow-inner">
+                            <h4 class="text-xs font-bold text-stone-800 mb-2 border-b border-stone-200 pb-1" id="breakdown-title">Location</h4>
+                            <ul class="text-[10px] text-stone-600 space-y-1 max-h-32 overflow-y-auto custom-scrollbar" id="breakdown-list"></ul>
                         </div>
-                        <div class="timeline-container" id="cal-timeline"></div>
+                    </div>
+                    
+                    <div class="bg-white p-4 rounded-lg shadow-sm">
+                        <h3 class="font-bold text-stone-700 mb-2 text-xs uppercase tracking-wide">類別總計</h3>
+                        <div id="category-stats-container" class="flex flex-wrap gap-2"></div>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg shadow-sm">
+                        <h4 class="text-xs font-bold text-stone-500 mb-2 uppercase">類別生產趨勢</h4>
+                        <div class="relative w-full h-40"><canvas id="categoryChart"></canvas></div>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg shadow-sm">
+                        <h4 class="text-xs font-bold text-stone-500 mb-2 uppercase">庫存佔比</h4>
+                        <div class="relative w-full h-40"><canvas id="allocationChart"></canvas></div>
                     </div>
                 </div>
             </div>
@@ -535,7 +556,7 @@
                     locations: locs, 
                     notes: p.notes || '',
                     soldPrice: p.soldPrice || null,
-                    soldAt: p.soldAt || null // Include timestamp
+                    soldAt: p.soldAt || null 
                 };
             });
         }
@@ -603,78 +624,74 @@
             renderCalendar(); 
         }
 
+        // NEW CALENDAR RENDERER
         function renderCalendar() {
             const today = new Date();
-            const currentMonthName = today.toLocaleString('en-US', { month: 'short', year: 'numeric' });
-            
+            const currentMonthName = today.toLocaleString('en-US', { month: 'long', year: 'numeric' });
             document.getElementById('calendar-month-label').innerText = currentMonthName;
             
             const unscheduledContainer = document.getElementById('cal-unscheduled-list');
-            const timelineContainer = document.getElementById('cal-timeline');
+            const gridContainer = document.getElementById('calendar-days-container');
             unscheduledContainer.innerHTML = '';
-            timelineContainer.innerHTML = '';
+            gridContainer.innerHTML = '';
 
-            const unscheduled = [];
-            const weeks = { 1: [], 2: [], 3: [], 4: [], 5: [] };
+            // Handle Unscheduled Items
+            const unscheduled = db.filter(item => 
+                !item.makingAt && item.month && item.month.includes(today.toLocaleString('en-US', { month: 'short' }))
+            );
+            document.getElementById('unscheduled-count').innerText = unscheduled.length;
+            
+            if(unscheduled.length === 0) unscheduledContainer.innerHTML = '<span class="text-[10px] text-stone-300 italic">None</span>';
+            else {
+                unscheduled.forEach(i => {
+                    let color = 'bg-stone-300';
+                    if(i.maker && i.maker.toLowerCase().includes('kim')) color = 'bg-pink-300';
+                    if(i.maker && i.maker.toLowerCase().includes('kelly')) color = 'bg-blue-300';
+                    unscheduledContainer.innerHTML += `
+                        <div onclick="window.openEditModal('${i.id}')" class="${color} text-white text-[10px] px-2 py-1 rounded cursor-pointer hover:opacity-80 transition shadow-sm">
+                            ${getCleanCategory(i.category)}: ${i.itemName}
+                        </div>`;
+                });
+            }
 
-            db.forEach(item => {
-                if (item.makingAt) {
-                    const d = new Date(item.makingAt.seconds * 1000);
-                    if (d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear()) {
-                        const date = d.getDate();
-                        let week = Math.ceil(date / 7); 
-                        if(week > 5) week = 5;
-                        weeks[week].push(item);
-                    }
-                } 
-                else if (item.month && item.month.includes(today.toLocaleString('en-US', { month: 'short' }))) {
-                    unscheduled.push(item);
-                }
-            });
+            // Handle Calendar Grid
+            const year = today.getFullYear();
+            const month = today.getMonth();
+            const firstDay = new Date(year, month, 1).getDay(); // 0 = Sun
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-            if (unscheduled.length === 0) unscheduledContainer.innerHTML = '<span class="text-[10px] text-stone-300 italic">None</span>';
-            else unscheduled.forEach(i => unscheduledContainer.innerHTML += createCalCard(i));
+            // Fill empty slots
+            for(let i=0; i<firstDay; i++) {
+                gridContainer.innerHTML += `<div class="calendar-cell bg-stone-50"></div>`;
+            }
 
-            [1, 2, 3, 4, 5].forEach(w => {
-                const items = weeks[w];
-                const dateStart = (w - 1) * 7 + 1;
-                const dateEnd = Math.min(w * 7, 31);
-                const weekTotal = items.reduce((sum, item) => sum + (parseInt(item.quantity) || 1), 0);
-                const currentDay = today.getDate();
-                const isCurrentWeek = currentDay >= dateStart && currentDay <= dateEnd;
-
-                timelineContainer.innerHTML += `
-                    <div class="timeline-week ${isCurrentWeek ? 'timeline-current' : ''}">
-                        <div class="timeline-dot"></div>
-                        <h5 class="text-xs font-bold text-stone-500 mb-2 uppercase flex justify-between items-center">
-                            <span>Week ${w} <span class="font-normal text-[10px] text-stone-400">(${dateStart}-${dateEnd})</span></span>
-                            ${weekTotal > 0 ? `<span class="text-[10px] bg-stone-100 text-stone-600 px-1.5 py-0.5 rounded border border-stone-200">Total: ${weekTotal}</span>` : ''}
-                        </h5>
-                        <div class="space-y-1">
-                            ${items.length > 0 ? items.map(i => createCalCard(i)).join('') : '<div class="text-[10px] text-stone-300 italic pl-1">Empty</div>'}
-                        </div>
-                    </div>
+            // Fill Days
+            for(let d=1; d<=daysInMonth; d++) {
+                const isToday = (d === today.getDate() && month === today.getMonth() && year === today.getFullYear());
+                let cellHTML = `
+                    <div class="calendar-cell ${isToday ? 'cal-today border border-amber-300 bg-amber-50' : ''}">
+                        <span class="cal-date-num">${d}</span>
                 `;
-            });
-        }
 
-        function createCalCard(item) {
-            let color = '#ccc';
-            if (item.maker && item.maker.includes('Kim')) color = '#f472b6';
-            else if (item.maker && item.maker.includes('Kelly')) color = '#60a5fa';
+                // Find items for this day
+                const itemsToday = db.filter(item => {
+                    if(!item.makingAt) return false;
+                    const date = new Date(item.makingAt.seconds * 1000);
+                    return date.getDate() === d && date.getMonth() === month && date.getFullYear() === year;
+                });
 
-            return `
-                <div class="cal-card cursor-pointer flex-col !items-start gap-1" onclick="window.openEditModal('${item.id}')">
-                    <div class="flex items-center justify-between w-full">
-                         <div class="flex items-center">
-                            <span class="maker-dot" style="background-color: ${color}"></span>
-                            <span class="font-bold text-stone-800 text-xs">${getCleanCategory(item.category)}</span>
-                         </div>
-                         <span class="text-[10px] bg-stone-100 px-1 rounded text-stone-500 font-bold">${item.quantity}</span>
-                    </div>
-                    <div class="text-[10px] text-stone-400 truncate w-full pl-3">${item.itemName}</div>
-                </div>
-            `;
+                itemsToday.forEach(item => {
+                    let colorClass = 'maker-other';
+                    if(item.maker && item.maker.toLowerCase().includes('kim')) colorClass = 'maker-kim';
+                    if(item.maker && item.maker.toLowerCase().includes('kelly')) colorClass = 'maker-kelly';
+                    
+                    const catName = getCleanCategory(item.category);
+                    cellHTML += `<div class="cal-item ${colorClass}" onclick="window.openEditModal('${item.id}')" title="${item.itemName}">${catName}</div>`;
+                });
+
+                cellHTML += `</div>`;
+                gridContainer.innerHTML += cellHTML;
+            }
         }
 
         function addToBreakdown(loc, name, cat) {
@@ -690,7 +707,7 @@
             const sortedKeys = Object.keys(stats).sort((a,b) => stats[b] - stats[a]);
 
             sortedKeys.forEach(c => {
-                if(stats[c] > 0) container.innerHTML += `<div class="bg-white px-3 py-1 rounded shadow-sm border border-stone-200 text-sm text-stone-600">${c}: <b class="text-stone-800">${stats[c]}</b></div>`;
+                if(stats[c] > 0) container.innerHTML += `<div class="bg-white px-3 py-1 rounded shadow-sm border border-stone-200 text-xs text-stone-600">${c}: <b class="text-stone-800">${stats[c]}</b></div>`;
             });
         }
 
@@ -698,9 +715,9 @@
             const container = document.getElementById('location-stats-container');
             container.innerHTML = '';
             appSettings.locations.forEach(l => {
-                if(stats[l] > 0) container.innerHTML += `<button onclick="window.showLocationBreakdown('${l}')" class="bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded shadow-sm border border-blue-100 text-sm text-blue-800 transition-colors">${l}: <b>${stats[l]}</b></button>`;
+                if(stats[l] > 0) container.innerHTML += `<button onclick="window.showLocationBreakdown('${l}')" class="bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded shadow-sm border border-blue-100 text-xs text-blue-800 transition-colors">${l}: <b>${stats[l]}</b></button>`;
             });
-            if(stats['Unallocated'] > 0) container.innerHTML += `<button onclick="window.showLocationBreakdown('Unallocated')" class="bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded shadow-sm border border-gray-200 text-sm text-gray-600">Unallocated: <b>${stats['Unallocated']}</b></button>`;
+            if(stats['Unallocated'] > 0) container.innerHTML += `<button onclick="window.showLocationBreakdown('Unallocated')" class="bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded shadow-sm border border-gray-200 text-xs text-gray-600">Unallocated: <b>${stats['Unallocated']}</b></button>`;
         }
 
         window.showLocationBreakdown = function(loc) {
@@ -708,8 +725,7 @@
             if(!data) return;
             const panel = document.getElementById('location-breakdown-panel');
             document.getElementById('breakdown-title').innerText = `${loc} (Total: ${data.total})`;
-            document.getElementById('breakdown-categories').innerText = Object.entries(data.catBreakdown).map(([k,v]) => `${k}: ${v}`).join(', ');
-            document.getElementById('breakdown-list').innerHTML = data.items.map(i => `<li class="border-b border-stone-50 pb-1 last:border-0">${i}</li>`).join('');
+            document.getElementById('breakdown-list').innerHTML = data.items.map(i => `<li class="border-b border-stone-200 pb-1 last:border-0">${i}</li>`).join('');
             panel.classList.remove('hidden');
         };
 
@@ -720,13 +736,13 @@
                 options: {
                     responsive: true, maintainAspectRatio: false,
                     scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
-                    plugins: { legend: { position: 'bottom' } }
+                    plugins: { legend: { display: false } }
                 }
             });
             allocChart = new Chart(document.getElementById('allocationChart'), {
                 type: 'doughnut',
                 data: { labels: [], datasets: [{ data: [], backgroundColor: [] }] },
-                options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+                options: { maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: {size: 10} } } } }
             });
         }
 
@@ -892,7 +908,6 @@
             
             let priceText = currentDetailItem.price ? `RM${currentDetailItem.price}` : '未定價';
             
-            // UPDATED: Show Sold Date in Detail Modal
             if(p.status === 'Sold') {
                 const soldPrice = p.soldPrice || '-';
                 let dateStr = '';
@@ -963,13 +978,8 @@
             let photos = normalizePhotos(currentDetailItem);
             photos[currentDetailPhotoIdx].status = 'Sold';
             photos[currentDetailPhotoIdx].soldPrice = soldPrice;
-            
-            // MANUAL DATE or TODAY
             photos[currentDetailPhotoIdx].soldAt = dateVal ? new Date(dateVal) : new Date();
-            
-            // ENSURE LOCATIONS ARE SAVED (Fixing previous bug)
             photos[currentDetailPhotoIdx].locations = tempLocations;
-
             if(note) photos[currentDetailPhotoIdx].notes = (photos[currentDetailPhotoIdx].notes ? photos[currentDetailPhotoIdx].notes + " | " : "") + note;
 
             document.getElementById('sold-modal').classList.add('hidden');
