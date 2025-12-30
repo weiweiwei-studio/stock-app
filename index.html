@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weiweiwei ERP (v11.12.0 Sold Date)</title>
+    <title>Weiweiwei ERP (v11.13.0 View Date)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -71,7 +71,7 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center gap-4">
                     <div class="flex-shrink-0 flex items-center">
-                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.12.0</span></span>
+                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.13.0</span></span>
                         <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] bg-stone-100 text-stone-400">Loading...</span>
                     </div>
                     <div class="hidden sm:ml-6 sm:flex sm:space-x-4">
@@ -534,7 +534,8 @@
                     status: p.status || 'Available',
                     locations: locs, 
                     notes: p.notes || '',
-                    soldPrice: p.soldPrice || null
+                    soldPrice: p.soldPrice || null,
+                    soldAt: p.soldAt || null // Include timestamp
                 };
             });
         }
@@ -890,7 +891,17 @@
             document.getElementById('detail-sku').innerText = `${getCleanCategory(currentDetailItem.category)} / ${currentDetailItem.color}`;
             
             let priceText = currentDetailItem.price ? `RM${currentDetailItem.price}` : '未定價';
-            if(p.status === 'Sold' && p.soldPrice) priceText += ` (Sold: RM${p.soldPrice})`;
+            
+            // UPDATED: Show Sold Date in Detail Modal
+            if(p.status === 'Sold') {
+                const soldPrice = p.soldPrice || '-';
+                let dateStr = '';
+                if(p.soldAt) {
+                    const dateObj = p.soldAt.seconds ? new Date(p.soldAt.seconds * 1000) : new Date(p.soldAt);
+                    dateStr = ` @ ${dateObj.toLocaleDateString()}`;
+                }
+                priceText += ` (Sold: RM${soldPrice}${dateStr})`;
+            }
             document.getElementById('detail-price-display').innerText = `Price: ${priceText}`;
 
             document.getElementById('detail-notes').value = p.notes;
