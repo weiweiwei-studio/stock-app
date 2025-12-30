@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weiweiwei ERP (v11.10.2 Strict Clean)</title>
+    <title>Weiweiwei ERP (v11.10.3 Debugger)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -71,7 +71,7 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center gap-4">
                     <div class="flex-shrink-0 flex items-center">
-                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.10.2</span></span>
+                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.10.3</span></span>
                         <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] bg-stone-100 text-stone-400">Loading...</span>
                     </div>
                     <div class="hidden sm:ml-6 sm:flex sm:space-x-4">
@@ -946,40 +946,50 @@
 
         window.closeDetailModal = () => document.getElementById('detail-modal').classList.add('hidden');
 
-        // --- UTILS ---
+        // --- UTILS with ERROR HANDLING ---
         window.handleAddItem = async function(e) { 
             e.preventDefault(); 
-            const btn = document.getElementById('btn-submit'); btn.innerText = '處理中...'; btn.disabled = true; 
-            const form = new FormData(e.target); 
-            const fileInput = document.querySelector('input[name="initialPhotos"]'); 
-            let photoObjs = []; 
-            if(fileInput.files.length > 0) { 
-                for(let i=0; i<fileInput.files.length; i++) { 
-                    const file = fileInput.files[i]; 
-                    const sRef = ref(storage, 'photos/'+Date.now()+'_'+file.name); 
-                    const snap = await uploadBytes(sRef, file); 
-                    const url = await getDownloadURL(snap.ref); 
-                    photoObjs.push({ url: url, status: 'Available', locations: [], notes: '', soldPrice: null }); 
+            const btn = document.getElementById('btn-submit'); 
+            btn.innerText = '處理中...'; 
+            btn.disabled = true; 
+            
+            try {
+                const form = new FormData(e.target); 
+                const fileInput = document.querySelector('input[name="initialPhotos"]'); 
+                let photoObjs = []; 
+                if(fileInput.files.length > 0) { 
+                    for(let i=0; i<fileInput.files.length; i++) { 
+                        const file = fileInput.files[i]; 
+                        const sRef = ref(storage, 'photos/'+Date.now()+'_'+file.name); 
+                        const snap = await uploadBytes(sRef, file); 
+                        const url = await getDownloadURL(snap.ref); 
+                        photoObjs.push({ url: url, status: 'Available', locations: [], notes: '', soldPrice: null }); 
+                    } 
                 } 
-            } 
-            
-            // STRICT CLEANING on Add
-            const cleanCat = getCleanCategory(form.get('category'));
-            
-            await addDoc(collection(dbFirestore, "stock_items"), { 
-                month: form.get('month'), 
-                itemName: form.get('itemName'), 
-                category: cleanCat, 
-                maker: form.get('maker'), 
-                color: form.get('color'), 
-                size: form.get('size'), 
-                quantity: parseInt(form.get('quantity')) || 1, 
-                price: form.get('price'), 
-                status: 'To Make', 
-                photos: photoObjs, 
-                createdAt: serverTimestamp() 
-            }); 
-            window.closeModal(); e.target.reset(); btn.innerText = '確認新增'; btn.disabled = false; 
+                
+                // STRICT CLEANING on Add
+                const cleanCat = getCleanCategory(form.get('category'));
+                
+                await addDoc(collection(dbFirestore, "stock_items"), { 
+                    month: form.get('month'), 
+                    itemName: form.get('itemName'), 
+                    category: cleanCat, 
+                    maker: form.get('maker'), 
+                    color: form.get('color'), 
+                    size: form.get('size'), 
+                    quantity: parseInt(form.get('quantity')) || 1, 
+                    price: form.get('price'), 
+                    status: 'To Make', 
+                    photos: photoObjs, 
+                    createdAt: serverTimestamp() 
+                }); 
+                window.closeModal(); e.target.reset(); 
+            } catch (error) {
+                console.error("Add Item Failed:", error);
+                alert("上傳失敗！請檢查圖片是否太大或網路連線。錯誤訊息: " + error.message);
+            } finally {
+                btn.innerText = '確認新增'; btn.disabled = false; 
+            }
         };
         
         window.openEditModal = (id) => { 
@@ -998,36 +1008,45 @@
         
         window.handleEditSubmit = async () => { 
             const id = document.getElementById('edit-id').value; 
-            const btn = document.getElementById('btn-edit-save'); btn.innerText = 'Saving...'; btn.disabled = true; 
-            const sDateVal = document.getElementById('edit-startDate').value; 
-            const cDateVal = document.getElementById('edit-completedDate').value; 
+            const btn = document.getElementById('btn-edit-save'); 
+            btn.innerText = 'Saving...'; 
+            btn.disabled = true; 
             
-            let data = { 
-                status: document.getElementById('edit-status').value, 
-                itemName: document.getElementById('edit-itemName').value, 
-                month: document.getElementById('edit-month').value,
-                price: document.getElementById('edit-price').value 
-            }; 
-            
-            if(sDateVal) data.makingAt = new Date(sDateVal); 
-            if(cDateVal) data.completedAt = new Date(cDateVal); 
-            
-            const photoInput = document.getElementById('edit-addPhotos'); 
-            if(photoInput.files.length > 0) { 
-                const item = db.find(i=>i.id===id); 
-                let existingPhotos = item.photos || []; 
-                for(let i=0; i<photoInput.files.length; i++) { 
-                    const file = photoInput.files[i]; 
-                    const sRef = ref(storage, 'photos/'+Date.now()+'_added_'+file.name); 
-                    const snap = await uploadBytes(sRef, file); 
-                    const url = await getDownloadURL(snap.ref); 
-                    existingPhotos.push({ url: url, status: 'Available', locations: [], notes: '', soldPrice: null }); 
+            try {
+                const sDateVal = document.getElementById('edit-startDate').value; 
+                const cDateVal = document.getElementById('edit-completedDate').value; 
+                
+                let data = { 
+                    status: document.getElementById('edit-status').value, 
+                    itemName: document.getElementById('edit-itemName').value, 
+                    month: document.getElementById('edit-month').value,
+                    price: document.getElementById('edit-price').value 
+                }; 
+                
+                if(sDateVal) data.makingAt = new Date(sDateVal); 
+                if(cDateVal) data.completedAt = new Date(cDateVal); 
+                
+                const photoInput = document.getElementById('edit-addPhotos'); 
+                if(photoInput.files.length > 0) { 
+                    const item = db.find(i=>i.id===id); 
+                    let existingPhotos = item.photos || []; 
+                    for(let i=0; i<photoInput.files.length; i++) { 
+                        const file = photoInput.files[i]; 
+                        const sRef = ref(storage, 'photos/'+Date.now()+'_added_'+file.name); 
+                        const snap = await uploadBytes(sRef, file); 
+                        const url = await getDownloadURL(snap.ref); 
+                        existingPhotos.push({ url: url, status: 'Available', locations: [], notes: '', soldPrice: null }); 
+                    } 
+                    data.photos = existingPhotos; 
                 } 
-                data.photos = existingPhotos; 
-            } 
-            await updateDoc(doc(dbFirestore, "stock_items", id), data); 
-            window.closeEditModal(); 
-            btn.innerText = '儲存變更'; btn.disabled = false; 
+                await updateDoc(doc(dbFirestore, "stock_items", id), data); 
+                window.closeEditModal(); 
+            } catch(error) {
+                console.error("Edit Failed:", error);
+                alert("儲存失敗！錯誤訊息: " + error.message);
+            } finally {
+                btn.innerText = '儲存變更'; btn.disabled = false; 
+            }
         };
 
         window.handleDelete = async () => { if(confirm('確定刪除此工單？(無法復原)')) { await deleteDoc(doc(dbFirestore, "stock_items", document.getElementById('edit-id').value)); window.closeEditModal(); } };
