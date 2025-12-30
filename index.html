@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weiweiwei ERP (v11.19.5 Final)</title>
+    <title>Weiweiwei ERP (v11.19.6 Debug)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -95,7 +95,7 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center gap-4">
                     <div class="flex-shrink-0 flex items-center">
-                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.19.5</span></span>
+                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.19.6</span></span>
                         <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] status-loading transition-colors duration-500">Connecting...</span>
                     </div>
                     <div class="hidden sm:ml-6 sm:flex sm:space-x-4">
@@ -437,9 +437,10 @@
             statusEl.innerText = "Initializing...";
             if (!auth) return;
             signInAnonymously(auth).catch((error) => { 
-                statusEl.innerText = "Login Fail"; 
+                statusEl.innerText = "Login Fail: " + error.message; 
                 statusEl.classList.remove('status-loading');
                 statusEl.classList.add('status-error');
+                alert("Login Error: " + error.message);
             });
             onAuthStateChanged(auth, (user) => { 
                 if (user) { 
@@ -464,6 +465,7 @@
             });
 
             // 🟢 讀取 stock_items
+            // ⚠️ 診斷版：加入報錯功能
             const q = collection(dbFirestore, "stock_items");
             
             onSnapshot(q, (snapshot) => {
@@ -480,6 +482,10 @@
                 renderProductionList();
                 renderAllocationList();
                 renderCalendar(); 
+            }, (error) => {
+                // 🔥🔥🔥 這裡會告訴我們為什麼讀不到！ 🔥🔥🔥
+                console.error("Snapshot Error:", error);
+                alert("讀取資料庫失敗！\n錯誤代碼: " + error.code + "\n錯誤訊息: " + error.message + "\n\n請檢查 Firestore Rules (權限) 設定。");
             });
         }
 
