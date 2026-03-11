@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weiweiwei ERP (v11.18.3 Interactive Update)</title>
+    <title>Weiweiwei ERP (v11.18.4 Multi-Studio Update)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -28,7 +28,6 @@
         .status-badge { position: absolute; bottom: 0; right: 0; left: 0; padding: 2px 0; font-size: 8px; font-weight: bold; color: white; text-align: center; border-radius: 0 0 4px 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .badge-sold { background-color: #1c1917; } 
         .badge-multi { background-color: #3b82f6; } 
-        .badge-studio { background-color: #10b981; } 
         .badge-none { background-color: #e5e7eb; color: #9ca3af; border-top: 1px solid #d1d5db; }
         .sold-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; border-radius: 4px; }
         .has-note-dot { position: absolute; top: -3px; right: -3px; width: 8px; height: 8px; background-color: #ef4444; border-radius: 50%; border: 1px solid white; z-index: 20; }
@@ -60,7 +59,6 @@
         .fill-red { background: #f87171; }
         .fill-yellow { background: #fbbf24; }
         .fill-green { background: #34d399; }
-        .fill-blue { background: #60a5fa; }
 
         .animate-fade-in { animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
@@ -73,7 +71,7 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center gap-4">
                     <div class="flex-shrink-0 flex items-center">
-                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.18.3</span></span>
+                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.18.4</span></span>
                         <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] bg-stone-100 text-stone-400">Loading...</span>
                     </div>
                     <div class="hidden sm:ml-6 sm:flex sm:space-x-4">
@@ -117,7 +115,7 @@
                     <div class="mt-2 text-3xl font-bold text-stone-800" id="kpi-studio">0</div>
                 </div>
                 <div onclick="window.openListModal('kpi', 'Unallocated')" class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-gray-400 cursor-pointer hover:-translate-y-1 hover:shadow-md transition-all">
-                    <div class="text-gray-500 text-xs font-bold uppercase">未分配 (件)</div>
+                    <div class="text-gray-500 text-xs font-bold uppercase">無地點標記 (件)</div>
                     <div class="mt-2 text-3xl font-bold text-stone-800" id="kpi-unallocated">0</div>
                 </div>
                 <div onclick="window.openListModal('kpi', 'Sold')" class="bg-stone-800 p-6 rounded-lg shadow-md border-l-4 border-yellow-500 text-white cursor-pointer hover:-translate-y-1 hover:shadow-lg transition-all">
@@ -245,12 +243,12 @@
         <section id="view-allocation" class="space-y-6 hidden animate-fade-in pb-10">
             <div class="bg-white rounded-lg p-6 shadow-sm border-l-4 border-blue-500">
                 <h2 class="text-xl font-bold text-stone-800">庫存與去向</h2>
-                <p class="text-stone-500 text-sm mt-1"><span class="bg-gray-200 border text-gray-500 text-[10px] px-1 rounded">未分配</span> 代表尚未入庫。點擊照片可標記售出或轉移地點。</p>
+                <p class="text-stone-500 text-sm mt-1">選單已加入 <b>JB Studio</b> 與 <b>PNG Studio</b>。選擇工作室地點即可查詢待出貨商品。</p>
             </div>
             <div class="flex flex-wrap items-center gap-4 bg-white p-3 rounded-lg shadow-sm">
                 <div class="flex items-center gap-2">
                     <span class="text-sm font-medium text-stone-600 flex-shrink-0">顯示地點:</span>
-                    <select id="alloc-filter-location" onchange="window.renderAllocationList()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5"><option value="all">全部庫存 (All)</option><option value="Sold">已售出 (Sold)</option><option value="Unallocated">未分配 (Unallocated)</option></select>
+                    <select id="alloc-filter-location" onchange="window.renderAllocationList()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5"><option value="all">全部庫存 (All)</option><option value="Sold">已售出 (Sold)</option><option value="Unallocated">無地點 (Unallocated)</option></select>
                 </div>
                 <div class="flex items-center gap-2">
                     <span class="text-sm font-medium text-stone-600 flex-shrink-0">過濾類別:</span>
@@ -306,9 +304,18 @@
                         <input type="number" name="price" placeholder="RM" class="w-full border-stone-300 rounded-md shadow-sm text-sm p-2 border">
                     </div>
                 </div>
-                <div class="bg-stone-50 p-3 rounded border border-dashed border-stone-300">
-                    <label class="text-xs font-bold text-stone-700 block mb-2">單品照片 (多選)</label>
-                    <input type="file" name="initialPhotos" accept="image/*" multiple class="block w-full text-xs">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-stone-500 mb-1">生產/入庫地 (Studio)</label>
+                        <select name="originStudio" class="w-full border-stone-300 rounded-md shadow-sm text-sm p-2 border bg-white">
+                            <option value="JB Studio">JB Studio</option>
+                            <option value="PNG Studio">PNG Studio</option>
+                        </select>
+                    </div>
+                    <div class="bg-stone-50 p-2 rounded border border-dashed border-stone-300">
+                        <label class="text-xs font-bold text-stone-700 block mb-1">單品照片 (多選)</label>
+                        <input type="file" name="initialPhotos" accept="image/*" multiple class="block w-full text-[10px]">
+                    </div>
                 </div>
                 <div class="flex justify-end pt-2 gap-2">
                     <button type="button" onclick="window.closeModal()" class="text-stone-500 text-sm">取消</button>
@@ -327,9 +334,15 @@
                     <label class="text-xs text-stone-500">品名</label>
                     <input type="text" id="edit-itemName" class="w-full border p-2 rounded text-sm">
                 </div>
-                <div>
-                    <label class="text-xs text-stone-500">月份</label>
-                    <input type="text" id="edit-month" class="w-full border p-2 rounded text-sm">
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="text-xs text-stone-500">月份</label>
+                        <input type="text" id="edit-month" class="w-full border p-2 rounded text-sm">
+                    </div>
+                    <div>
+                        <label class="text-xs text-stone-500">類別</label>
+                        <select id="edit-category" class="w-full border p-2 rounded text-sm bg-white dynamic-category-select"></select>
+                    </div>
                 </div>
                 <div class="grid grid-cols-2 gap-2">
                       <div>
@@ -347,10 +360,20 @@
                         </select>
                       </div>
                 </div>
-                 <div>
-                    <label class="text-xs text-stone-500 font-bold">定價 (RM)</label>
-                    <input type="number" id="edit-price" class="w-full border p-2 rounded text-sm font-bold text-stone-700">
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="text-xs text-stone-500 font-bold">定價 (RM)</label>
+                        <input type="number" id="edit-price" class="w-full border p-2 rounded text-sm font-bold text-stone-700">
+                    </div>
+                    <div>
+                        <label class="text-xs text-stone-500">入庫地 (覆寫無地點)</label>
+                        <select id="edit-originStudio" class="w-full border p-2 rounded text-sm bg-white">
+                            <option value="JB Studio">JB Studio</option>
+                            <option value="PNG Studio">PNG Studio</option>
+                        </select>
+                    </div>
                 </div>
+                
                 <div class="grid grid-cols-2 gap-2 pt-2 border-t border-stone-100">
                     <div>
                         <label class="text-xs text-stone-500 font-bold">開始製作日</label>
@@ -422,7 +445,7 @@
                     <div>
                         <label class="text-xs font-bold text-stone-600 uppercase tracking-wider mb-2 block">庫存地點 (可複選)</label>
                         <div class="grid grid-cols-2 gap-2" id="detail-location-options"></div>
-                        <p class="text-[10px] text-stone-400 mt-1">* 若未選擇，將顯示為「未分配 (None)」</p>
+                        <p class="text-[10px] text-stone-400 mt-1">* 若未選擇，將顯示為「無地點」</p>
                     </div>
                     <div>
                         <label class="text-xs font-bold text-stone-600 uppercase tracking-wider mb-2 block">單品備註</label>
@@ -480,7 +503,8 @@
         let calendarMode = 'production'; 
         let currentCalDate = new Date(); 
         let categoryChart = null, allocChart = null;
-        let appSettings = { makers: ['Kim', 'Kelly', 'Lijin'], locations: ['Studio', 'Online', 'Bev C', 'Pop-Up'], categories: ['Top', 'Dress', 'Pants'], weekly_goals: {} };
+        // 已更新預設 locations，涵蓋 JB Studio 和 PNG Studio
+        let appSettings = { makers: ['Kim', 'Kelly', 'Lijin'], locations: ['JB Studio', 'PNG Studio', 'Online', 'Bev C', 'Opener'], categories: ['Top', 'Dress', 'Pants'], weekly_goals: {} };
         let currentDetailItem = null, currentDetailPhotoIdx = -1, tempLocations = []; 
         const catColors = ['#f472b6', '#60a5fa', '#a78bfa', '#34d399', '#fbbf24', '#9ca3af'];
         const locColors = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#6366f1', '#14b8a6'];
@@ -555,15 +579,18 @@
             if (item.photos && Array.isArray(item.photos)) raw = item.photos;
             else if (item.photo) raw = [item.photo];
 
+            const fallbackStudio = item.originStudio || 'JB Studio';
+
             if (raw.length === 0 && item.quantity > 0) {
-                 return Array.from({ length: item.quantity }, () => ({ url: '', status: 'Available', locations: [], notes: '', soldPrice: null }));
+                 return Array.from({ length: item.quantity }, () => ({ url: '', status: 'Available', locations: [fallbackStudio], notes: '', soldPrice: null }));
             }
 
             return raw.map(p => {
-                if (typeof p === 'string') return { url: p, status: 'Available', locations: [], notes: '', soldPrice: null };
+                if (typeof p === 'string') return { url: p, status: 'Available', locations: [fallbackStudio], notes: '', soldPrice: null };
                 let locs = [];
-                if (Array.isArray(p.locations)) locs = p.locations;
+                if (Array.isArray(p.locations) && p.locations.length > 0) locs = p.locations;
                 else if (p.location && p.location !== 'Studio') locs = [p.location]; 
+                else if (!p.status || p.status !== 'Sold') locs = [fallbackStudio]; // 舊資料自動補足生產地
                 
                 return {
                     url: p.url || '',
@@ -576,13 +603,10 @@
             });
         }
         
-        // --- ★ 升級 1: 類別自動清洗 ---
         function getCleanCategory(catName) {
             if (!catName) return "";
-            // 移除所有空白、轉為小寫做統一比較
             let str = String(catName).replace(/[\u00A0\s]+/g, ' ').trim().toLowerCase();
             if (!str || str === "unknown") return "";
-            // 首字母大寫後回傳
             return str.charAt(0).toUpperCase() + str.slice(1);
         }
 
@@ -800,7 +824,6 @@
 
             sortedKeys.forEach(c => {
                 if(stats[c] > 0) {
-                    // ★ 升級 3: 改為按鈕並連結 openListModal
                     container.innerHTML += `<button onclick="window.openListModal('category', '${c}')" class="bg-white px-3 py-1 rounded shadow-sm border border-stone-200 text-xs text-stone-600 hover:shadow-md transition-shadow">${c}: <b class="text-stone-800">${stats[c]}</b></button>`;
                 }
             });
@@ -811,12 +834,11 @@
             container.innerHTML = '';
             appSettings.locations.forEach(l => {
                 if(stats[l] > 0) {
-                    // ★ 升級 3: 改為按鈕並連結 openListModal
                     container.innerHTML += `<button onclick="window.openListModal('location', '${l}')" class="bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded shadow-sm border border-blue-100 text-xs text-blue-800 transition-colors">${l}: <b>${stats[l]}</b></button>`;
                 }
             });
             if(stats['Unallocated'] > 0) {
-                container.innerHTML += `<button onclick="window.openListModal('location', 'Unallocated')" class="bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded shadow-sm border border-gray-200 text-xs text-gray-600">Unallocated: <b>${stats['Unallocated']}</b></button>`;
+                container.innerHTML += `<button onclick="window.openListModal('location', 'Unallocated')" class="bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded shadow-sm border border-gray-200 text-xs text-gray-600">無地點: <b>${stats['Unallocated']}</b></button>`;
             }
         }
 
@@ -937,8 +959,13 @@
                         if (isSold) { badgeText = p.soldPrice ? `SOLD (RM${p.soldPrice})` : 'SOLD'; badgeClass = 'badge-sold'; } 
                         else {
                             if (p.locations.length > 1) { badgeText = 'MULTI'; badgeClass = 'badge-multi'; } 
-                            else if (p.locations.length === 1) { badgeText = p.locations[0].substring(0,6).toUpperCase(); badgeClass = p.locations[0] === 'Studio' ? 'badge-studio' : 'badge-multi'; } 
-                            else { badgeText = '未分配 (None)'; badgeClass = 'badge-none'; }
+                            else if (p.locations.length === 1) { 
+                                badgeText = p.locations[0].substring(0,8).toUpperCase(); 
+                                if (p.locations[0] === 'JB Studio') badgeClass = 'bg-emerald-600 text-white';
+                                else if (p.locations[0] === 'PNG Studio') badgeClass = 'bg-sky-600 text-white';
+                                else badgeClass = 'badge-multi'; 
+                            } 
+                            else { badgeText = '無地點'; badgeClass = 'badge-none'; }
                         }
                         gridHTML += `<div class="grid-item" onclick="window.openDetailModal('${item.id}', ${idx})">${hasImg ? `<img src="${p.url}" class="grid-img ${isSold ? 'opacity-50 grayscale' : ''}">` : `<div class="grid-img bg-stone-100 flex items-center justify-center text-[8px] text-stone-400">No Img</div>`}<div class="status-badge ${badgeClass}">${badgeText}</div>${isSold ? `<div class="sold-overlay"><i data-lucide="check" class="text-white w-5 h-5"></i></div>` : ''}${hasNote ? `<div class="has-note-dot"></div>` : ''}</div>`;
                     });
@@ -960,10 +987,9 @@
             lucide.createIcons();
         };
 
-        // --- ★ 升級 2 & 3: 共用清單視窗 ---
         window.openListModal = function(type, value) {
             const titleMap = {
-                'Total': '總生產件數 (Total)', 'Making': '製作中', 'Studio': '在庫', 'Unallocated': '未分配', 'Sold': '已售出'
+                'Total': '總生產件數 (Total)', 'Making': '製作中', 'Studio': '在庫', 'Unallocated': '無地點標記', 'Sold': '已售出'
             };
             const titleEl = document.getElementById('list-modal-title');
             if (type === 'kpi') titleEl.innerText = titleMap[value] || value;
@@ -999,8 +1025,20 @@
                         let imgSrc = p.url ? p.url : '';
                         let imgHTML = imgSrc ? `<img src="${imgSrc}" class="w-full h-32 object-cover rounded-t-md">` : `<div class="w-full h-32 bg-stone-200 flex items-center justify-center text-xs text-stone-400 rounded-t-md">無照片</div>`;
                         
-                        let cardStatus = p.status === 'Sold' ? 'Sold' : (p.locations.length > 0 ? p.locations[0] : item.status);
                         let cardColorClass = getStatusColorClass(p.status === 'Sold' ? 'Sold' : item.status);
+                        let cardBadgeHTML = '';
+                        if (p.status === 'Sold') {
+                            cardBadgeHTML = `<div class="mt-2 text-[10px] font-bold px-1.5 py-0.5 rounded w-fit bg-stone-800 text-white shadow-sm border border-stone-900">SOLD</div>`;
+                        } else if (p.locations.length > 0) {
+                            let loc0 = p.locations[0];
+                            let bg = 'bg-stone-200 text-stone-700 border-stone-300';
+                            if (loc0 === 'JB Studio') bg = 'bg-emerald-100 text-emerald-800 border-emerald-200';
+                            if (loc0 === 'PNG Studio') bg = 'bg-sky-100 text-sky-800 border-sky-200';
+                            if (loc0 === 'Bev C' || loc0 === 'Opener') bg = 'bg-indigo-100 text-indigo-800 border-indigo-200';
+                            cardBadgeHTML = `<div class="mt-2 text-[10px] font-bold px-1.5 py-0.5 rounded w-fit border ${bg}">${loc0}</div>`;
+                        } else {
+                            cardBadgeHTML = `<div class="mt-2 text-[10px] font-bold px-1.5 py-0.5 rounded w-fit border border-black/5 ${cardColorClass}">${item.status}</div>`;
+                        }
                         
                         gridContainer.innerHTML += `
                             <div class="bg-white rounded-md shadow-sm border border-stone-200 hover:shadow-md transition flex flex-col overflow-hidden relative group cursor-pointer" onclick="window.openDetailModal('${item.id}', ${idx})">
@@ -1008,9 +1046,7 @@
                                 <div class="p-2 flex flex-col flex-grow">
                                     <div class="font-bold text-stone-800 text-xs truncate" title="${item.itemName}">${item.itemName}</div>
                                     <div class="text-[10px] text-stone-500">${cleanCat} | ${item.color || '-'}</div>
-                                    <div class="mt-2 text-[10px] font-bold px-1.5 py-0.5 rounded w-fit ${cardColorClass}">
-                                        ${p.status === 'Sold' ? 'SOLD' : cardStatus}
-                                    </div>
+                                    ${cardBadgeHTML}
                                 </div>
                                 <button onclick="event.stopPropagation(); window.openEditModal('${item.id}')" class="absolute top-1 right-1 bg-white/90 text-stone-600 p-1.5 rounded shadow flex items-center justify-center opacity-0 group-hover:opacity-100 transition hover:bg-stone-100 hover:text-stone-900" title="編輯這筆工單">
                                     <i data-lucide="pencil" class="w-3 h-3"></i>
@@ -1082,16 +1118,53 @@
         async function updateItemStatus(photos) { const allSold = photos.every(p => p.status === 'Sold'); const anySold = photos.some(p => p.status === 'Sold'); let globalStatus = allSold ? 'Sold' : (anySold ? 'Partial Sold' : 'Ready'); await updateDoc(doc(dbFirestore, "stock_items", currentDetailItem.id), { photos: photos, status: globalStatus }); window.closeDetailModal(); }
         window.closeDetailModal = () => document.getElementById('detail-modal').classList.add('hidden');
         
-        window.handleAddItem = async function(e) { e.preventDefault(); const btn = document.getElementById('btn-submit'); btn.innerText = '處理中...'; btn.disabled = true; try { const form = new FormData(e.target); const fileInput = document.querySelector('input[name="initialPhotos"]'); let photoObjs = []; if(fileInput.files.length > 0) { for(let i=0; i<fileInput.files.length; i++) { const file = fileInput.files[i]; const sRef = ref(storage, 'photos/'+Date.now()+'_'+file.name); const snap = await uploadBytes(sRef, file); const url = await getDownloadURL(snap.ref); photoObjs.push({ url: url, status: 'Available', locations: [], notes: '', soldPrice: null }); } } const cleanCat = getCleanCategory(form.get('category')); await addDoc(collection(dbFirestore, "stock_items"), { month: form.get('month'), itemName: form.get('itemName'), category: cleanCat, maker: form.get('maker'), color: form.get('color'), size: form.get('size'), quantity: parseInt(form.get('quantity')) || 1, price: form.get('price'), status: 'To Make', photos: photoObjs, createdAt: serverTimestamp() }); window.closeModal(); e.target.reset(); } catch (error) { console.error(error); alert("Error: " + error.message); } finally { btn.innerText = '確認新增'; btn.disabled = false; } };
+        window.handleAddItem = async function(e) { 
+            e.preventDefault(); 
+            const btn = document.getElementById('btn-submit'); btn.innerText = '處理中...'; btn.disabled = true; 
+            try { 
+                const form = new FormData(e.target); 
+                const originStudio = form.get('originStudio');
+                const fileInput = document.querySelector('input[name="initialPhotos"]'); 
+                let photoObjs = []; 
+                if(fileInput.files.length > 0) { 
+                    for(let i=0; i<fileInput.files.length; i++) { 
+                        const file = fileInput.files[i]; 
+                        const sRef = ref(storage, 'photos/'+Date.now()+'_'+file.name); 
+                        const snap = await uploadBytes(sRef, file); 
+                        const url = await getDownloadURL(snap.ref); 
+                        photoObjs.push({ url: url, status: 'Available', locations: [originStudio], notes: '', soldPrice: null }); 
+                    } 
+                } 
+                const cleanCat = getCleanCategory(form.get('category')); 
+                await addDoc(collection(dbFirestore, "stock_items"), { 
+                    month: form.get('month'), 
+                    itemName: form.get('itemName'), 
+                    category: cleanCat, 
+                    maker: form.get('maker'), 
+                    color: form.get('color'), 
+                    size: form.get('size'), 
+                    originStudio: originStudio, 
+                    quantity: parseInt(form.get('quantity')) || 1, 
+                    price: form.get('price'), 
+                    status: 'To Make', 
+                    photos: photoObjs, 
+                    createdAt: serverTimestamp() 
+                }); 
+                window.closeModal(); 
+                e.target.reset(); 
+            } catch (error) { console.error(error); alert("Error: " + error.message); } finally { btn.innerText = '確認新增'; btn.disabled = false; } 
+        };
         
         window.openEditModal = (id) => { 
             const item = db.find(i=>i.id===id); 
-            document.getElementById('edit-id').value=id; 
-            document.getElementById('edit-itemName').value=item.itemName; 
-            document.getElementById('edit-month').value=item.month; 
-            document.getElementById('edit-status').value=item.status; 
+            document.getElementById('edit-id').value = id; 
+            document.getElementById('edit-itemName').value = item.itemName; 
+            document.getElementById('edit-month').value = item.month; 
+            document.getElementById('edit-status').value = item.status; 
             document.getElementById('edit-maker').value = item.maker || ''; 
-            document.getElementById('edit-price').value=item.price || ''; 
+            document.getElementById('edit-category').value = getCleanCategory(item.category); 
+            document.getElementById('edit-price').value = item.price || ''; 
+            document.getElementById('edit-originStudio').value = item.originStudio || 'JB Studio'; 
             document.getElementById('edit-addPhotos').value = ''; 
             document.getElementById('edit-startDate').value = formatDateForInput(item.makingAt); 
             document.getElementById('edit-completedDate').value = formatDateForInput(item.completedAt); 
@@ -1108,10 +1181,13 @@
             try { 
                 const sDateVal = document.getElementById('edit-startDate').value; 
                 const cDateVal = document.getElementById('edit-completedDate').value; 
+                const newOriginStudio = document.getElementById('edit-originStudio').value;
                 
                 let data = { 
                     status: document.getElementById('edit-status').value, 
                     maker: document.getElementById('edit-maker').value, 
+                    category: getCleanCategory(document.getElementById('edit-category').value), 
+                    originStudio: newOriginStudio,
                     itemName: document.getElementById('edit-itemName').value, 
                     month: document.getElementById('edit-month').value, 
                     price: document.getElementById('edit-price').value 
@@ -1121,18 +1197,33 @@
                 data.completedAt = cDateVal ? new Date(cDateVal) : null;
                 
                 const photoInput = document.getElementById('edit-addPhotos'); 
+                const item = db.find(i=>i.id===id); 
+                let existingPhotos = item.photos || []; 
+                let photosModified = false;
+                
+                // 自動覆寫尚未指定確切地點的子項目
+                existingPhotos.forEach(p => {
+                    if (!p.locations || p.locations.length === 0 || (p.locations.length === 1 && p.locations[0] === 'Studio')) {
+                        p.locations = [newOriginStudio];
+                        photosModified = true;
+                    }
+                });
+
                 if(photoInput.files.length > 0) { 
-                    const item = db.find(i=>i.id===id); 
-                    let existingPhotos = item.photos || []; 
                     for(let i=0; i<photoInput.files.length; i++) { 
                         const file = photoInput.files[i]; 
                         const sRef = ref(storage, 'photos/'+Date.now()+'_added_'+file.name); 
                         const snap = await uploadBytes(sRef, file); 
                         const url = await getDownloadURL(snap.ref); 
-                        existingPhotos.push({ url: url, status: 'Available', locations: [], notes: '', soldPrice: null }); 
+                        existingPhotos.push({ url: url, status: 'Available', locations: [newOriginStudio], notes: '', soldPrice: null }); 
                     } 
-                    data.photos = existingPhotos; 
+                    photosModified = true;
                 } 
+                
+                if (photosModified || existingPhotos.length > 0) {
+                    data.photos = existingPhotos;
+                }
+
                 await updateDoc(doc(dbFirestore, "stock_items", id), data); 
                 window.closeEditModal(); 
             } catch(error) { 
@@ -1162,7 +1253,7 @@
             const locSelect = document.getElementById('alloc-filter-location'); 
             if(locSelect) { 
                 const currentVal = locSelect.value; 
-                locSelect.innerHTML = `<option value="all">全部庫存 (All)</option><option value="Sold">已售出 (Sold)</option><option value="Unallocated">未分配 (Unallocated)</option>`; 
+                locSelect.innerHTML = `<option value="all">全部庫存 (All)</option><option value="Sold">已售出 (Sold)</option><option value="Unallocated">無地點 (Unallocated)</option>`; 
                 appSettings.locations.forEach(l => { locSelect.innerHTML += `<option value="${l}">${l}</option>`; }); 
                 locSelect.value = currentVal || "all"; 
             } 
