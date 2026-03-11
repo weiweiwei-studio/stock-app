@@ -454,13 +454,23 @@
         let db = [];
         let currentRole = 'admin';
         let calendarMode = 'production'; 
-        let currentCalDate = new Date(); // State for selected month
+        let currentCalDate = new Date(); 
         let categoryChart = null, allocChart = null;
         let appSettings = { makers: ['Kim', 'Kelly', 'Lijin'], locations: ['Studio', 'Online', 'Bev C', 'Pop-Up'], categories: ['Top', 'Dress', 'Pants'], weekly_goals: {} };
         let currentDetailItem = null, currentDetailPhotoIdx = -1, tempLocations = []; 
         const catColors = ['#f472b6', '#60a5fa', '#a78bfa', '#34d399', '#fbbf24', '#9ca3af'];
         const locColors = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#6366f1', '#14b8a6'];
         let locationBreakdownData = {}; 
+
+        // 🟢 FIX 2: 加入日期轉換函數，避免 toISOString() 造成的時區位移問題
+        function formatDateForInput(firebaseTimestamp) {
+            if (!firebaseTimestamp) return '';
+            const d = firebaseTimestamp.seconds ? new Date(firebaseTimestamp.seconds * 1000) : new Date(firebaseTimestamp);
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
 
         document.addEventListener('DOMContentLoaded', () => {
             const statusEl = document.getElementById('connection-status');
@@ -526,7 +536,8 @@
             else if (item.photo) raw = [item.photo];
 
             if (raw.length === 0 && item.quantity > 0) {
-                 return Array(item.quantity).fill({ url: '', status: 'Available', locations: [], notes: '', soldPrice: null }); 
+                 // 🟢 FIX 1: 使用 Array.from 避免所有陣列元素指向同一個記憶體位址 (Reference Leak)
+                 return Array.from({ length: item.quantity }, () => ({ url: '', status: 'Available', locations: [], notes: '', soldPrice: null }));
             }
 
             return raw.map(p => {
@@ -553,15 +564,11 @@
             return str.charAt(0).toUpperCase() + str.slice(1);
         }
 
-        // --- DASHBOARD & CALENDAR ---
+        // ... (中間的 updateDashboard 到 initCharts 邏輯不變，省略註解以保持簡潔)
         function updateDashboard() {
             const totalPieces = db.reduce((sum, item) => sum + (parseInt(item.quantity)||1), 0);
             document.getElementById('kpi-total').textContent = totalPieces;
-
-            const making = db
-                .filter(i => i.status === 'Making')
-                .reduce((sum, item) => sum + (parseInt(item.quantity) || 1), 0);
-
+            const making = db.filter(i => i.status === 'Making').reduce((sum, item) => sum + (parseInt(item.quantity) || 1), 0);
             let soldCount = 0, studioCount = 0, unallocatedCount = 0;
             const catStats = {};
             const locStats = { 'Unallocated': 0, 'Sold': 0 };
@@ -575,10 +582,8 @@
 
             db.forEach(i => {
                 const count = i.photos && i.photos.length > 0 ? i.photos.length : (parseInt(i.quantity)||1);
-                
                 const cat = getCleanCategory(i.category);
                 catStats[cat] = (catStats[cat] || 0) + count;
-
                 const photos = normalizePhotos(i);
                 photos.forEach((p, idx) => {
                     const itemName = `${i.itemName} (${i.color})`;
@@ -664,7 +669,6 @@
             gridContainer.innerHTML = '';
             weeklyGoalsList.innerHTML = '';
 
-            // 1. UNSCHEDULED (Matches Displayed Month)
             if (calendarMode === 'production') {
                 const monthShort = displayDate.toLocaleString('en-US', { month: 'short' });
                 document.getElementById('unscheduled-month-label').innerText = monthShort;
@@ -739,16 +743,14 @@
                 gridContainer.innerHTML += cellHTML;
             }
             
-            // 2. RENDER WEEKLY GOALS (Arrival Mode) - SAVED PER MONTH
             if (calendarMode === 'arrival') {
                 for (let w = 1; w <= 5; w++) {
                     const goalKey = `y${year}m${month}w${w}`;
-                    const target = appSettings.weekly_goals[goalKey] || 0; // Default 0
+                    const target = appSettings.weekly_goals[goalKey] || 0; 
                     const actual = weeklyActuals[w] || 0;
                     
-                    if (target === 0 && actual === 0 && w > 4) continue; // Skip empty late weeks
+                    if (target === 0 && actual === 0 && w > 4) continue; 
 
-                    // Calc progress
                     const pct = target > 0 ? Math.min((actual / target) * 100, 100) : 0;
                     let fillClass = 'fill-red';
                     if (actual >= target && target > 0) fillClass = 'fill-green';
@@ -880,7 +882,6 @@
             const catFilter = document.getElementById('alloc-filter-category').value;
             tbody.innerHTML = '';
 
-            // Filter the main database based on category first
             let filteredDb = db.filter(i => i.status === 'Ready' || i.status === 'In Studio' || i.status === 'Sold' || i.status === 'Partial Sold');
             
             if (catFilter !== 'all') {
@@ -890,7 +891,6 @@
             filteredDb.forEach(item => {
                 const photos = normalizePhotos(item);
                 
-                // Location Filtering logic
                 let matchesLoc = true;
                 if (locFilter !== 'all') {
                     if (locFilter === 'Sold') { 
@@ -910,7 +910,6 @@
                 if(photos.length === 0) gridHTML = `<span class="text-xs text-stone-400">無照片資料</span>`;
                 else {
                     photos.forEach((p, idx) => {
-                        // Special check: if a location filter is on, only show items matching that location inside the grid
                         if (locFilter !== 'all' && locFilter !== 'Sold' && locFilter !== 'Unallocated') {
                             if (!p.locations.includes(locFilter)) return;
                         }
@@ -937,6 +936,7 @@
             lucide.createIcons();
         };
 
+        // 🟢 FIX 2 對應: 使用新的 formatDateForInput 函數填入編輯視窗
         window.openDetailModal = function(id, idx) {
             currentDetailItem = db.find(i => i.id === id); currentDetailPhotoIdx = idx;
             const p = normalizePhotos(currentDetailItem)[idx];
@@ -961,6 +961,7 @@
             renderDetailLocationButtons();
             document.getElementById('detail-modal').classList.remove('hidden');
         };
+        
         window.renderDetailLocationButtons = function() {
             const container = document.getElementById('detail-location-options'); container.innerHTML = '';
             const p = normalizePhotos(currentDetailItem)[currentDetailPhotoIdx];
@@ -973,6 +974,7 @@
         };
         window.toggleDetailLocation = function(loc) { if(tempLocations.includes(loc)) { tempLocations = tempLocations.filter(l => l !== loc); } else { tempLocations.push(loc); } renderDetailLocationButtons(); };
         window.saveItemDetails = async function() { if(!currentDetailItem) return; let photos = normalizePhotos(currentDetailItem); photos[currentDetailPhotoIdx].notes = document.getElementById('detail-notes').value; photos[currentDetailPhotoIdx].locations = tempLocations; try { await updateDoc(doc(dbFirestore, "stock_items", currentDetailItem.id), { photos: photos }); window.closeDetailModal(); } catch(e) { alert("Save failed"); } };
+        
         window.triggerSoldFlow = function() {
             let photos = normalizePhotos(currentDetailItem); const currentStatus = photos[currentDetailPhotoIdx].status;
             if (currentStatus === 'Sold') { if(confirm("確認取消售出？物品將回到庫存中。")) { photos[currentDetailPhotoIdx].status = 'Available'; photos[currentDetailPhotoIdx].soldPrice = null; updateItemStatus(photos); } } 
@@ -986,28 +988,85 @@
         };
         async function updateItemStatus(photos) { const allSold = photos.every(p => p.status === 'Sold'); const anySold = photos.some(p => p.status === 'Sold'); let globalStatus = allSold ? 'Sold' : (anySold ? 'Partial Sold' : 'Ready'); await updateDoc(doc(dbFirestore, "stock_items", currentDetailItem.id), { photos: photos, status: globalStatus }); window.closeDetailModal(); }
         window.closeDetailModal = () => document.getElementById('detail-modal').classList.add('hidden');
+        
         window.handleAddItem = async function(e) { e.preventDefault(); const btn = document.getElementById('btn-submit'); btn.innerText = '處理中...'; btn.disabled = true; try { const form = new FormData(e.target); const fileInput = document.querySelector('input[name="initialPhotos"]'); let photoObjs = []; if(fileInput.files.length > 0) { for(let i=0; i<fileInput.files.length; i++) { const file = fileInput.files[i]; const sRef = ref(storage, 'photos/'+Date.now()+'_'+file.name); const snap = await uploadBytes(sRef, file); const url = await getDownloadURL(snap.ref); photoObjs.push({ url: url, status: 'Available', locations: [], notes: '', soldPrice: null }); } } const cleanCat = getCleanCategory(form.get('category')); await addDoc(collection(dbFirestore, "stock_items"), { month: form.get('month'), itemName: form.get('itemName'), category: cleanCat, maker: form.get('maker'), color: form.get('color'), size: form.get('size'), quantity: parseInt(form.get('quantity')) || 1, price: form.get('price'), status: 'To Make', photos: photoObjs, createdAt: serverTimestamp() }); window.closeModal(); e.target.reset(); } catch (error) { console.error(error); alert("Error: " + error.message); } finally { btn.innerText = '確認新增'; btn.disabled = false; } };
-        window.openEditModal = (id) => { const item = db.find(i=>i.id===id); document.getElementById('edit-id').value=id; document.getElementById('edit-itemName').value=item.itemName; document.getElementById('edit-month').value=item.month; document.getElementById('edit-status').value=item.status; document.getElementById('edit-price').value=item.price || ''; document.getElementById('edit-addPhotos').value = ''; document.getElementById('edit-startDate').value = item.makingAt ? new Date(item.makingAt.seconds*1000).toISOString().split('T')[0] : ''; document.getElementById('edit-completedDate').value = item.completedAt ? new Date(item.completedAt.seconds*1000).toISOString().split('T')[0] : ''; document.getElementById('edit-modal').classList.remove('hidden'); };
+        
+        window.openEditModal = (id) => { 
+            const item = db.find(i=>i.id===id); 
+            document.getElementById('edit-id').value=id; 
+            document.getElementById('edit-itemName').value=item.itemName; 
+            document.getElementById('edit-month').value=item.month; 
+            document.getElementById('edit-status').value=item.status; 
+            document.getElementById('edit-price').value=item.price || ''; 
+            document.getElementById('edit-addPhotos').value = ''; 
+            
+            // 🟢 FIX 2 對應: 使用時區安全的日期格式化函數
+            document.getElementById('edit-startDate').value = formatDateForInput(item.makingAt); 
+            document.getElementById('edit-completedDate').value = formatDateForInput(item.completedAt); 
+            
+            document.getElementById('edit-modal').classList.remove('hidden'); 
+        };
+        
         window.closeEditModal = () => document.getElementById('edit-modal').classList.add('hidden');
-        window.handleEditSubmit = async () => { const id = document.getElementById('edit-id').value; const btn = document.getElementById('btn-edit-save'); btn.innerText = 'Saving...'; btn.disabled = true; try { const sDateVal = document.getElementById('edit-startDate').value; const cDateVal = document.getElementById('edit-completedDate').value; let data = { status: document.getElementById('edit-status').value, itemName: document.getElementById('edit-itemName').value, month: document.getElementById('edit-month').value, price: document.getElementById('edit-price').value }; if(sDateVal) data.makingAt = new Date(sDateVal); if(cDateVal) data.completedAt = new Date(cDateVal); const photoInput = document.getElementById('edit-addPhotos'); if(photoInput.files.length > 0) { const item = db.find(i=>i.id===id); let existingPhotos = item.photos || []; for(let i=0; i<photoInput.files.length; i++) { const file = photoInput.files[i]; const sRef = ref(storage, 'photos/'+Date.now()+'_added_'+file.name); const snap = await uploadBytes(sRef, file); const url = await getDownloadURL(snap.ref); existingPhotos.push({ url: url, status: 'Available', locations: [], notes: '', soldPrice: null }); } data.photos = existingPhotos; } await updateDoc(doc(dbFirestore, "stock_items", id), data); window.closeEditModal(); } catch(error) { console.error(error); alert("Error: " + error.message); } finally { btn.innerText = '儲存變更'; btn.disabled = false; } };
+        
+        window.handleEditSubmit = async () => { 
+            const id = document.getElementById('edit-id').value; 
+            const btn = document.getElementById('btn-edit-save'); 
+            btn.innerText = 'Saving...'; btn.disabled = true; 
+            try { 
+                const sDateVal = document.getElementById('edit-startDate').value; 
+                const cDateVal = document.getElementById('edit-completedDate').value; 
+                
+                let data = { 
+                    status: document.getElementById('edit-status').value, 
+                    itemName: document.getElementById('edit-itemName').value, 
+                    month: document.getElementById('edit-month').value, 
+                    price: document.getElementById('edit-price').value 
+                }; 
+                
+                // 🟢 FIX 3: 確保清空日期時能正確寫入 null 而不是被忽略
+                data.makingAt = sDateVal ? new Date(sDateVal) : null;
+                data.completedAt = cDateVal ? new Date(cDateVal) : null;
+                
+                const photoInput = document.getElementById('edit-addPhotos'); 
+                if(photoInput.files.length > 0) { 
+                    const item = db.find(i=>i.id===id); 
+                    let existingPhotos = item.photos || []; 
+                    for(let i=0; i<photoInput.files.length; i++) { 
+                        const file = photoInput.files[i]; 
+                        const sRef = ref(storage, 'photos/'+Date.now()+'_added_'+file.name); 
+                        const snap = await uploadBytes(sRef, file); 
+                        const url = await getDownloadURL(snap.ref); 
+                        existingPhotos.push({ url: url, status: 'Available', locations: [], notes: '', soldPrice: null }); 
+                    } 
+                    data.photos = existingPhotos; 
+                } 
+                await updateDoc(doc(dbFirestore, "stock_items", id), data); 
+                window.closeEditModal(); 
+            } catch(error) { 
+                console.error(error); alert("Error: " + error.message); 
+            } finally { 
+                btn.innerText = '儲存變更'; btn.disabled = false; 
+            } 
+        };
+
         window.handleDelete = async () => { if(confirm('確定刪除此工單？')) { await deleteDoc(doc(dbFirestore, "stock_items", document.getElementById('edit-id').value)); window.closeEditModal(); } };
         window.renderSettingsView = function() { const render = (type) => (appSettings[type]||[]).map(i => `<span class="bg-stone-100 px-2 py-1 rounded text-xs mr-1 mb-1 inline-block border cursor-pointer hover:bg-red-50 hover:text-red-500" onclick="window.removeSetting('${type}','${i}')">${i} &times;</span>`).join(''); document.getElementById('settings-makers-list').innerHTML = render('makers'); document.getElementById('settings-locations-list').innerHTML = render('locations'); document.getElementById('settings-categories-list').innerHTML = render('categories'); };
         window.addSetting = async function(type) { const map = {'makers':'new-maker-input', 'locations':'new-location-input', 'categories':'new-category-input'}; let val = document.getElementById(map[type]).value; if (type === 'categories') val = getCleanCategory(val); else val = val.trim(); if(val) { await updateDoc(doc(dbFirestore, "settings", "config"), { [type]: [...appSettings[type], val] }); document.getElementById(map[type]).value = ''; } };
         window.removeSetting = async function(type, val) { if(confirm(`Remove ${val}?`)) await updateDoc(doc(dbFirestore, "settings", "config"), { [type]: appSettings[type].filter(x => x !== val) }); }
+        
         window.updateDropdowns = function() { 
             const distinctMakers = [...new Set([...appSettings.makers, ...db.map(i => i.maker)])].filter(Boolean).sort(); 
             const distinctCategories = [...new Set([...appSettings.categories.map(c => getCleanCategory(c)), ...db.map(i => getCleanCategory(i.category))])].filter(Boolean).sort(); 
             
-            // Update Location Filter
             const locSelect = document.getElementById('alloc-filter-location'); 
             if(locSelect) { 
                 const currentVal = locSelect.value; 
                 locSelect.innerHTML = `<option value="all">全部庫存 (All)</option><option value="Sold">已售出 (Sold)</option><option value="Unallocated">未分配 (Unallocated)</option>`; 
                 appSettings.locations.forEach(l => { locSelect.innerHTML += `<option value="${l}">${l}</option>`; }); 
-                locSelect.value = currentVal; 
+                locSelect.value = currentVal || "all"; 
             } 
             
-            // Update Maker and Category dropdowns
             const fill = (cls, list) => document.querySelectorAll(cls).forEach(s => { 
                 const old = s.value; 
                 const isFilter = s.id.includes('filter');
@@ -1019,6 +1078,7 @@
             fill('.dynamic-maker-select', distinctMakers); 
             fill('.dynamic-category-select', distinctCategories); 
         };
+        
         window.switchView = (v) => { document.querySelectorAll('section[id^="view-"]').forEach(el => el.classList.add('hidden')); document.getElementById(`view-${v}`).classList.remove('hidden'); document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('nav-active')); document.getElementById(`nav-${v}`)?.classList.add('nav-active'); };
         window.updateRole = () => { currentRole = document.getElementById('role-select').value; const isAdmin = currentRole === 'admin'; document.getElementById('nav-settings').classList.toggle('hidden', !isAdmin); window.switchView(currentRole.startsWith('maker') ? 'production' : 'dashboard'); };
         window.openModal = () => document.getElementById('add-modal').classList.remove('hidden');
