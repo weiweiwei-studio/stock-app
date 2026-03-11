@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weiweiwei ERP (v11.18.5 Clean Category Update)</title>
+    <title>Weiweiwei ERP (v11.18.6 Dispatch Update)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -71,7 +71,7 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center gap-4">
                     <div class="flex-shrink-0 flex items-center">
-                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.18.5</span></span>
+                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.18.6</span></span>
                         <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] bg-stone-100 text-stone-400">Loading...</span>
                     </div>
                     <div class="hidden sm:ml-6 sm:flex sm:space-x-4">
@@ -110,8 +110,8 @@
                     <div class="text-amber-600 text-xs font-bold uppercase">製作中 (件)</div>
                     <div class="mt-2 text-3xl font-bold text-stone-800" id="kpi-making">0</div>
                 </div>
-                <div onclick="window.openListModal('kpi', 'Studio')" class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-emerald-500 cursor-pointer hover:-translate-y-1 hover:shadow-md transition-all">
-                    <div class="text-emerald-600 text-xs font-bold uppercase">在庫 (件)</div>
+                <div onclick="window.openListModal('kpi', 'Studio')" class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-emerald-500 cursor-pointer hover:-translate-y-1 hover:shadow-md transition-all relative">
+                    <div class="text-emerald-600 text-xs font-bold uppercase">待出貨 (Studio在庫)</div>
                     <div class="mt-2 text-3xl font-bold text-stone-800" id="kpi-studio">0</div>
                 </div>
                 <div onclick="window.openListModal('kpi', 'Unallocated')" class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-gray-400 cursor-pointer hover:-translate-y-1 hover:shadow-md transition-all">
@@ -185,9 +185,10 @@
 
                 <div class="space-y-6">
                     <div class="bg-white p-4 rounded-lg shadow-sm">
-                        <h3 class="font-bold text-stone-700 mb-2 text-xs uppercase tracking-wide">庫存分佈 (點擊看照片)</h3>
-                        <div id="location-stats-container" class="flex flex-wrap gap-2"></div>
+                        <h3 class="font-bold text-stone-700 mb-3 text-xs uppercase tracking-wide border-b border-stone-100 pb-2">庫存與出貨狀態 (點擊看清單)</h3>
+                        <div id="location-stats-container" class="flex flex-col gap-3"></div>
                     </div>
+                    
                     <div class="bg-white p-4 rounded-lg shadow-sm">
                         <h3 class="font-bold text-stone-700 mb-2 text-xs uppercase tracking-wide">類別總計 (點擊看照片)</h3>
                         <div id="category-stats-container" class="flex flex-wrap gap-2"></div>
@@ -242,8 +243,8 @@
 
         <section id="view-allocation" class="space-y-6 hidden animate-fade-in pb-10">
             <div class="bg-white rounded-lg p-6 shadow-sm border-l-4 border-blue-500">
-                <h2 class="text-xl font-bold text-stone-800">庫存與去向</h2>
-                <p class="text-stone-500 text-sm mt-1">選單已加入 <b>JB Studio</b> 與 <b>PNG Studio</b>。選擇工作室地點即可查詢待出貨商品。</p>
+                <h2 class="text-xl font-bold text-stone-800">庫存與出貨管理</h2>
+                <p class="text-stone-500 text-sm mt-1">選擇 <b>JB Studio</b> 或 <b>PNG Studio</b> 即可查詢待出貨商品。</p>
             </div>
             <div class="flex flex-wrap items-center gap-4 bg-white p-3 rounded-lg shadow-sm">
                 <div class="flex items-center gap-2">
@@ -271,8 +272,8 @@
              <div class="bg-white p-6 rounded-lg shadow-sm border border-stone-200"><h2 class="text-xl font-bold text-stone-800">系統設定</h2></div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div class="bg-white p-6 rounded-lg shadow-sm"><h3 class="font-bold text-stone-700 mb-2">製作人</h3><div id="settings-makers-list" class="flex flex-wrap gap-1 mb-2"></div><div class="flex gap-2"><input id="new-maker-input" placeholder="新增..." class="flex-1 border text-sm rounded px-2"><button onclick="window.addSetting('makers')" class="bg-stone-800 text-white px-2 rounded">+</button></div></div>
-                <div class="bg-white p-6 rounded-lg shadow-sm"><h3 class="font-bold text-stone-700 mb-2">地點</h3><div id="settings-locations-list" class="flex flex-wrap gap-1 mb-2"></div><div class="flex gap-2"><input id="new-location-input" placeholder="新增..." class="flex-1 border text-sm rounded px-2"><button onclick="window.addSetting('locations')" class="bg-stone-800 text-white px-2 rounded">+</button></div></div>
-                 <div class="bg-white p-6 rounded-lg shadow-sm"><h3 class="font-bold text-stone-700 mb-2">類別</h3><div id="settings-categories-list" class="flex flex-wrap gap-1 mb-2"></div><div class="flex gap-2"><input id="new-category-input" placeholder="新增..." class="flex-1 border text-sm rounded px-2"><button onclick="window.addSetting('categories')" class="bg-stone-800 text-white px-2 rounded">+</button></div></div>
+                <div class="bg-white p-6 rounded-lg shadow-sm"><h3 class="font-bold text-stone-700 mb-2">地點與Stockists</h3><div id="settings-locations-list" class="flex flex-wrap gap-1 mb-2"></div><div class="flex gap-2"><input id="new-location-input" placeholder="新增地點..." class="flex-1 border text-sm rounded px-2"><button onclick="window.addSetting('locations')" class="bg-stone-800 text-white px-2 rounded">+</button></div></div>
+                 <div class="bg-white p-6 rounded-lg shadow-sm"><h3 class="font-bold text-stone-700 mb-2">類別</h3><div id="settings-categories-list" class="flex flex-wrap gap-1 mb-2"></div><div class="flex gap-2"><input id="new-category-input" placeholder="新增類別..." class="flex-1 border text-sm rounded px-2"><button onclick="window.addSetting('categories')" class="bg-stone-800 text-white px-2 rounded">+</button></div></div>
             </div>
         </section>
 
@@ -503,7 +504,14 @@
         let calendarMode = 'production'; 
         let currentCalDate = new Date(); 
         let categoryChart = null, allocChart = null;
-        let appSettings = { makers: ['Kim', 'Kelly', 'Lijin'], locations: ['JB Studio', 'PNG Studio', 'Online', 'Bev C', 'Opener'], categories: ['Top', 'Dress', 'Pants'], weekly_goals: {} };
+        
+        // 預設將通路加入 locations，方便快速出貨
+        let appSettings = { 
+            makers: ['Kim', 'Kelly', 'Lijin'], 
+            locations: ['JB Studio', 'PNG Studio', 'Online', 'Bev C', 'Tamara Malas', 'tamago store', 'tumbpeak', 'Opener'], 
+            categories: ['Top', 'Dress', 'Pants'], 
+            weekly_goals: {} 
+        };
         let currentDetailItem = null, currentDetailPhotoIdx = -1, tempLocations = []; 
         const catColors = ['#f472b6', '#60a5fa', '#a78bfa', '#34d399', '#fbbf24', '#9ca3af'];
         const locColors = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#6366f1', '#14b8a6'];
@@ -605,10 +613,7 @@
         function getCleanCategory(catName) {
             if (!catName) return "";
             let str = String(catName).replace(/[\u00A0\s]+/g, ' ').trim().toLowerCase();
-            
-            // 強制過濾掉不需要的舊類別
             if (!str || str === "unknown" || str === "apron skrit" || str === "aria top") return "";
-            
             return str.charAt(0).toUpperCase() + str.slice(1);
         }
 
@@ -649,7 +654,10 @@
                         soldCount++; locStats['Sold']++; 
                     } else {
                         if (p.locations.length > 0) {
-                            studioCount++;
+                            // 計算在 JB 或 PNG Studio 的總數作為 "待出貨 (Studio在庫)"
+                            if (p.locations.includes('JB Studio') || p.locations.includes('PNG Studio')) {
+                                studioCount++;
+                            }
                             p.locations.forEach(loc => {
                                 if(locStats[loc] !== undefined) locStats[loc]++;
                             });
@@ -675,7 +683,6 @@
             calendarMode = mode;
             const btnProd = document.getElementById('btn-mode-production');
             const btnArr = document.getElementById('btn-mode-arrival');
-            const calendarWrapper = document.getElementById('calendar-wrapper');
             
             if(mode === 'production') {
                 btnProd.className = "px-3 py-1.5 text-xs font-bold rounded-md shadow bg-white text-stone-800 transition-all flex items-center gap-1";
@@ -834,14 +841,31 @@
         function renderLocationButtons(stats) {
             const container = document.getElementById('location-stats-container');
             container.innerHTML = '';
+            
+            // 視覺分組：待出貨(工作室) vs 已出貨(Stockists)
+            let studiosHTML = '<div class="w-full flex gap-2 mb-3 items-center flex-wrap"><span class="text-xs font-bold text-stone-400 w-16 whitespace-nowrap"><i data-lucide="package" class="w-4 h-4 inline pb-0.5"></i> 待出貨:</span>';
+            let stockistsHTML = '<div class="w-full flex gap-2 flex-wrap items-center"><span class="text-xs font-bold text-stone-400 w-16 whitespace-nowrap"><i data-lucide="truck" class="w-4 h-4 inline pb-0.5"></i> 已出貨:</span>';
+            
             appSettings.locations.forEach(l => {
                 if(stats[l] > 0) {
-                    container.innerHTML += `<button onclick="window.openListModal('location', '${l}')" class="bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded shadow-sm border border-blue-100 text-xs text-blue-800 transition-colors">${l}: <b>${stats[l]}</b></button>`;
+                    const isStudio = (l === 'JB Studio' || l === 'PNG Studio');
+                    let colorCls = isStudio ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100';
+                    const btn = `<button onclick="window.openListModal('location', '${l}')" class="${colorCls} px-3 py-1.5 rounded shadow-sm border text-xs transition-colors font-medium">${l}: <b class="font-bold">${stats[l]}</b></button>`;
+                    
+                    if (isStudio) studiosHTML += btn;
+                    else stockistsHTML += btn;
                 }
             });
+            
+            studiosHTML += '</div>';
+            stockistsHTML += '</div>';
+            
+            container.innerHTML = studiosHTML + stockistsHTML;
+            
             if(stats['Unallocated'] > 0) {
-                container.innerHTML += `<button onclick="window.openListModal('location', 'Unallocated')" class="bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded shadow-sm border border-gray-200 text-xs text-gray-600">無地點: <b>${stats['Unallocated']}</b></button>`;
+                container.innerHTML += `<div class="w-full flex gap-2 mt-3 pt-3 border-t border-stone-100"><button onclick="window.openListModal('location', 'Unallocated')" class="bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded shadow-sm border border-gray-200 text-xs text-gray-600">無地點標記 (遺漏): <b>${stats['Unallocated']}</b></button></div>`;
             }
+            lucide.createIcons();
         }
 
         function initCharts() {
@@ -989,9 +1013,33 @@
             lucide.createIcons();
         };
 
+        // 快速出貨功能
+        window.quickDispatch = async function(e, itemId, photoIdx, toLocation) {
+            e.stopPropagation();
+            if(!confirm(`確認將此商品出貨至 ${toLocation}？`)) {
+                e.target.value = ""; // 取消則重設選單
+                return;
+            }
+            try {
+                const item = db.find(i => i.id === itemId);
+                let photos = normalizePhotos(item);
+                // 更新地點為所選的 Stockist
+                photos[photoIdx].locations = [toLocation]; 
+                await updateDoc(doc(dbFirestore, "stock_items", itemId), { photos: photos });
+                
+                // 視覺回饋：將該卡片直接變成已出貨狀態
+                const card = e.target.closest('.group');
+                card.innerHTML = `<div class="flex items-center justify-center h-full text-xs font-bold text-emerald-600 bg-emerald-50 rounded"><i data-lucide="check-circle" class="w-4 h-4 mr-1"></i> 已轉移至 ${toLocation}</div>`;
+                lucide.createIcons();
+            } catch (err) {
+                alert("出貨失敗：" + err.message);
+                e.target.value = "";
+            }
+        };
+
         window.openListModal = function(type, value) {
             const titleMap = {
-                'Total': '總生產件數 (Total)', 'Making': '製作中', 'Studio': '在庫', 'Unallocated': '無地點標記', 'Sold': '已售出'
+                'Total': '總生產件數 (Total)', 'Making': '製作中', 'Studio': '待出貨 (Studio在庫)', 'Unallocated': '無地點標記', 'Sold': '已售出'
             };
             const titleEl = document.getElementById('list-modal-title');
             if (type === 'kpi') titleEl.innerText = titleMap[value] || value;
@@ -1012,7 +1060,7 @@
                     if (type === 'kpi') {
                         if (value === 'Total') match = true;
                         if (value === 'Making' && item.status === 'Making') match = true;
-                        if (value === 'Studio' && p.locations.length > 0 && p.status !== 'Sold') match = true;
+                        if (value === 'Studio' && (p.locations.includes('JB Studio') || p.locations.includes('PNG Studio')) && p.status !== 'Sold') match = true;
                         if (value === 'Unallocated' && p.locations.length === 0 && p.status !== 'Sold') match = true;
                         if (value === 'Sold' && p.status === 'Sold') match = true;
                     } else if (type === 'category') {
@@ -1029,6 +1077,7 @@
                         
                         let cardColorClass = getStatusColorClass(p.status === 'Sold' ? 'Sold' : item.status);
                         let cardBadgeHTML = '';
+                        
                         if (p.status === 'Sold') {
                             cardBadgeHTML = `<div class="mt-2 text-[10px] font-bold px-1.5 py-0.5 rounded w-fit bg-stone-800 text-white shadow-sm border border-stone-900">SOLD</div>`;
                         } else if (p.locations.length > 0) {
@@ -1036,19 +1085,39 @@
                             let bg = 'bg-stone-200 text-stone-700 border-stone-300';
                             if (loc0 === 'JB Studio') bg = 'bg-emerald-100 text-emerald-800 border-emerald-200';
                             if (loc0 === 'PNG Studio') bg = 'bg-sky-100 text-sky-800 border-sky-200';
-                            if (loc0 === 'Bev C' || loc0 === 'Opener') bg = 'bg-indigo-100 text-indigo-800 border-indigo-200';
+                            if (loc0 !== 'JB Studio' && loc0 !== 'PNG Studio') bg = 'bg-indigo-100 text-indigo-800 border-indigo-200';
                             cardBadgeHTML = `<div class="mt-2 text-[10px] font-bold px-1.5 py-0.5 rounded w-fit border ${bg}">${loc0}</div>`;
                         } else {
                             cardBadgeHTML = `<div class="mt-2 text-[10px] font-bold px-1.5 py-0.5 rounded w-fit border border-black/5 ${cardColorClass}">${item.status}</div>`;
                         }
                         
+                        // 判斷是否顯示「快速出貨」選單
+                        let quickDispatchHTML = '';
+                        const isStudio = p.locations.length === 1 && (p.locations[0] === 'JB Studio' || p.locations[0] === 'PNG Studio');
+                        if (isStudio && p.status !== 'Sold') {
+                            // 過濾出所有非 Studio 的地點作為 Stockists 選項
+                            const stockists = appSettings.locations.filter(l => l !== 'JB Studio' && l !== 'PNG Studio');
+                            let options = stockists.map(s => `<option value="${s}">${s}</option>`).join('');
+                            quickDispatchHTML = `
+                                <div class="mt-2 border-t border-stone-100 pt-2">
+                                    <select onchange="window.quickDispatch(event, '${item.id}', ${idx}, this.value)" class="w-full text-[10px] p-1.5 border border-stone-200 rounded bg-stone-50 text-stone-600 font-bold cursor-pointer outline-none hover:bg-stone-100 transition" onclick="event.stopPropagation()">
+                                        <option value="" disabled selected>🚚 安排出貨至...</option>
+                                        ${options}
+                                    </select>
+                                </div>
+                            `;
+                        }
+
                         gridContainer.innerHTML += `
                             <div class="bg-white rounded-md shadow-sm border border-stone-200 hover:shadow-md transition flex flex-col overflow-hidden relative group cursor-pointer" onclick="window.openDetailModal('${item.id}', ${idx})">
                                 ${imgHTML}
                                 <div class="p-2 flex flex-col flex-grow">
                                     <div class="font-bold text-stone-800 text-xs truncate" title="${item.itemName}">${item.itemName}</div>
                                     <div class="text-[10px] text-stone-500">${cleanCat} | ${item.color || '-'}</div>
-                                    ${cardBadgeHTML}
+                                    <div class="flex-grow">
+                                        ${cardBadgeHTML}
+                                    </div>
+                                    ${quickDispatchHTML}
                                 </div>
                                 <button onclick="event.stopPropagation(); window.openEditModal('${item.id}')" class="absolute top-1 right-1 bg-white/90 text-stone-600 p-1.5 rounded shadow flex items-center justify-center opacity-0 group-hover:opacity-100 transition hover:bg-stone-100 hover:text-stone-900" title="編輯這筆工單">
                                     <i data-lucide="pencil" class="w-3 h-3"></i>
