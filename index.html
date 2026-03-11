@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weiweiwei ERP (v11.18.4 Multi-Studio Update)</title>
+    <title>Weiweiwei ERP (v11.18.5 Clean Category Update)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -71,7 +71,7 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center gap-4">
                     <div class="flex-shrink-0 flex items-center">
-                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.18.4</span></span>
+                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.18.5</span></span>
                         <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] bg-stone-100 text-stone-400">Loading...</span>
                     </div>
                     <div class="hidden sm:ml-6 sm:flex sm:space-x-4">
@@ -503,7 +503,6 @@
         let calendarMode = 'production'; 
         let currentCalDate = new Date(); 
         let categoryChart = null, allocChart = null;
-        // 已更新預設 locations，涵蓋 JB Studio 和 PNG Studio
         let appSettings = { makers: ['Kim', 'Kelly', 'Lijin'], locations: ['JB Studio', 'PNG Studio', 'Online', 'Bev C', 'Opener'], categories: ['Top', 'Dress', 'Pants'], weekly_goals: {} };
         let currentDetailItem = null, currentDetailPhotoIdx = -1, tempLocations = []; 
         const catColors = ['#f472b6', '#60a5fa', '#a78bfa', '#34d399', '#fbbf24', '#9ca3af'];
@@ -590,7 +589,7 @@
                 let locs = [];
                 if (Array.isArray(p.locations) && p.locations.length > 0) locs = p.locations;
                 else if (p.location && p.location !== 'Studio') locs = [p.location]; 
-                else if (!p.status || p.status !== 'Sold') locs = [fallbackStudio]; // 舊資料自動補足生產地
+                else if (!p.status || p.status !== 'Sold') locs = [fallbackStudio]; 
                 
                 return {
                     url: p.url || '',
@@ -606,7 +605,10 @@
         function getCleanCategory(catName) {
             if (!catName) return "";
             let str = String(catName).replace(/[\u00A0\s]+/g, ' ').trim().toLowerCase();
-            if (!str || str === "unknown") return "";
+            
+            // 強制過濾掉不需要的舊類別
+            if (!str || str === "unknown" || str === "apron skrit" || str === "aria top") return "";
+            
             return str.charAt(0).toUpperCase() + str.slice(1);
         }
 
@@ -1201,7 +1203,6 @@
                 let existingPhotos = item.photos || []; 
                 let photosModified = false;
                 
-                // 自動覆寫尚未指定確切地點的子項目
                 existingPhotos.forEach(p => {
                     if (!p.locations || p.locations.length === 0 || (p.locations.length === 1 && p.locations[0] === 'Studio')) {
                         p.locations = [newOriginStudio];
