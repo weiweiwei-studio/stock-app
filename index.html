@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weiweiwei ERP (v11.18.1 Filter Update)</title>
+    <title>Weiweiwei ERP (v11.18.2 Filter Update)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -43,12 +43,15 @@
         .cal-items-wrapper::-webkit-scrollbar-thumb { background: #d6d3d1; }
         .cal-date-num { font-size: 12px; font-weight: bold; color: #a8a29e; margin-bottom: 4px; display: block; padding-left: 2px; }
         .cal-today .cal-date-num { color: #f59e0b; font-size: 14px; }
-        .cal-item { font-size: 9px; padding: 3px 4px; border-radius: 3px; color: white; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; box-shadow: 0 1px 1px rgba(0,0,0,0.1); }
-        .maker-kim { background-color: #f472b6; }
-        .maker-kelly { background-color: #60a5fa; }
-        .maker-other { background-color: #a8a29e; }
-        .mode-arrival .maker-kim { background-color: #ec4899; border-left: 2px solid #831843; } 
-        .mode-arrival .maker-kelly { background-color: #3b82f6; border-left: 2px solid #1e3a8a; } 
+        .cal-item { font-size: 9px; font-weight: 500; padding: 3px 4px; border-radius: 3px; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; box-shadow: 0 1px 1px rgba(0,0,0,0.05); }
+        
+        /* STATUS COLORS FOR CALENDAR */
+        .status-pending { background-color: #f5f5f4; color: #78716c; border-left: 2px solid #d6d3d1; }
+        .status-tomake { background-color: #e0f2fe; color: #0369a1; border-left: 2px solid #7dd3fc; }
+        .status-making { background-color: #fef08a; color: #854d0e; border-left: 2px solid #fde047; }
+        .status-qc { background-color: #f3e8ff; color: #6b21a8; border-left: 2px solid #d8b4fe; }
+        .status-ready { background-color: #d1fae5; color: #065f46; border-left: 2px solid #6ee7b7; }
+        .status-sold { background-color: #e7e5e4; color: #44403c; border-left: 2px solid #a8a29e; }
 
         /* PROGRESS BARS for GOALS */
         .goal-card { background: white; border: 1px solid #e7e5e4; border-radius: 6px; padding: 8px; min-width: 140px; flex: 1; display: flex; flex-direction: column; gap: 4px; }
@@ -70,7 +73,7 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center gap-4">
                     <div class="flex-shrink-0 flex items-center">
-                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.18.1</span></span>
+                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.18.2</span></span>
                         <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] bg-stone-100 text-stone-400">Loading...</span>
                     </div>
                     <div class="hidden sm:ml-6 sm:flex sm:space-x-4">
@@ -144,6 +147,14 @@
                                 <i data-lucide="chevron-right" class="w-4 h-4"></i>
                             </button>
                         </div>
+                    </div>
+
+                    <div class="flex flex-wrap gap-3 text-[9px] mb-3 font-bold uppercase tracking-wider text-stone-500 border-b border-stone-100 pb-3">
+                        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-[#f5f5f4] border border-[#d6d3d1]"></span>Pending</span>
+                        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-[#e0f2fe] border border-[#7dd3fc]"></span>To Make</span>
+                        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-[#fef08a] border border-[#fde047]"></span>Making</span>
+                        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-[#f3e8ff] border border-[#d8b4fe]"></span>QC</span>
+                        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-[#d1fae5] border border-[#6ee7b7]"></span>Ready</span>
                     </div>
 
                     <div id="unscheduled-container" class="mb-4 bg-stone-50 p-3 rounded border border-stone-100 transition-all">
@@ -320,10 +331,14 @@
                     <label class="text-xs text-stone-500">品名</label>
                     <input type="text" id="edit-itemName" class="w-full border p-2 rounded text-sm">
                 </div>
+                <div>
+                    <label class="text-xs text-stone-500">月份</label>
+                    <input type="text" id="edit-month" class="w-full border p-2 rounded text-sm">
+                </div>
                 <div class="grid grid-cols-2 gap-2">
                       <div>
-                        <label class="text-xs text-stone-500">月份</label>
-                        <input type="text" id="edit-month" class="w-full border p-2 rounded text-sm">
+                        <label class="text-xs text-stone-500">製作人</label>
+                        <select id="edit-maker" class="w-full border p-2 rounded text-sm bg-white dynamic-maker-select"></select>
                       </div>
                       <div>
                         <label class="text-xs text-stone-500">生產階段</label>
@@ -462,7 +477,6 @@
         const locColors = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#6366f1', '#14b8a6'];
         let locationBreakdownData = {}; 
 
-        // 🟢 FIX 2: 加入日期轉換函數，避免 toISOString() 造成的時區位移問題
         function formatDateForInput(firebaseTimestamp) {
             if (!firebaseTimestamp) return '';
             const d = firebaseTimestamp.seconds ? new Date(firebaseTimestamp.seconds * 1000) : new Date(firebaseTimestamp);
@@ -536,7 +550,6 @@
             else if (item.photo) raw = [item.photo];
 
             if (raw.length === 0 && item.quantity > 0) {
-                 // 🟢 FIX 1: 使用 Array.from 避免所有陣列元素指向同一個記憶體位址 (Reference Leak)
                  return Array.from({ length: item.quantity }, () => ({ url: '', status: 'Available', locations: [], notes: '', soldPrice: null }));
             }
 
@@ -564,7 +577,6 @@
             return str.charAt(0).toUpperCase() + str.slice(1);
         }
 
-        // ... (中間的 updateDashboard 到 initCharts 邏輯不變，省略註解以保持簡潔)
         function updateDashboard() {
             const totalPieces = db.reduce((sum, item) => sum + (parseInt(item.quantity)||1), 0);
             document.getElementById('kpi-total').textContent = totalPieces;
@@ -625,13 +637,11 @@
                 btnArr.className = "px-3 py-1.5 text-xs font-bold rounded-md text-stone-500 hover:text-stone-800 transition-all flex items-center gap-1";
                 document.getElementById('unscheduled-container').classList.remove('hidden');
                 document.getElementById('weekly-stats-container').classList.add('hidden');
-                calendarWrapper.classList.remove('mode-arrival');
             } else {
                 btnProd.className = "px-3 py-1.5 text-xs font-bold rounded-md text-stone-500 hover:text-stone-800 transition-all flex items-center gap-1";
                 btnArr.className = "px-3 py-1.5 text-xs font-bold rounded-md shadow bg-emerald-100 text-emerald-800 transition-all flex items-center gap-1";
                 document.getElementById('unscheduled-container').classList.add('hidden');
                 document.getElementById('weekly-stats-container').classList.remove('hidden');
-                calendarWrapper.classList.add('mode-arrival');
             }
             renderCalendar();
         };
@@ -651,6 +661,21 @@
                 await updateDoc(doc(dbFirestore, "settings", "config"), { weekly_goals: newGoals });
             }
         };
+
+        // 回傳對應狀態的顏色 class
+        function getStatusColorClass(status) {
+            switch(status) {
+                case 'Pending': return 'status-pending';
+                case 'To Make': return 'status-tomake';
+                case 'Making': return 'status-making';
+                case 'QC': return 'status-qc';
+                case 'Ready': 
+                case 'In Studio': return 'status-ready';
+                case 'Sold':
+                case 'Partial Sold': return 'status-sold';
+                default: return 'bg-stone-300';
+            }
+        }
 
         function renderCalendar() {
             const displayDate = currentCalDate;
@@ -680,11 +705,9 @@
                 if(unscheduled.length === 0) unscheduledContainer.innerHTML = '<span class="text-[10px] text-stone-300 italic">None</span>';
                 else {
                     unscheduled.forEach(i => {
-                        let color = 'bg-stone-300';
-                        if(i.maker && i.maker.toLowerCase().includes('kim')) color = 'bg-pink-300';
-                        if(i.maker && i.maker.toLowerCase().includes('kelly')) color = 'bg-blue-300';
+                        let colorClass = getStatusColorClass(i.status);
                         unscheduledContainer.innerHTML += `
-                            <div onclick="window.openEditModal('${i.id}')" class="${color} text-white text-[10px] px-2 py-1 rounded cursor-pointer hover:opacity-80 transition shadow-sm">
+                            <div onclick="window.openEditModal('${i.id}')" class="${colorClass} text-[10px] px-2 py-1 rounded cursor-pointer hover:opacity-80 transition shadow-sm border border-black/5">
                                 ${getCleanCategory(i.category)}: ${i.itemName}
                             </div>`;
                     });
@@ -693,7 +716,7 @@
 
             const firstDay = new Date(year, month, 1).getDay(); 
             const daysInMonth = new Date(year, month + 1, 0).getDate();
-            let weeklyActuals = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+            let weeklyActuals = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }; // 固定只存 5 週
 
             for(let i=0; i<firstDay; i++) {
                 gridContainer.innerHTML += `<div class="calendar-cell bg-stone-50"></div>`;
@@ -707,7 +730,8 @@
                         <div class="cal-items-wrapper custom-scrollbar">
                 `;
 
-                const currentWeek = Math.ceil((d + firstDay) / 7);
+                // 把跨到第 6 週的零星天數自動合併到第 5 週計算
+                const currentWeek = Math.min(5, Math.ceil((d + firstDay) / 7));
 
                 const itemsToday = db.filter(item => {
                     let targetDate = null;
@@ -729,27 +753,23 @@
                 }
 
                 itemsToday.forEach(item => {
-                    let colorClass = 'maker-other';
-                    if(item.maker && item.maker.toLowerCase().includes('kim')) colorClass = 'maker-kim';
-                    if(item.maker && item.maker.toLowerCase().includes('kelly')) colorClass = 'maker-kelly';
-                    
+                    let colorClass = getStatusColorClass(item.status);
                     const catName = getCleanCategory(item.category);
                     const qtyDisplay = item.quantity > 1 ? ` (${item.quantity})` : '';
                     
-                    cellHTML += `<div class="cal-item ${colorClass}" onclick="window.openEditModal('${item.id}')" title="${item.itemName}">${catName}${qtyDisplay}</div>`;
+                    cellHTML += `<div class="cal-item ${colorClass} border border-black/5" onclick="window.openEditModal('${item.id}')" title="${item.itemName}">${catName}${qtyDisplay}</div>`;
                 });
 
                 cellHTML += `</div></div>`;
                 gridContainer.innerHTML += cellHTML;
             }
             
+            // 強制跑 5 週的迴圈
             if (calendarMode === 'arrival') {
                 for (let w = 1; w <= 5; w++) {
                     const goalKey = `y${year}m${month}w${w}`;
                     const target = appSettings.weekly_goals[goalKey] || 0; 
                     const actual = weeklyActuals[w] || 0;
-                    
-                    if (target === 0 && actual === 0 && w > 4) continue; 
 
                     const pct = target > 0 ? Math.min((actual / target) * 100, 100) : 0;
                     let fillClass = 'fill-red';
@@ -930,13 +950,23 @@
                     });
                 }
                 gridHTML += `</div>`;
-                tr.innerHTML = `<td class="px-6 py-4">${gridHTML}</td><td class="px-6 py-4"><div class="font-bold text-stone-800">${item.itemName}</div><div class="text-xs text-stone-500">${item.color||''} ${item.size||''}</div></td><td class="px-6 py-4 text-xs text-stone-500">${getCleanCategory(item.category)}</td>`;
+                
+                // 在這裡加入了「編輯工單」的快捷按鈕
+                tr.innerHTML = `
+                    <td class="px-6 py-4">${gridHTML}</td>
+                    <td class="px-6 py-4">
+                        <div class="font-bold text-stone-800">${item.itemName}</div>
+                        <div class="text-xs text-stone-500">${item.color||''} ${item.size||''}</div>
+                        <button onclick="window.openEditModal('${item.id}')" class="mt-2 text-[10px] font-bold bg-stone-100 hover:bg-stone-200 text-stone-600 px-2 py-1 rounded border border-stone-200 transition-colors flex items-center gap-1 w-fit">
+                            <i data-lucide="pencil" class="w-3 h-3"></i> 編輯工單
+                        </button>
+                    </td>
+                    <td class="px-6 py-4 text-xs text-stone-500">${getCleanCategory(item.category)}</td>`;
                 tbody.appendChild(tr);
             });
             lucide.createIcons();
         };
 
-        // 🟢 FIX 2 對應: 使用新的 formatDateForInput 函數填入編輯視窗
         window.openDetailModal = function(id, idx) {
             currentDetailItem = db.find(i => i.id === id); currentDetailPhotoIdx = idx;
             const p = normalizePhotos(currentDetailItem)[idx];
@@ -997,10 +1027,9 @@
             document.getElementById('edit-itemName').value=item.itemName; 
             document.getElementById('edit-month').value=item.month; 
             document.getElementById('edit-status').value=item.status; 
+            document.getElementById('edit-maker').value = item.maker || ''; 
             document.getElementById('edit-price').value=item.price || ''; 
             document.getElementById('edit-addPhotos').value = ''; 
-            
-            // 🟢 FIX 2 對應: 使用時區安全的日期格式化函數
             document.getElementById('edit-startDate').value = formatDateForInput(item.makingAt); 
             document.getElementById('edit-completedDate').value = formatDateForInput(item.completedAt); 
             
@@ -1019,12 +1048,12 @@
                 
                 let data = { 
                     status: document.getElementById('edit-status').value, 
+                    maker: document.getElementById('edit-maker').value, 
                     itemName: document.getElementById('edit-itemName').value, 
                     month: document.getElementById('edit-month').value, 
                     price: document.getElementById('edit-price').value 
                 }; 
                 
-                // 🟢 FIX 3: 確保清空日期時能正確寫入 null 而不是被忽略
                 data.makingAt = sDateVal ? new Date(sDateVal) : null;
                 data.completedAt = cDateVal ? new Date(cDateVal) : null;
                 
