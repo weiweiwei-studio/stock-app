@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weiweiwei ERP (v11.18.2 Filter Update)</title>
+    <title>Weiweiwei ERP (v11.18.3 Interactive Update)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -45,7 +45,7 @@
         .cal-today .cal-date-num { color: #f59e0b; font-size: 14px; }
         .cal-item { font-size: 9px; font-weight: 500; padding: 3px 4px; border-radius: 3px; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; box-shadow: 0 1px 1px rgba(0,0,0,0.05); }
         
-        /* STATUS COLORS FOR CALENDAR */
+        /* STATUS COLORS */
         .status-pending { background-color: #f5f5f4; color: #78716c; border-left: 2px solid #d6d3d1; }
         .status-tomake { background-color: #e0f2fe; color: #0369a1; border-left: 2px solid #7dd3fc; }
         .status-making { background-color: #fef08a; color: #854d0e; border-left: 2px solid #fde047; }
@@ -73,7 +73,7 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center gap-4">
                     <div class="flex-shrink-0 flex items-center">
-                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.18.2</span></span>
+                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.18.3</span></span>
                         <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] bg-stone-100 text-stone-400">Loading...</span>
                     </div>
                     <div class="hidden sm:ml-6 sm:flex sm:space-x-4">
@@ -104,23 +104,23 @@
 
         <section id="view-dashboard" class="space-y-8 animate-fade-in pb-10">
             <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
-                 <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-stone-800">
+                 <div onclick="window.openListModal('kpi', 'Total')" class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-stone-800 cursor-pointer hover:-translate-y-1 hover:shadow-md transition-all">
                     <div class="text-stone-500 text-xs font-bold uppercase tracking-wider">總生產件數 (Total)</div>
                     <div class="mt-2 text-3xl font-bold text-stone-800" id="kpi-total">0</div>
                 </div>
-                <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-amber-500">
+                <div onclick="window.openListModal('kpi', 'Making')" class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-amber-500 cursor-pointer hover:-translate-y-1 hover:shadow-md transition-all">
                     <div class="text-amber-600 text-xs font-bold uppercase">製作中 (件)</div>
                     <div class="mt-2 text-3xl font-bold text-stone-800" id="kpi-making">0</div>
                 </div>
-                <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-emerald-500">
+                <div onclick="window.openListModal('kpi', 'Studio')" class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-emerald-500 cursor-pointer hover:-translate-y-1 hover:shadow-md transition-all">
                     <div class="text-emerald-600 text-xs font-bold uppercase">在庫 (件)</div>
                     <div class="mt-2 text-3xl font-bold text-stone-800" id="kpi-studio">0</div>
                 </div>
-                <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-gray-400">
+                <div onclick="window.openListModal('kpi', 'Unallocated')" class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-gray-400 cursor-pointer hover:-translate-y-1 hover:shadow-md transition-all">
                     <div class="text-gray-500 text-xs font-bold uppercase">未分配 (件)</div>
                     <div class="mt-2 text-3xl font-bold text-stone-800" id="kpi-unallocated">0</div>
                 </div>
-                <div class="bg-stone-800 p-6 rounded-lg shadow-md border-l-4 border-yellow-500 text-white">
+                <div onclick="window.openListModal('kpi', 'Sold')" class="bg-stone-800 p-6 rounded-lg shadow-md border-l-4 border-yellow-500 text-white cursor-pointer hover:-translate-y-1 hover:shadow-lg transition-all">
                     <div class="text-yellow-500 text-xs font-bold uppercase">已售出 (件)</div>
                     <div class="mt-2 text-3xl font-bold" id="kpi-sold">0</div>
                 </div>
@@ -187,15 +187,11 @@
 
                 <div class="space-y-6">
                     <div class="bg-white p-4 rounded-lg shadow-sm">
-                        <h3 class="font-bold text-stone-700 mb-2 text-xs uppercase tracking-wide">庫存分佈</h3>
+                        <h3 class="font-bold text-stone-700 mb-2 text-xs uppercase tracking-wide">庫存分佈 (點擊看照片)</h3>
                         <div id="location-stats-container" class="flex flex-wrap gap-2"></div>
-                         <div id="location-breakdown-panel" class="mt-4 hidden bg-stone-50 border border-stone-100 rounded p-3 shadow-inner">
-                            <h4 class="text-xs font-bold text-stone-800 mb-2 border-b border-stone-200 pb-1" id="breakdown-title">Location</h4>
-                            <ul class="text-[10px] text-stone-600 space-y-1 max-h-32 overflow-y-auto custom-scrollbar" id="breakdown-list"></ul>
-                        </div>
                     </div>
                     <div class="bg-white p-4 rounded-lg shadow-sm">
-                        <h3 class="font-bold text-stone-700 mb-2 text-xs uppercase tracking-wide">類別總計</h3>
+                        <h3 class="font-bold text-stone-700 mb-2 text-xs uppercase tracking-wide">類別總計 (點擊看照片)</h3>
                         <div id="category-stats-container" class="flex flex-wrap gap-2"></div>
                     </div>
                     <div class="bg-white p-4 rounded-lg shadow-sm">
@@ -446,6 +442,19 @@
         </div>
     </div>
 
+    <div id="list-modal" class="fixed inset-0 bg-black bg-opacity-60 hidden z-[55] flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-2xl max-w-5xl w-full flex flex-col max-h-[90vh]">
+            <div class="p-4 border-b border-stone-200 flex justify-between items-center bg-stone-50 rounded-t-lg">
+                <h3 class="text-lg font-bold text-stone-800 flex items-center gap-2" id="list-modal-title">清單</h3>
+                <button onclick="document.getElementById('list-modal').classList.add('hidden')" class="text-stone-400 hover:text-stone-800 text-3xl leading-none">&times;</button>
+            </div>
+            <div class="p-4 overflow-y-auto flex-grow bg-stone-100/50 custom-scrollbar">
+                <div id="list-modal-grid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                    </div>
+            </div>
+        </div>
+    </div>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -475,7 +484,6 @@
         let currentDetailItem = null, currentDetailPhotoIdx = -1, tempLocations = []; 
         const catColors = ['#f472b6', '#60a5fa', '#a78bfa', '#34d399', '#fbbf24', '#9ca3af'];
         const locColors = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#6366f1', '#14b8a6'];
-        let locationBreakdownData = {}; 
 
         function formatDateForInput(firebaseTimestamp) {
             if (!firebaseTimestamp) return '';
@@ -527,7 +535,6 @@
             });
 
             const q = collection(dbFirestore, "stock_items");
-            
             onSnapshot(q, (snapshot) => {
                 db = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
                 db.sort((a, b) => {
@@ -536,7 +543,6 @@
                     if (!b.createdAt) return -1;
                     return 0; 
                 });
-                
                 updateDashboard();
                 renderProductionList();
                 renderAllocationList();
@@ -570,11 +576,28 @@
             });
         }
         
+        // --- ★ 升級 1: 類別自動清洗 ---
         function getCleanCategory(catName) {
-            if (!catName) return "Unknown";
-            const str = String(catName).replace(/\u00A0/g, ' ').trim();
-            if (!str) return "Unknown";
+            if (!catName) return "";
+            // 移除所有空白、轉為小寫做統一比較
+            let str = String(catName).replace(/[\u00A0\s]+/g, ' ').trim().toLowerCase();
+            if (!str || str === "unknown") return "";
+            // 首字母大寫後回傳
             return str.charAt(0).toUpperCase() + str.slice(1);
+        }
+
+        function getStatusColorClass(status) {
+            switch(status) {
+                case 'Pending': return 'status-pending';
+                case 'To Make': return 'status-tomake';
+                case 'Making': return 'status-making';
+                case 'QC': return 'status-qc';
+                case 'Ready': 
+                case 'In Studio': return 'status-ready';
+                case 'Sold':
+                case 'Partial Sold': return 'status-sold';
+                default: return 'bg-stone-300';
+            }
         }
 
         function updateDashboard() {
@@ -587,29 +610,25 @@
             
             appSettings.locations.forEach(l => {
                 locStats[l] = 0;
-                locationBreakdownData[l] = { total: 0, items: [], catBreakdown: {} };
             });
-            locationBreakdownData['Unallocated'] = { total: 0, items: [], catBreakdown: {} };
-            locationBreakdownData['Sold'] = { total: 0, items: [], catBreakdown: {} };
 
             db.forEach(i => {
                 const count = i.photos && i.photos.length > 0 ? i.photos.length : (parseInt(i.quantity)||1);
                 const cat = getCleanCategory(i.category);
-                catStats[cat] = (catStats[cat] || 0) + count;
+                if (cat) catStats[cat] = (catStats[cat] || 0) + count;
+                
                 const photos = normalizePhotos(i);
                 photos.forEach((p, idx) => {
-                    const itemName = `${i.itemName} (${i.color})`;
                     if (p.status === 'Sold') {
-                        soldCount++; locStats['Sold']++; addToBreakdown('Sold', itemName, cat);
+                        soldCount++; locStats['Sold']++; 
                     } else {
                         if (p.locations.length > 0) {
                             studioCount++;
                             p.locations.forEach(loc => {
                                 if(locStats[loc] !== undefined) locStats[loc]++;
-                                addToBreakdown(loc, itemName, cat);
                             });
                         } else {
-                            unallocatedCount++; locStats['Unallocated']++; addToBreakdown('Unallocated', itemName, cat);
+                            unallocatedCount++; locStats['Unallocated']++;
                         }
                     }
                 });
@@ -662,21 +681,6 @@
             }
         };
 
-        // 回傳對應狀態的顏色 class
-        function getStatusColorClass(status) {
-            switch(status) {
-                case 'Pending': return 'status-pending';
-                case 'To Make': return 'status-tomake';
-                case 'Making': return 'status-making';
-                case 'QC': return 'status-qc';
-                case 'Ready': 
-                case 'In Studio': return 'status-ready';
-                case 'Sold':
-                case 'Partial Sold': return 'status-sold';
-                default: return 'bg-stone-300';
-            }
-        }
-
         function renderCalendar() {
             const displayDate = currentCalDate;
             const year = displayDate.getFullYear();
@@ -716,7 +720,7 @@
 
             const firstDay = new Date(year, month, 1).getDay(); 
             const daysInMonth = new Date(year, month + 1, 0).getDate();
-            let weeklyActuals = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }; // 固定只存 5 週
+            let weeklyActuals = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }; 
 
             for(let i=0; i<firstDay; i++) {
                 gridContainer.innerHTML += `<div class="calendar-cell bg-stone-50"></div>`;
@@ -730,7 +734,6 @@
                         <div class="cal-items-wrapper custom-scrollbar">
                 `;
 
-                // 把跨到第 6 週的零星天數自動合併到第 5 週計算
                 const currentWeek = Math.min(5, Math.ceil((d + firstDay) / 7));
 
                 const itemsToday = db.filter(item => {
@@ -764,7 +767,6 @@
                 gridContainer.innerHTML += cellHTML;
             }
             
-            // 強制跑 5 週的迴圈
             if (calendarMode === 'arrival') {
                 for (let w = 1; w <= 5; w++) {
                     const goalKey = `y${year}m${month}w${w}`;
@@ -791,20 +793,16 @@
             }
         }
 
-        function addToBreakdown(loc, name, cat) {
-            if(!locationBreakdownData[loc]) locationBreakdownData[loc] = { total: 0, items: [], catBreakdown: {} };
-            locationBreakdownData[loc].total++;
-            locationBreakdownData[loc].items.push(name);
-            locationBreakdownData[loc].catBreakdown[cat] = (locationBreakdownData[loc].catBreakdown[cat] || 0) + 1;
-        }
-
         function renderCategoryBadges(stats) {
             const container = document.getElementById('category-stats-container');
             container.innerHTML = '';
             const sortedKeys = Object.keys(stats).sort((a,b) => stats[b] - stats[a]);
 
             sortedKeys.forEach(c => {
-                if(stats[c] > 0) container.innerHTML += `<div class="bg-white px-3 py-1 rounded shadow-sm border border-stone-200 text-xs text-stone-600">${c}: <b class="text-stone-800">${stats[c]}</b></div>`;
+                if(stats[c] > 0) {
+                    // ★ 升級 3: 改為按鈕並連結 openListModal
+                    container.innerHTML += `<button onclick="window.openListModal('category', '${c}')" class="bg-white px-3 py-1 rounded shadow-sm border border-stone-200 text-xs text-stone-600 hover:shadow-md transition-shadow">${c}: <b class="text-stone-800">${stats[c]}</b></button>`;
+                }
             });
         }
 
@@ -812,19 +810,15 @@
             const container = document.getElementById('location-stats-container');
             container.innerHTML = '';
             appSettings.locations.forEach(l => {
-                if(stats[l] > 0) container.innerHTML += `<button onclick="window.showLocationBreakdown('${l}')" class="bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded shadow-sm border border-blue-100 text-xs text-blue-800 transition-colors">${l}: <b>${stats[l]}</b></button>`;
+                if(stats[l] > 0) {
+                    // ★ 升級 3: 改為按鈕並連結 openListModal
+                    container.innerHTML += `<button onclick="window.openListModal('location', '${l}')" class="bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded shadow-sm border border-blue-100 text-xs text-blue-800 transition-colors">${l}: <b>${stats[l]}</b></button>`;
+                }
             });
-            if(stats['Unallocated'] > 0) container.innerHTML += `<button onclick="window.showLocationBreakdown('Unallocated')" class="bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded shadow-sm border border-gray-200 text-xs text-gray-600">Unallocated: <b>${stats['Unallocated']}</b></button>`;
+            if(stats['Unallocated'] > 0) {
+                container.innerHTML += `<button onclick="window.openListModal('location', 'Unallocated')" class="bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded shadow-sm border border-gray-200 text-xs text-gray-600">Unallocated: <b>${stats['Unallocated']}</b></button>`;
+            }
         }
-
-        window.showLocationBreakdown = function(loc) {
-            const data = locationBreakdownData[loc];
-            if(!data) return;
-            const panel = document.getElementById('location-breakdown-panel');
-            document.getElementById('breakdown-title').innerText = `${loc} (Total: ${data.total})`;
-            document.getElementById('breakdown-list').innerHTML = data.items.map(i => `<li class="border-b border-stone-200 pb-1 last:border-0">${i}</li>`).join('');
-            panel.classList.remove('hidden');
-        };
 
         function initCharts() {
             categoryChart = new Chart(document.getElementById('categoryChart'), {
@@ -951,7 +945,6 @@
                 }
                 gridHTML += `</div>`;
                 
-                // 在這裡加入了「編輯工單」的快捷按鈕
                 tr.innerHTML = `
                     <td class="px-6 py-4">${gridHTML}</td>
                     <td class="px-6 py-4">
@@ -964,6 +957,76 @@
                     <td class="px-6 py-4 text-xs text-stone-500">${getCleanCategory(item.category)}</td>`;
                 tbody.appendChild(tr);
             });
+            lucide.createIcons();
+        };
+
+        // --- ★ 升級 2 & 3: 共用清單視窗 ---
+        window.openListModal = function(type, value) {
+            const titleMap = {
+                'Total': '總生產件數 (Total)', 'Making': '製作中', 'Studio': '在庫', 'Unallocated': '未分配', 'Sold': '已售出'
+            };
+            const titleEl = document.getElementById('list-modal-title');
+            if (type === 'kpi') titleEl.innerText = titleMap[value] || value;
+            else if (type === 'category') titleEl.innerText = `類別: ${value}`;
+            else if (type === 'location') titleEl.innerText = `地點: ${value}`;
+            
+            const gridContainer = document.getElementById('list-modal-grid');
+            gridContainer.innerHTML = '';
+            
+            let count = 0;
+
+            db.forEach(item => {
+                const photos = normalizePhotos(item);
+                const cleanCat = getCleanCategory(item.category);
+                
+                photos.forEach((p, idx) => {
+                    let match = false;
+                    if (type === 'kpi') {
+                        if (value === 'Total') match = true;
+                        if (value === 'Making' && item.status === 'Making') match = true;
+                        if (value === 'Studio' && p.locations.length > 0 && p.status !== 'Sold') match = true;
+                        if (value === 'Unallocated' && p.locations.length === 0 && p.status !== 'Sold') match = true;
+                        if (value === 'Sold' && p.status === 'Sold') match = true;
+                    } else if (type === 'category') {
+                        if (cleanCat === value) match = true;
+                    } else if (type === 'location') {
+                        if (value === 'Unallocated' && p.locations.length === 0 && p.status !== 'Sold') match = true;
+                        else if (p.locations.includes(value)) match = true;
+                    }
+
+                    if (match) {
+                        count++;
+                        let imgSrc = p.url ? p.url : '';
+                        let imgHTML = imgSrc ? `<img src="${imgSrc}" class="w-full h-32 object-cover rounded-t-md">` : `<div class="w-full h-32 bg-stone-200 flex items-center justify-center text-xs text-stone-400 rounded-t-md">無照片</div>`;
+                        
+                        let cardStatus = p.status === 'Sold' ? 'Sold' : (p.locations.length > 0 ? p.locations[0] : item.status);
+                        let cardColorClass = getStatusColorClass(p.status === 'Sold' ? 'Sold' : item.status);
+                        
+                        gridContainer.innerHTML += `
+                            <div class="bg-white rounded-md shadow-sm border border-stone-200 hover:shadow-md transition flex flex-col overflow-hidden relative group cursor-pointer" onclick="window.openDetailModal('${item.id}', ${idx})">
+                                ${imgHTML}
+                                <div class="p-2 flex flex-col flex-grow">
+                                    <div class="font-bold text-stone-800 text-xs truncate" title="${item.itemName}">${item.itemName}</div>
+                                    <div class="text-[10px] text-stone-500">${cleanCat} | ${item.color || '-'}</div>
+                                    <div class="mt-2 text-[10px] font-bold px-1.5 py-0.5 rounded w-fit ${cardColorClass}">
+                                        ${p.status === 'Sold' ? 'SOLD' : cardStatus}
+                                    </div>
+                                </div>
+                                <button onclick="event.stopPropagation(); window.openEditModal('${item.id}')" class="absolute top-1 right-1 bg-white/90 text-stone-600 p-1.5 rounded shadow flex items-center justify-center opacity-0 group-hover:opacity-100 transition hover:bg-stone-100 hover:text-stone-900" title="編輯這筆工單">
+                                    <i data-lucide="pencil" class="w-3 h-3"></i>
+                                </button>
+                            </div>
+                        `;
+                    }
+                });
+            });
+            
+            titleEl.innerText += ` (${count}件)`;
+            if(count === 0) {
+                gridContainer.innerHTML = `<div class="col-span-full py-8 text-center text-stone-400 text-sm">目前沒有相關商品</div>`;
+            }
+
+            document.getElementById('list-modal').classList.remove('hidden');
             lucide.createIcons();
         };
 
@@ -1080,9 +1143,17 @@
         };
 
         window.handleDelete = async () => { if(confirm('確定刪除此工單？')) { await deleteDoc(doc(dbFirestore, "stock_items", document.getElementById('edit-id').value)); window.closeEditModal(); } };
-        window.renderSettingsView = function() { const render = (type) => (appSettings[type]||[]).map(i => `<span class="bg-stone-100 px-2 py-1 rounded text-xs mr-1 mb-1 inline-block border cursor-pointer hover:bg-red-50 hover:text-red-500" onclick="window.removeSetting('${type}','${i}')">${i} &times;</span>`).join(''); document.getElementById('settings-makers-list').innerHTML = render('makers'); document.getElementById('settings-locations-list').innerHTML = render('locations'); document.getElementById('settings-categories-list').innerHTML = render('categories'); };
+        
+        window.renderSettingsView = function() { 
+            const render = (type) => [...new Set((appSettings[type]||[]).map(x=>type==='categories'?getCleanCategory(x):x).filter(Boolean))]
+                .map(i => `<span class="bg-stone-100 px-2 py-1 rounded text-xs mr-1 mb-1 inline-block border cursor-pointer hover:bg-red-50 hover:text-red-500" onclick="window.removeSetting('${type}','${i}')">${i} &times;</span>`).join(''); 
+            document.getElementById('settings-makers-list').innerHTML = render('makers'); 
+            document.getElementById('settings-locations-list').innerHTML = render('locations'); 
+            document.getElementById('settings-categories-list').innerHTML = render('categories'); 
+        };
+        
         window.addSetting = async function(type) { const map = {'makers':'new-maker-input', 'locations':'new-location-input', 'categories':'new-category-input'}; let val = document.getElementById(map[type]).value; if (type === 'categories') val = getCleanCategory(val); else val = val.trim(); if(val) { await updateDoc(doc(dbFirestore, "settings", "config"), { [type]: [...appSettings[type], val] }); document.getElementById(map[type]).value = ''; } };
-        window.removeSetting = async function(type, val) { if(confirm(`Remove ${val}?`)) await updateDoc(doc(dbFirestore, "settings", "config"), { [type]: appSettings[type].filter(x => x !== val) }); }
+        window.removeSetting = async function(type, val) { if(confirm(`Remove ${val}?`)) await updateDoc(doc(dbFirestore, "settings", "config"), { [type]: appSettings[type].filter(x => (type==='categories'?getCleanCategory(x):x) !== val) }); }
         
         window.updateDropdowns = function() { 
             const distinctMakers = [...new Set([...appSettings.makers, ...db.map(i => i.maker)])].filter(Boolean).sort(); 
