@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weiweiwei ERP (v11.18.7 Logic Fix Update)</title>
+    <title>Weiweiwei ERP (v11.18.8 Dispatch UI Update)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -20,9 +20,7 @@
         /* Photo Reel & Grid */
         .photo-reel { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; max-width: 180px; scrollbar-width: thin; scrollbar-color: #d6d3d1 transparent; }
         .reel-img { width: 36px; height: 48px; object-fit: cover; border-radius: 4px; border: 1px solid #e7e5e4; flex-shrink: 0; background: #fff; }
-        .photo-grid { display: flex; flex-wrap: wrap; gap: 8px; max-width: 400px; }
-        .grid-item { position: relative; width: 52px; height: 68px; cursor: pointer; transition: transform 0.1s; background: white; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-        .grid-img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; border: 1px solid #e7e5e4; }
+        .photo-grid { display: flex; flex-wrap: wrap; gap: 8px; max-width: 500px; }
         
         /* Badges */
         .status-badge { position: absolute; bottom: 0; right: 0; left: 0; padding: 2px 0; font-size: 8px; font-weight: bold; color: white; text-align: center; border-radius: 0 0 4px 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -52,7 +50,7 @@
         .status-ready { background-color: #d1fae5; color: #065f46; border-left: 2px solid #6ee7b7; }
         .status-sold { background-color: #e7e5e4; color: #44403c; border-left: 2px solid #a8a29e; }
 
-        /* PROGRESS BARS for GOALS */
+        /* PROGRESS BARS */
         .goal-card { background: white; border: 1px solid #e7e5e4; border-radius: 6px; padding: 8px; min-width: 140px; flex: 1; display: flex; flex-direction: column; gap: 4px; }
         .progress-track { height: 6px; background: #f5f5f4; border-radius: 3px; overflow: hidden; position: relative; }
         .progress-fill { height: 100%; border-radius: 3px; transition: width 0.3s ease; }
@@ -71,7 +69,7 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center gap-4">
                     <div class="flex-shrink-0 flex items-center">
-                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.18.7</span></span>
+                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.18.8</span></span>
                         <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] bg-stone-100 text-stone-400">Loading...</span>
                     </div>
                     <div class="hidden sm:ml-6 sm:flex sm:space-x-4">
@@ -245,14 +243,15 @@
             <div class="bg-white rounded-lg p-6 shadow-sm border-l-4 border-blue-500">
                 <h2 class="text-xl font-bold text-stone-800">庫存與出貨管理</h2>
                 <p class="text-stone-500 text-sm mt-1">
-                    當商品狀態改為 <b>Ready</b> 後，才會出現在這裡。<br>
-                    選擇 <b>JB Studio</b> 或 <b>PNG Studio</b> 即可查詢待出貨商品。
+                    這裡顯示的過濾器代表的是商品**現在正躺在哪裡**。<br>
+                    你可以直接從下方的單品圖下方下拉選單，一鍵將商品分配至 Stockist。
                 </p>
             </div>
             <div class="flex flex-wrap items-center gap-4 bg-white p-3 rounded-lg shadow-sm">
                 <div class="flex items-center gap-2">
-                    <span class="text-sm font-medium text-stone-600 flex-shrink-0">顯示地點:</span>
-                    <select id="alloc-filter-location" onchange="window.renderAllocationList()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5"><option value="all">全部庫存 (All)</option><option value="Sold">已售出 (Sold)</option><option value="Unallocated">無地點 (Unallocated)</option></select>
+                    <span class="text-sm font-medium text-stone-600 flex-shrink-0">當前所在位置:</span>
+                    <select id="alloc-filter-location" onchange="window.renderAllocationList()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5 font-bold">
+                        </select>
                 </div>
                 <div class="flex items-center gap-2">
                     <span class="text-sm font-medium text-stone-600 flex-shrink-0">過濾類別:</span>
@@ -263,7 +262,7 @@
                 <div class="overflow-x-auto custom-scrollbar">
                     <table class="min-w-full text-left text-sm">
                         <thead class="bg-stone-100 text-stone-600 uppercase font-semibold">
-                            <tr><th class="px-6 py-3 w-[450px]">Unique Pieces (Inventory)</th><th class="px-6 py-3">Item Detail</th><th class="px-6 py-3">Category</th></tr>
+                            <tr><th class="px-6 py-3 w-[500px]">單品圖列 (直接選擇出貨)</th><th class="px-6 py-3">Item Detail</th><th class="px-6 py-3">Category</th></tr>
                         </thead>
                         <tbody id="allocation-table-body" class="divide-y divide-stone-100"></tbody>
                     </table>
@@ -311,7 +310,7 @@
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-xs font-medium text-stone-500 mb-1">生產/入庫地 (Studio)</label>
-                        <select name="originStudio" class="w-full border-stone-300 rounded-md shadow-sm text-sm p-2 border bg-white">
+                        <select name="originStudio" class="w-full border-stone-300 rounded-md shadow-sm text-sm p-2 border bg-white font-bold">
                             <option value="JB Studio">JB Studio</option>
                             <option value="PNG Studio">PNG Studio</option>
                         </select>
@@ -371,7 +370,7 @@
                     </div>
                     <div>
                         <label class="text-xs text-stone-500">入庫地 (覆寫無地點)</label>
-                        <select id="edit-originStudio" class="w-full border p-2 rounded text-sm bg-white">
+                        <select id="edit-originStudio" class="w-full border p-2 rounded text-sm bg-white font-bold">
                             <option value="JB Studio">JB Studio</option>
                             <option value="PNG Studio">PNG Studio</option>
                         </select>
@@ -447,9 +446,9 @@
 
                 <div class="space-y-6 flex-grow overflow-y-auto pr-2">
                     <div>
-                        <label class="text-xs font-bold text-stone-600 uppercase tracking-wider mb-2 block">庫存地點 (可複選)</label>
+                        <label class="text-xs font-bold text-stone-600 uppercase tracking-wider mb-2 block">當前所在地點 (可複選)</label>
                         <div class="grid grid-cols-2 gap-2" id="detail-location-options"></div>
-                        <p class="text-[10px] text-stone-400 mt-1">* 若未選擇，將顯示為「無地點」</p>
+                        <p class="text-[10px] text-amber-600 font-bold mt-2 bg-amber-50 p-1 rounded border border-amber-200">* 💡 如果商品已被分配至 Stockist，建議先取消勾選 Studio 以防標籤重疊 (變成 MULTI)。</p>
                     </div>
                     <div>
                         <label class="text-xs font-bold text-stone-600 uppercase tracking-wider mb-2 block">單品備註</label>
@@ -590,25 +589,21 @@
 
             const fallbackStudio = item.originStudio || 'JB Studio';
 
-            // 防呆處理：沒有照片但有數量
             if (raw.length === 0 && item.quantity > 0) {
                  return Array.from({ length: item.quantity }, () => ({ url: '', status: 'Available', locations: [fallbackStudio], notes: '', soldPrice: null }));
             }
 
             return raw.map(p => {
-                // 防呆處理：舊的字串格式
                 if (typeof p === 'string') return { url: p, status: 'Available', locations: [fallbackStudio], notes: '', soldPrice: null };
                 
                 let locs = [];
                 if (Array.isArray(p.locations) && p.locations.length > 0) {
-                    // 👉 核心邏輯修正：將陣列裡面的舊 "Studio" 標籤，強制映射到具體的 originStudio (JB/PNG)
                     locs = p.locations.map(l => l === 'Studio' ? fallbackStudio : l);
                 }
                 else if (p.location && p.location !== 'Studio') {
                     locs = [p.location];
                 }
                 else if (!p.status || p.status !== 'Sold') {
-                    // 如果陣列是空的 []，而且還沒賣出，強制塞入預設 Studio
                     locs = [fallbackStudio];
                 }
                 
@@ -955,7 +950,6 @@
             const catFilter = document.getElementById('alloc-filter-category').value;
             tbody.innerHTML = '';
 
-            // ⚠️ 狀態邏輯：只有 Ready 以上的實體庫存才會出現在這裡
             let filteredDb = db.filter(i => i.status === 'Ready' || i.status === 'In Studio' || i.status === 'Sold' || i.status === 'Partial Sold');
             
             if (catFilter !== 'all') {
@@ -994,7 +988,7 @@
                         const hasNote = p.notes && p.notes.length > 0;
                         const hasImg = p.url && p.url.length > 0;
                         let badgeText = '', badgeClass = '';
-                        if (isSold) { badgeText = p.soldPrice ? `SOLD (RM${p.soldPrice})` : 'SOLD'; badgeClass = 'badge-sold'; } 
+                        if (isSold) { badgeText = p.soldPrice ? `SOLD` : 'SOLD'; badgeClass = 'badge-sold'; } 
                         else {
                             if (p.locations.length > 1) { badgeText = 'MULTI'; badgeClass = 'badge-multi'; } 
                             else if (p.locations.length === 1) { 
@@ -1005,7 +999,33 @@
                             } 
                             else { badgeText = '無地點'; badgeClass = 'badge-none'; }
                         }
-                        gridHTML += `<div class="grid-item" onclick="window.openDetailModal('${item.id}', ${idx})">${hasImg ? `<img src="${p.url}" class="grid-img ${isSold ? 'opacity-50 grayscale' : ''}">` : `<div class="grid-img bg-stone-100 flex items-center justify-center text-[8px] text-stone-400">No Img</div>`}<div class="status-badge ${badgeClass}">${badgeText}</div>${isSold ? `<div class="sold-overlay"><i data-lucide="check" class="text-white w-5 h-5"></i></div>` : ''}${hasNote ? `<div class="has-note-dot"></div>` : ''}</div>`;
+                        
+                        // 👉 升級亮點：直接在圖表下方嵌入「安排出貨」的下拉選單
+                        let quickDispatchHTML = '';
+                        const isStudio = p.locations.length === 1 && (p.locations[0] === 'JB Studio' || p.locations[0] === 'PNG Studio');
+                        if (isStudio && !isSold) {
+                            const stockists = appSettings.locations.filter(l => l !== 'JB Studio' && l !== 'PNG Studio');
+                            let options = stockists.map(s => `<option value="${s}">${s}</option>`).join('');
+                            quickDispatchHTML = `
+                                <select onchange="window.quickDispatch(event, '${item.id}', ${idx}, this.value)" class="mt-1 w-full text-[9px] p-1 border border-stone-200 rounded bg-white text-stone-600 font-bold cursor-pointer outline-none hover:bg-stone-50 shadow-sm" onclick="event.stopPropagation()">
+                                    <option value="" disabled selected>📦 安排出貨..</option>
+                                    ${options}
+                                </select>
+                            `;
+                        }
+
+                        gridHTML += `
+                        <div class="flex flex-col items-center w-[64px] flex-shrink-0 dispatch-card">
+                            <div class="relative w-full h-[84px] cursor-pointer transition-transform hover:scale-105 bg-white rounded shadow-sm border border-stone-200" onclick="window.openDetailModal('${item.id}', ${idx})">
+                                ${hasImg ? `<img src="${p.url}" class="w-full h-full object-cover rounded ${isSold ? 'opacity-50 grayscale' : ''}">` : `<div class="w-full h-full bg-stone-50 flex items-center justify-center text-[8px] text-stone-400 rounded">No Img</div>`}
+                                <div class="status-badge ${badgeClass}">${badgeText}</div>
+                                ${isSold ? `<div class="sold-overlay"><i data-lucide="check" class="text-white w-4 h-4"></i></div>` : ''}
+                                ${hasNote ? `<div class="has-note-dot"></div>` : ''}
+                            </div>
+                            <div class="w-full dispatch-wrapper">
+                                ${quickDispatchHTML}
+                            </div>
+                        </div>`;
                     });
                 }
                 gridHTML += `</div>`;
@@ -1013,13 +1033,13 @@
                 tr.innerHTML = `
                     <td class="px-6 py-4">${gridHTML}</td>
                     <td class="px-6 py-4">
-                        <div class="font-bold text-stone-800">${item.itemName}</div>
+                        <div class="font-bold text-stone-800 text-sm">${item.itemName}</div>
                         <div class="text-xs text-stone-500">${item.color||''} ${item.size||''}</div>
-                        <button onclick="window.openEditModal('${item.id}')" class="mt-2 text-[10px] font-bold bg-stone-100 hover:bg-stone-200 text-stone-600 px-2 py-1 rounded border border-stone-200 transition-colors flex items-center gap-1 w-fit">
+                        <button onclick="window.openEditModal('${item.id}')" class="mt-3 text-[10px] font-bold bg-stone-100 hover:bg-stone-200 text-stone-600 px-2 py-1.5 rounded border border-stone-200 transition-colors flex items-center gap-1 w-fit">
                             <i data-lucide="pencil" class="w-3 h-3"></i> 編輯工單
                         </button>
                     </td>
-                    <td class="px-6 py-4 text-xs text-stone-500">${getCleanCategory(item.category)}</td>`;
+                    <td class="px-6 py-4 text-xs font-medium text-stone-500">${getCleanCategory(item.category)}</td>`;
                 tbody.appendChild(tr);
             });
             lucide.createIcons();
@@ -1034,12 +1054,12 @@
             try {
                 const item = db.find(i => i.id === itemId);
                 let photos = normalizePhotos(item);
+                // 直接將地點「覆寫」為該 Stockist，徹底解決重疊 (MULTI) 的問題
                 photos[photoIdx].locations = [toLocation]; 
                 await updateDoc(doc(dbFirestore, "stock_items", itemId), { photos: photos });
                 
-                const card = e.target.closest('.group');
-                card.innerHTML = `<div class="flex items-center justify-center h-full text-xs font-bold text-emerald-600 bg-emerald-50 rounded"><i data-lucide="check-circle" class="w-4 h-4 mr-1"></i> 已轉移至 ${toLocation}</div>`;
-                lucide.createIcons();
+                const wrapper = e.target.parentElement;
+                wrapper.innerHTML = `<div class="mt-1 text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1 py-1 text-center w-full truncate">🚚 已出貨</div>`;
             } catch (err) {
                 alert("出貨失敗：" + err.message);
                 e.target.value = "";
@@ -1106,7 +1126,7 @@
                             const stockists = appSettings.locations.filter(l => l !== 'JB Studio' && l !== 'PNG Studio');
                             let options = stockists.map(s => `<option value="${s}">${s}</option>`).join('');
                             quickDispatchHTML = `
-                                <div class="mt-2 border-t border-stone-100 pt-2">
+                                <div class="mt-2 border-t border-stone-100 pt-2 dispatch-wrapper">
                                     <select onchange="window.quickDispatch(event, '${item.id}', ${idx}, this.value)" class="w-full text-[10px] p-1.5 border border-stone-200 rounded bg-stone-50 text-stone-600 font-bold cursor-pointer outline-none hover:bg-stone-100 transition" onclick="event.stopPropagation()">
                                         <option value="" disabled selected>🚚 安排出貨至...</option>
                                         ${options}
@@ -1116,7 +1136,7 @@
                         }
 
                         gridContainer.innerHTML += `
-                            <div class="bg-white rounded-md shadow-sm border border-stone-200 hover:shadow-md transition flex flex-col overflow-hidden relative group cursor-pointer" onclick="window.openDetailModal('${item.id}', ${idx})">
+                            <div class="bg-white rounded-md shadow-sm border border-stone-200 hover:shadow-md transition flex flex-col overflow-hidden relative group cursor-pointer dispatch-card" onclick="window.openDetailModal('${item.id}', ${idx})">
                                 ${imgHTML}
                                 <div class="p-2 flex flex-col flex-grow">
                                     <div class="font-bold text-stone-800 text-xs truncate" title="${item.itemName}">${item.itemName}</div>
@@ -1327,11 +1347,28 @@
             const distinctMakers = [...new Set([...appSettings.makers, ...db.map(i => i.maker)])].filter(Boolean).sort(); 
             const distinctCategories = [...new Set([...appSettings.categories.map(c => getCleanCategory(c)), ...db.map(i => getCleanCategory(i.category))])].filter(Boolean).sort(); 
             
+            // 👉 這裡重新分組 Dropdown 裡的選項，讓「待出貨」和「已出貨」徹底分開
             const locSelect = document.getElementById('alloc-filter-location'); 
             if(locSelect) { 
                 const currentVal = locSelect.value; 
-                locSelect.innerHTML = `<option value="all">全部庫存 (All)</option><option value="Sold">已售出 (Sold)</option><option value="Unallocated">無地點 (Unallocated)</option>`; 
-                appSettings.locations.forEach(l => { locSelect.innerHTML += `<option value="${l}">${l}</option>`; }); 
+                let html = `<option value="all">全部庫存 (All)</option><option value="Sold">已售出 (Sold)</option><option value="Unallocated">無地點 (Unallocated)</option>`; 
+                
+                const studios = appSettings.locations.filter(l => l === 'JB Studio' || l === 'PNG Studio');
+                const stockists = appSettings.locations.filter(l => l !== 'JB Studio' && l !== 'PNG Studio');
+                
+                if(studios.length > 0) {
+                    html += `<optgroup label="📦 待出貨 (Studio在庫)">`;
+                    studios.forEach(l => html += `<option value="${l}">${l}</option>`);
+                    html += `</optgroup>`;
+                }
+                
+                if(stockists.length > 0) {
+                    html += `<optgroup label="🚚 已出貨 (Stockists)">`;
+                    stockists.forEach(l => html += `<option value="${l}">${l}</option>`);
+                    html += `</optgroup>`;
+                }
+
+                locSelect.innerHTML = html; 
                 locSelect.value = currentVal || "all"; 
             } 
             
