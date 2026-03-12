@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weiweiwei ERP (v11.18.9 Color Badge & Studio Filter Update)</title>
+    <title>Weiweiwei ERP (v11.18.10 Studio Filter Force Update)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -69,7 +69,7 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center gap-4">
                     <div class="flex-shrink-0 flex items-center">
-                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.18.9</span></span>
+                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.18.10</span></span>
                         <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] bg-stone-100 text-stone-400">Loading...</span>
                     </div>
                     <div class="hidden sm:ml-6 sm:flex sm:space-x-4">
@@ -251,7 +251,13 @@
                 <div class="flex items-center gap-2">
                     <span class="text-sm font-medium text-stone-600 flex-shrink-0">當前所在位置:</span>
                     <select id="alloc-filter-location" onchange="window.renderAllocationList()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5 font-bold">
-                        </select>
+                        <option value="all">全部庫存 (All)</option>
+                        <option value="Sold">已售出 (Sold)</option>
+                        <option value="Unallocated">無地點 (Unallocated)</option>
+                        <optgroup label="📦 待出貨 (Studio在庫)">
+                            <option value="Studio">全部 Studio (JB & PNG)</option>
+                        </optgroup>
+                    </select>
                 </div>
                 <div class="flex items-center gap-2">
                     <span class="text-sm font-medium text-stone-600 flex-shrink-0">過濾類別:</span>
@@ -662,7 +668,7 @@
                         soldCount++; locStats['Sold']++; 
                     } else {
                         if (p.locations.length > 0) {
-                            if (p.locations.includes('JB Studio') || p.locations.includes('PNG Studio')) {
+                            if (p.locations.some(loc => loc.toUpperCase().includes('JB') || loc.toUpperCase().includes('PNG'))) {
                                 studioCount++;
                             }
                             p.locations.forEach(loc => {
@@ -854,7 +860,8 @@
             
             appSettings.locations.forEach(l => {
                 if(stats[l] > 0) {
-                    const isStudio = (l === 'JB Studio' || l === 'PNG Studio');
+                    // 只要包含 JB 或 PNG，無論大小寫，都算 Studio
+                    const isStudio = l.toUpperCase().includes('JB') || l.toUpperCase().includes('PNG');
                     let colorCls = isStudio ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100';
                     const btn = `<button onclick="window.openListModal('location', '${l}')" class="${colorCls} px-3 py-1.5 rounded shadow-sm border text-xs transition-colors font-medium">${l}: <b class="font-bold">${stats[l]}</b></button>`;
                     
@@ -959,7 +966,7 @@
             filteredDb.forEach(item => {
                 const photos = normalizePhotos(item);
                 
-                // 👉 1. 過濾邏輯加入 "Studio" (代表所有 Studio)
+                // 👉 強制寬鬆比對：包含 JB 或 PNG 就符合 Studio
                 let matchesLoc = true;
                 if (locFilter !== 'all') {
                     if (locFilter === 'Sold') { 
@@ -967,7 +974,7 @@
                     } else if (locFilter === 'Unallocated') { 
                         matchesLoc = photos.some(p => p.status !== 'Sold' && p.locations.length === 0); 
                     } else if (locFilter === 'Studio') {
-                        matchesLoc = photos.some(p => p.status !== 'Sold' && (p.locations.includes('JB Studio') || p.locations.includes('PNG Studio')));
+                        matchesLoc = photos.some(p => p.status !== 'Sold' && p.locations.some(loc => loc.toUpperCase().includes('JB') || loc.toUpperCase().includes('PNG')));
                     } else { 
                         matchesLoc = photos.some(p => p.locations.includes(locFilter)); 
                     }
@@ -981,10 +988,9 @@
                 if(photos.length === 0) gridHTML = `<span class="text-xs text-stone-400">無照片資料</span>`;
                 else {
                     photos.forEach((p, idx) => {
-                        // 👉 2. 確保只顯示符合 "Studio" 條件的單品圖片
                         if (locFilter !== 'all' && locFilter !== 'Sold' && locFilter !== 'Unallocated') {
                             if (locFilter === 'Studio') {
-                                if (!p.locations.includes('JB Studio') && !p.locations.includes('PNG Studio')) return;
+                                if (!p.locations.some(loc => loc.toUpperCase().includes('JB') || loc.toUpperCase().includes('PNG'))) return;
                             } else {
                                 if (!p.locations.includes(locFilter)) return;
                             }
@@ -997,18 +1003,16 @@
                         const hasImg = p.url && p.url.length > 0;
                         let badgeText = '', badgeClass = '';
                         
-                        // 👉 3. 根據 Stockist 自動分配顏色
                         if (isSold) { badgeText = p.soldPrice ? `SOLD` : 'SOLD'; badgeClass = 'badge-sold'; } 
                         else {
                             if (p.locations.length > 1) { badgeText = 'MULTI'; badgeClass = 'badge-multi'; } 
                             else if (p.locations.length === 1) { 
                                 const loc0 = p.locations[0];
                                 badgeText = loc0.substring(0,8).toUpperCase(); 
-                                if (loc0 === 'JB Studio') badgeClass = 'bg-emerald-600 text-white';
-                                else if (loc0 === 'PNG Studio') badgeClass = 'bg-sky-600 text-white';
+                                if (loc0.toUpperCase().includes('JB')) badgeClass = 'bg-emerald-600 text-white';
+                                else if (loc0.toUpperCase().includes('PNG')) badgeClass = 'bg-sky-600 text-white';
                                 else { 
-                                    // Stockists 的專屬色盤
-                                    const stockists = appSettings.locations.filter(l => l !== 'JB Studio' && l !== 'PNG Studio');
+                                    const stockists = appSettings.locations.filter(l => !(l.toUpperCase().includes('JB') || l.toUpperCase().includes('PNG')));
                                     const palette = ['bg-amber-600', 'bg-purple-600', 'bg-pink-600', 'bg-indigo-600', 'bg-teal-600', 'bg-rose-600', 'bg-orange-600'];
                                     let sIdx = stockists.indexOf(loc0);
                                     if(sIdx === -1) sIdx = 0;
@@ -1019,9 +1023,9 @@
                         }
                         
                         let quickDispatchHTML = '';
-                        const isStudio = p.locations.length === 1 && (p.locations[0] === 'JB Studio' || p.locations[0] === 'PNG Studio');
+                        const isStudio = p.locations.length === 1 && (p.locations[0].toUpperCase().includes('JB') || p.locations[0].toUpperCase().includes('PNG'));
                         if (isStudio && !isSold) {
-                            const stockists = appSettings.locations.filter(l => l !== 'JB Studio' && l !== 'PNG Studio');
+                            const stockists = appSettings.locations.filter(l => !(l.toUpperCase().includes('JB') || l.toUpperCase().includes('PNG')));
                             let options = stockists.map(s => `<option value="${s}">${s}</option>`).join('');
                             quickDispatchHTML = `
                                 <select onchange="window.quickDispatch(event, '${item.id}', ${idx}, this.value)" class="mt-1 w-full text-[9px] p-1 border border-stone-200 rounded bg-white text-stone-600 font-bold cursor-pointer outline-none hover:bg-stone-50 shadow-sm" onclick="event.stopPropagation()">
@@ -1105,7 +1109,7 @@
                     if (type === 'kpi') {
                         if (value === 'Total') match = true;
                         if (value === 'Making' && item.status === 'Making') match = true;
-                        if (value === 'Studio' && (p.locations.includes('JB Studio') || p.locations.includes('PNG Studio')) && p.status !== 'Sold') match = true;
+                        if (value === 'Studio' && p.locations.some(loc => loc.toUpperCase().includes('JB') || loc.toUpperCase().includes('PNG')) && p.status !== 'Sold') match = true;
                         if (value === 'Unallocated' && p.locations.length === 0 && p.status !== 'Sold') match = true;
                         if (value === 'Sold' && p.status === 'Sold') match = true;
                     } else if (type === 'category') {
@@ -1128,18 +1132,18 @@
                         } else if (p.locations.length > 0) {
                             let loc0 = p.locations[0];
                             let bg = 'bg-stone-200 text-stone-700 border-stone-300';
-                            if (loc0 === 'JB Studio') bg = 'bg-emerald-100 text-emerald-800 border-emerald-200';
-                            if (loc0 === 'PNG Studio') bg = 'bg-sky-100 text-sky-800 border-sky-200';
-                            if (loc0 !== 'JB Studio' && loc0 !== 'PNG Studio') bg = 'bg-indigo-100 text-indigo-800 border-indigo-200';
+                            if (loc0.toUpperCase().includes('JB')) bg = 'bg-emerald-100 text-emerald-800 border-emerald-200';
+                            if (loc0.toUpperCase().includes('PNG')) bg = 'bg-sky-100 text-sky-800 border-sky-200';
+                            if (!loc0.toUpperCase().includes('JB') && !loc0.toUpperCase().includes('PNG')) bg = 'bg-indigo-100 text-indigo-800 border-indigo-200';
                             cardBadgeHTML = `<div class="mt-2 text-[10px] font-bold px-1.5 py-0.5 rounded w-fit border ${bg}">${loc0}</div>`;
                         } else {
                             cardBadgeHTML = `<div class="mt-2 text-[10px] font-bold px-1.5 py-0.5 rounded w-fit border border-black/5 ${cardColorClass}">${item.status}</div>`;
                         }
                         
                         let quickDispatchHTML = '';
-                        const isStudio = p.locations.length === 1 && (p.locations[0] === 'JB Studio' || p.locations[0] === 'PNG Studio');
+                        const isStudio = p.locations.length === 1 && (p.locations[0].toUpperCase().includes('JB') || p.locations[0].toUpperCase().includes('PNG'));
                         if (isStudio && p.status !== 'Sold') {
-                            const stockists = appSettings.locations.filter(l => l !== 'JB Studio' && l !== 'PNG Studio');
+                            const stockists = appSettings.locations.filter(l => !(l.toUpperCase().includes('JB') || l.toUpperCase().includes('PNG')));
                             let options = stockists.map(s => `<option value="${s}">${s}</option>`).join('');
                             quickDispatchHTML = `
                                 <div class="mt-2 border-t border-stone-100 pt-2 dispatch-wrapper">
@@ -1368,16 +1372,15 @@
                 const currentVal = locSelect.value; 
                 let html = `<option value="all">全部庫存 (All)</option><option value="Sold">已售出 (Sold)</option><option value="Unallocated">無地點 (Unallocated)</option>`; 
                 
-                const studios = appSettings.locations.filter(l => l === 'JB Studio' || l === 'PNG Studio');
-                const stockists = appSettings.locations.filter(l => l !== 'JB Studio' && l !== 'PNG Studio');
+                // 👉 改為寬鬆比對：不管大小寫，包含 JB 或 PNG 就是 Studio
+                const studios = appSettings.locations.filter(l => l.toUpperCase().includes('JB') || l.toUpperCase().includes('PNG'));
+                const stockists = appSettings.locations.filter(l => !(l.toUpperCase().includes('JB') || l.toUpperCase().includes('PNG')));
                 
-                if(studios.length > 0) {
-                    html += `<optgroup label="📦 待出貨 (Studio在庫)">`;
-                    // 👉 新增的 "全部 Studio" 選項
-                    html += `<option value="Studio">全部 Studio (JB & PNG)</option>`;
-                    studios.forEach(l => html += `<option value="${l}">${l}</option>`);
-                    html += `</optgroup>`;
-                }
+                // 強制渲染 Studio 選項，就算上述 filter 為空也照常產生
+                html += `<optgroup label="📦 待出貨 (Studio在庫)">`;
+                html += `<option value="Studio">全部 Studio (JB & PNG)</option>`;
+                studios.forEach(l => html += `<option value="${l}">${l}</option>`);
+                html += `</optgroup>`;
                 
                 if(stockists.length > 0) {
                     html += `<optgroup label="🚚 已出貨 (Stockists)">`;
