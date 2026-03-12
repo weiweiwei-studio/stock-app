@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weiweiwei ERP (v11.18.11 Custom Brand Colors)</title>
+    <title>Weiweiwei ERP (v11.18.12 Color Palette & Anti-Multi Fix)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -24,8 +24,7 @@
         
         /* Badges */
         .status-badge { position: absolute; bottom: 0; right: 0; left: 0; padding: 2px 0; font-size: 8px; font-weight: bold; color: white; text-align: center; border-radius: 0 0 4px 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .badge-sold { background-color: #1c1917; color: white; } 
-        .badge-multi { background-color: #3b82f6; color: white; } 
+        .badge-sold { background-color: #ce3375; color: white; } /* Updated Sold Out Color */
         .badge-none { background-color: #e5e7eb; color: #9ca3af; border-top: 1px solid #d1d5db; }
         .sold-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; border-radius: 4px; }
         .has-note-dot { position: absolute; top: -3px; right: -3px; width: 8px; height: 8px; background-color: #ef4444; border-radius: 50%; border: 1px solid white; z-index: 20; }
@@ -48,7 +47,7 @@
         .status-making { background-color: #fef08a; color: #854d0e; border-left: 2px solid #fde047; }
         .status-qc { background-color: #f3e8ff; color: #6b21a8; border-left: 2px solid #d8b4fe; }
         .status-ready { background-color: #d1fae5; color: #065f46; border-left: 2px solid #6ee7b7; }
-        .status-sold { background-color: #e7e5e4; color: #44403c; border-left: 2px solid #a8a29e; }
+        .status-sold { background-color: #fdf2f8; color: #ce3375; border-left: 2px solid #ce3375; }
 
         /* PROGRESS BARS */
         .goal-card { background: white; border: 1px solid #e7e5e4; border-radius: 6px; padding: 8px; min-width: 140px; flex: 1; display: flex; flex-direction: column; gap: 4px; }
@@ -69,7 +68,7 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center gap-4">
                     <div class="flex-shrink-0 flex items-center">
-                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.18.11</span></span>
+                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.18.12</span></span>
                         <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] bg-stone-100 text-stone-400">Loading...</span>
                     </div>
                     <div class="hidden sm:ml-6 sm:flex sm:space-x-4">
@@ -116,8 +115,8 @@
                     <div class="text-gray-500 text-xs font-bold uppercase">無地點標記 (件)</div>
                     <div class="mt-2 text-3xl font-bold text-stone-800" id="kpi-unallocated">0</div>
                 </div>
-                <div onclick="window.openListModal('kpi', 'Sold')" class="bg-stone-800 p-6 rounded-lg shadow-md border-l-4 border-yellow-500 text-white cursor-pointer hover:-translate-y-1 hover:shadow-lg transition-all">
-                    <div class="text-yellow-500 text-xs font-bold uppercase">已售出 (件)</div>
+                <div onclick="window.openListModal('kpi', 'Sold')" class="bg-stone-800 p-6 rounded-lg shadow-md border-l-4 text-white cursor-pointer hover:-translate-y-1 hover:shadow-lg transition-all" style="border-color: #ce3375;">
+                    <div class="text-xs font-bold uppercase" style="color: #fbcfe8;">已售出 (件)</div>
                     <div class="mt-2 text-3xl font-bold" id="kpi-sold">0</div>
                 </div>
             </div>
@@ -438,7 +437,7 @@
         <div class="bg-white rounded-lg shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col md:flex-row max-h-[90vh]">
             <div class="w-full md:w-1/2 bg-stone-100 flex items-center justify-center p-4 relative">
                 <img id="detail-img" src="" class="max-w-full max-h-[300px] md:max-h-full object-contain rounded shadow-sm">
-                <div id="detail-sold-badge" class="absolute top-4 right-4 bg-stone-900 text-white px-3 py-1 text-xs font-bold hidden shadow-lg border border-white">SOLD</div>
+                <div id="detail-sold-badge" class="absolute top-4 right-4 text-white px-3 py-1 text-xs font-bold hidden shadow-lg border border-white" style="background-color: #ce3375;">SOLD</div>
             </div>
             <div class="w-full md:w-1/2 p-6 flex flex-col">
                 <div class="flex justify-between items-start mb-4">
@@ -452,9 +451,9 @@
 
                 <div class="space-y-6 flex-grow overflow-y-auto pr-2">
                     <div>
-                        <label class="text-xs font-bold text-stone-600 uppercase tracking-wider mb-2 block">當前所在地點 (可複選)</label>
+                        <label class="text-xs font-bold text-stone-600 uppercase tracking-wider mb-2 block">切換所在地點 (單品只能有一處實體位置)</label>
                         <div class="grid grid-cols-2 gap-2" id="detail-location-options"></div>
-                        <p class="text-[10px] text-amber-600 font-bold mt-2 bg-amber-50 p-1 rounded border border-amber-200">* 💡 如果商品已被分配至 Stockist，建議先取消勾選 Studio 以防標籤重疊 (變成 MULTI)。</p>
+                        <p class="text-[10px] text-amber-600 font-bold mt-2 bg-amber-50 p-1 rounded border border-amber-200">* 💡 點擊按鈕直接切換地點。系統已強制避免出現重疊 (MULTI) 狀態。</p>
                     </div>
                     <div>
                         <label class="text-xs font-bold text-stone-600 uppercase tracking-wider mb-2 block">單品備註</label>
@@ -513,7 +512,7 @@
         let currentCalDate = new Date(); 
         let categoryChart = null, allocChart = null;
         
-        // 👉 初始化時寫入所有你指定的預設地點，方便選單使用
+        // 預設地點陣列
         let appSettings = { 
             makers: ['Kim', 'Kelly', 'Lijin'], 
             locations: ['JB Studio', 'PNG Studio', 'Online', 'Bev C', 'Fifth', 'Tamara Malas', 'Pop Up', 'Snub', 'Loan', 'Hahhah Store'], 
@@ -523,25 +522,25 @@
         let currentDetailItem = null, currentDetailPhotoIdx = -1, tempLocations = []; 
         const catColors = ['#f472b6', '#60a5fa', '#a78bfa', '#34d399', '#fbbf24', '#9ca3af'];
 
-        // 👉 全域地點顏色對應引擎 (支援 HEX 背景與智慧字體顏色)
+        // 👉 全域色彩對應引擎 (包含微調後的防撞色設計)
         window.getLocColorObj = function(loc) {
             const map = {
-                'ONLINE': { bg: '#4b5563', text: '#ffffff' }, // 深灰
-                'BEV C': { bg: '#f6114a', text: '#ffffff' },
+                'ONLINE': { bg: '#49bb76', text: '#ffffff' }, // 原綠色
+                'BEV C': { bg: '#d50000', text: '#ffffff' }, // 從 #f6114a 調整為正紅，避免與 Sold Out 撞色
                 'FIFTH': { bg: '#0aa0bf', text: '#ffffff' },
-                'TAMARA MALAS': { bg: '#f36e98', text: '#ffffff' },
-                'POP UP': { bg: '#78b177', text: '#ffffff' },
+                'TAMARA MALAS': { bg: '#f36e98', text: '#ffffff' }, 
+                'POP UP': { bg: '#64748b', text: '#ffffff' }, // 從 #78b177 調整為板岩藍灰，避免與 Online 撞色
                 'SNUB': { bg: '#9862a2', text: '#ffffff' },
                 'LOAN': { bg: '#f05006', text: '#ffffff' },
-                'HAHHAH STORE': { bg: '#25998f', text: '#ffffff' },
-                'JB STUDIO': { bg: '#fca00c', text: '#1c1917' }, // 亮橘配深字
-                'PNG STUDIO': { bg: '#00ff99', text: '#1c1917' }  // 螢光綠配深字
+                'HAHHAH STORE': { bg: '#1e3a8a', text: '#ffffff' }, // 從 #25998f 調整為深海軍藍，避免與 Fifth 撞色
+                'JB STUDIO': { bg: '#fca00c', text: '#1c1917' }, // 橘色 + 深字
+                'PNG STUDIO': { bg: '#00ff99', text: '#1c1917' }  // 螢光綠 + 深字
             };
             const upperLoc = String(loc).toUpperCase();
             for (const key in map) {
                 if (upperLoc.includes(key)) return map[key];
             }
-            // 隨機替補色盤 (如果有新增未定義地點)
+            // 隨機替補色盤
             const fallbackPalette = ['#f59e0b', '#8b5cf6', '#ec4899', '#6366f1', '#14b8a6'];
             let hash = 0;
             for (let i = 0; i < String(loc).length; i++) hash = String(loc).charCodeAt(i) + ((hash << 5) - hash);
@@ -636,6 +635,16 @@
                 }
                 else if (!p.status || p.status !== 'Sold') {
                     locs = [fallbackStudio];
+                }
+                
+                // 👉 徹底修復 MULTI 的向下相容邏輯：如果同時存在 Studio 和 Stockist，強制刪除 Studio
+                const studios = ['JB Studio', 'PNG Studio'];
+                const stockists = locs.filter(l => !studios.includes(l));
+                
+                if (stockists.length > 0) {
+                    locs = [stockists[0]]; // 只取第一個真正的 Stockist
+                } else if (locs.length > 0) {
+                    locs = [locs[0]]; // 如果都在 Studio 範圍內，也只取一個
                 }
                 
                 return {
@@ -886,7 +895,6 @@
             appSettings.locations.forEach(l => {
                 if(stats[l] > 0) {
                     const isStudio = l.toUpperCase().includes('JB') || l.toUpperCase().includes('PNG');
-                    // 套用新色系統
                     const colors = window.getLocColorObj(l);
                     const btnStyle = `background-color: ${colors.bg}; color: ${colors.text}; border-color: rgba(0,0,0,0.1);`;
                     const btn = `<button onclick="window.openListModal('location', '${l}')" class="px-3 py-1.5 rounded shadow-sm border text-xs transition-colors font-medium hover:opacity-80" style="${btnStyle}">${l}: <b class="font-bold">${stats[l]}</b></button>`;
@@ -928,8 +936,8 @@
             const labels = [...appSettings.locations, 'Unallocated', 'Sold'];
             const data = [...appSettings.locations.map(l => locStats[l]), locStats['Unallocated'], locStats['Sold']];
             
-            // 套用新色系統到圖表背景
-            const bgColors = [...appSettings.locations.map(l => window.getLocColorObj(l).bg), '#e5e7eb', '#1c1917'];
+            // 套用新色系統到圖表背景 (#ce3375 for sold)
+            const bgColors = [...appSettings.locations.map(l => window.getLocColorObj(l).bg), '#e5e7eb', '#ce3375'];
             
             allocChart.data.labels = labels;
             allocChart.data.datasets[0].data = data;
@@ -1031,21 +1039,21 @@
                         const hasImg = p.url && p.url.length > 0;
                         let badgeText = '', badgeClass = '', badgeStyle = '';
                         
-                        // 👉 在清單內套用新版色彩引擎
                         if (isSold) { 
                             badgeText = p.soldPrice ? `SOLD` : 'SOLD'; 
                             badgeClass = 'badge-sold'; 
                         } 
                         else {
                             if (p.locations.length > 1) { 
+                                // Because of the fix, this should rarely/never trigger, but keeping as ultimate fallback
                                 badgeText = 'MULTI'; 
                                 badgeClass = 'badge-multi'; 
                             } 
                             else if (p.locations.length === 1) { 
                                 const loc0 = p.locations[0];
-                                badgeText = loc0.substring(0,12).toUpperCase(); // 放寬字數顯示
+                                badgeText = loc0.substring(0,12).toUpperCase(); 
                                 const colors = window.getLocColorObj(loc0);
-                                badgeClass = ''; // 清空預設 class
+                                badgeClass = ''; 
                                 badgeStyle = `background-color: ${colors.bg}; color: ${colors.text};`; 
                             } 
                             else { 
@@ -1107,7 +1115,7 @@
             try {
                 const item = db.find(i => i.id === itemId);
                 let photos = normalizePhotos(item);
-                photos[photoIdx].locations = [toLocation]; 
+                photos[photoIdx].locations = [toLocation]; // 原本就是直接覆蓋，這裡沒問題
                 await updateDoc(doc(dbFirestore, "stock_items", itemId), { photos: photos });
                 
                 const wrapper = e.target.parentElement;
@@ -1159,9 +1167,8 @@
                         let cardColorClass = getStatusColorClass(p.status === 'Sold' ? 'Sold' : item.status);
                         let cardBadgeHTML = '';
                         
-                        // 👉 清單內動態套用新色系統
                         if (p.status === 'Sold') {
-                            cardBadgeHTML = `<div class="mt-2 text-[10px] font-bold px-1.5 py-0.5 rounded w-fit bg-stone-800 text-white shadow-sm border border-stone-900">SOLD</div>`;
+                            cardBadgeHTML = `<div class="mt-2 text-[10px] font-bold px-1.5 py-0.5 rounded w-fit text-white shadow-sm border" style="background-color: #ce3375; border-color: #a31f5b;">SOLD</div>`;
                         } else if (p.locations.length > 0) {
                             let loc0 = p.locations[0];
                             const colors = window.getLocColorObj(loc0);
@@ -1246,10 +1253,12 @@
             appSettings.locations.forEach(loc => {
                 const isSelected = tempLocations.includes(loc);
                 const btnClass = isSelected ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-stone-500 border-stone-200 hover:border-blue-300';
-                container.innerHTML += `<button onclick="window.toggleDetailLocation('${loc}')" class="border rounded py-2 text-xs font-bold transition-colors ${btnClass}">${loc} ${isSelected ? '✓' : ''}</button>`;
+                // 👉 修改為 onClick 時呼叫 setDetailLocation，確保單選
+                container.innerHTML += `<button onclick="window.setDetailLocation('${loc}')" class="border rounded py-2 text-xs font-bold transition-colors ${btnClass}">${loc} ${isSelected ? '✓' : ''}</button>`;
             });
         };
-        window.toggleDetailLocation = function(loc) { if(tempLocations.includes(loc)) { tempLocations = tempLocations.filter(l => l !== loc); } else { tempLocations.push(loc); } renderDetailLocationButtons(); };
+        // 👉 將原本的 toggle 改為直接覆蓋 (單選)，杜絕 MULTI 狀態
+        window.setDetailLocation = function(loc) { tempLocations = [loc]; renderDetailLocationButtons(); };
         window.saveItemDetails = async function() { if(!currentDetailItem) return; let photos = normalizePhotos(currentDetailItem); photos[currentDetailPhotoIdx].notes = document.getElementById('detail-notes').value; photos[currentDetailPhotoIdx].locations = tempLocations; try { await updateDoc(doc(dbFirestore, "stock_items", currentDetailItem.id), { photos: photos }); window.closeDetailModal(); } catch(e) { alert("Save failed"); } };
         
         window.triggerSoldFlow = function() {
