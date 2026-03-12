@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weiweiwei ERP (v11.18.19 Studio Transfer & Online UI)</title>
+    <title>Weiweiwei ERP (v11.18.20 Studio Transfer & Dual State Logic)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -69,7 +69,7 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center gap-4">
                     <div class="flex-shrink-0 flex items-center">
-                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.18.19</span></span>
+                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.18.20</span></span>
                         <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] bg-stone-100 text-stone-400">Loading...</span>
                     </div>
                     <div class="hidden sm:ml-6 sm:flex sm:space-x-4">
@@ -109,11 +109,11 @@
                     <div class="mt-2 text-3xl font-bold text-stone-800" id="kpi-making">0</div>
                 </div>
                 <div onclick="window.openListModal('kpi', 'Studio')" class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-emerald-500 cursor-pointer hover:-translate-y-1 hover:shadow-md transition-all relative">
-                    <div class="text-emerald-600 text-xs font-bold uppercase">待出貨 (實體在庫 未上線)</div>
+                    <div class="text-emerald-600 text-[10px] font-bold uppercase tracking-wide">待出貨 (實體在庫 未上線)</div>
                     <div class="mt-2 text-3xl font-bold text-stone-800" id="kpi-studio">0</div>
                 </div>
                 <div onclick="window.openListModal('kpi', 'Unallocated')" class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-gray-400 cursor-pointer hover:-translate-y-1 hover:shadow-md transition-all">
-                    <div class="text-gray-500 text-xs font-bold uppercase">無地點標記 (件)</div>
+                    <div class="text-gray-500 text-[10px] font-bold uppercase tracking-wide">無地點標記 (遺漏件)</div>
                     <div class="mt-2 text-3xl font-bold text-stone-800" id="kpi-unallocated">0</div>
                 </div>
                 <div onclick="window.openListModal('kpi', 'Sold')" class="bg-stone-800 p-6 rounded-lg shadow-md border-l-4 text-white cursor-pointer hover:-translate-y-1 hover:shadow-lg transition-all" style="border-color: #ce3375;">
@@ -275,14 +275,14 @@
             <div class="bg-white rounded-lg p-6 shadow-sm border-l-4 border-blue-500">
                 <h2 class="text-xl font-bold text-stone-800">庫存與出貨管理</h2>
                 <p class="text-stone-500 text-sm mt-1">
-                    這裡顯示的過濾器代表的是商品**現在正躺在哪裡**。<br>
-                    即使商品已經發佈上線(Online)，它仍然會顯示在所屬的工作室清單中，你可以隨時點擊卡片下方的下拉選單進行「跨工作室調貨」或「出庫」。
+                    過濾器將展示商品**現在正躺在哪裡**。即使商品已上線(Online)，若實體仍在 Studio，過濾 Studio 時依然會顯示，並標註 <span class="bg-blue-50 text-blue-700 px-1 py-0.5 rounded text-[10px] font-bold border border-blue-200">🌐 已上線</span>。<br>
+                    你可以直接從下拉選單進行「跨工作室調貨」；若需單品修改照片或定價，請點擊單品圖展開詳細介面。
                 </p>
             </div>
             <div class="flex flex-wrap items-center gap-4 bg-white p-3 rounded-lg shadow-sm">
                 <div class="flex items-center gap-2">
                     <span class="text-sm font-medium text-stone-600 flex-shrink-0">當前所在位置:</span>
-                    <select id="alloc-filter-location" onchange="window.renderAllocationList()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5 font-bold">
+                    <select id="alloc-filter-location" onchange="window.renderAllocationList()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5 font-bold outline-none cursor-pointer hover:bg-stone-100 transition-colors">
                         </select>
                 </div>
                 <div class="flex items-center gap-2">
@@ -294,7 +294,7 @@
                 <div class="overflow-x-auto custom-scrollbar">
                     <table class="min-w-full text-left text-sm">
                         <thead class="bg-stone-100 text-stone-600 uppercase font-semibold">
-                            <tr><th class="px-6 py-3 w-[500px]">單品圖列 (直接選擇出貨/調貨)</th><th class="px-6 py-3">Item Detail</th><th class="px-6 py-3">Category</th></tr>
+                            <tr><th class="px-6 py-3 w-[500px]">單品圖列 (直接選擇調貨/上線 或 點擊編輯)</th><th class="px-6 py-3">Item Detail</th><th class="px-6 py-3">Category</th></tr>
                         </thead>
                         <tbody id="allocation-table-body" class="divide-y divide-stone-100"></tbody>
                     </table>
@@ -306,7 +306,12 @@
              <div class="bg-white p-6 rounded-lg shadow-sm border border-stone-200"><h2 class="text-xl font-bold text-stone-800">系統設定</h2></div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div class="bg-white p-6 rounded-lg shadow-sm"><h3 class="font-bold text-stone-700 mb-2">製作人</h3><div id="settings-makers-list" class="flex flex-wrap gap-1 mb-2"></div><div class="flex gap-2"><input id="new-maker-input" placeholder="新增..." class="flex-1 border text-sm rounded px-2"><button onclick="window.addSetting('makers')" class="bg-stone-800 text-white px-2 rounded">+</button></div></div>
-                <div class="bg-white p-6 rounded-lg shadow-sm"><h3 class="font-bold text-stone-700 mb-2">地點與Stockists</h3><div id="settings-locations-list" class="flex flex-wrap gap-1 mb-2"></div><div class="flex gap-2"><input id="new-location-input" placeholder="新增地點..." class="flex-1 border text-sm rounded px-2"><button onclick="window.addSetting('locations')" class="bg-stone-800 text-white px-2 rounded">+</button></div></div>
+                <div class="bg-white p-6 rounded-lg shadow-sm">
+                    <h3 class="font-bold text-stone-700 mb-2">地點與Stockists</h3>
+                    <div id="settings-locations-list" class="flex flex-wrap gap-1 mb-2"></div>
+                    <div class="flex gap-2"><input id="new-location-input" placeholder="新增地點..." class="flex-1 border text-sm rounded px-2"><button onclick="window.addSetting('locations')" class="bg-stone-800 text-white px-2 rounded">+</button></div>
+                    <p class="text-[9px] text-red-500 mt-2 font-bold">* JB Studio / PNG Studio / Online 為核心系統地點，不可刪除。</p>
+                </div>
                  <div class="bg-white p-6 rounded-lg shadow-sm"><h3 class="font-bold text-stone-700 mb-2">類別</h3><div id="settings-categories-list" class="flex flex-wrap gap-1 mb-2"></div><div class="flex gap-2"><input id="new-category-input" placeholder="新增類別..." class="flex-1 border text-sm rounded px-2"><button onclick="window.addSetting('categories')" class="bg-stone-800 text-white px-2 rounded">+</button></div></div>
             </div>
         </section>
@@ -353,8 +358,8 @@
                     </div>
                 </div>
                 <div class="flex justify-end pt-2 gap-2">
-                    <button type="button" onclick="window.closeModal()" class="text-stone-500 text-sm">取消</button>
-                    <button type="submit" id="btn-submit" class="bg-stone-800 text-white px-4 py-2 rounded text-sm">確認新增</button>
+                    <button type="button" onclick="window.closeModal()" class="text-stone-500 text-sm hover:bg-stone-100 px-3 py-1.5 rounded transition">取消</button>
+                    <button type="submit" id="btn-submit" class="bg-stone-800 text-white px-4 py-2 rounded text-sm shadow-sm transition hover:bg-stone-900">確認新增</button>
                 </div>
             </form>
         </div>
@@ -426,10 +431,10 @@
                 </div>
             </div>
             <div class="flex justify-between mt-6">
-                <button onclick="window.handleDelete()" class="text-red-500 text-xs flex items-center gap-1"><i data-lucide="trash-2" class="w-3 h-3"></i> 刪除整個工單</button>
+                <button onclick="window.handleDelete()" class="text-red-500 text-xs flex items-center gap-1 hover:bg-red-50 px-2 py-1 rounded transition"><i data-lucide="trash-2" class="w-3 h-3"></i> 刪除整個工單</button>
                 <div class="flex gap-2">
-                    <button onclick="window.closeEditModal()" class="px-3 py-1 text-sm bg-gray-100 rounded">取消</button>
-                    <button onclick="window.handleEditSubmit()" id="btn-edit-save" class="px-3 py-1 text-sm bg-stone-800 text-white rounded">儲存變更</button>
+                    <button onclick="window.closeEditModal()" class="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded transition">取消</button>
+                    <button onclick="window.handleEditSubmit()" id="btn-edit-save" class="px-4 py-1.5 text-sm bg-stone-800 hover:bg-stone-900 text-white rounded transition shadow-sm">儲存變更</button>
                 </div>
             </div>
         </div>
@@ -438,44 +443,48 @@
     <div id="detail-modal" class="fixed inset-0 bg-black bg-opacity-80 hidden z-[60] flex items-center justify-center p-4">
         <div class="bg-white rounded-lg shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col md:flex-row max-h-[90vh]">
             <div class="w-full md:w-1/2 bg-stone-100 flex items-center justify-center p-4 relative">
-                <img id="detail-img" src="" class="max-w-full max-h-[300px] md:max-h-full object-contain rounded shadow-sm">
+                <img id="detail-img" src="" class="max-w-full max-h-[300px] md:max-h-full object-contain rounded shadow-sm border border-black/5">
                 <div id="detail-sold-badge" class="absolute top-4 right-4 text-white px-3 py-1 text-xs font-bold hidden shadow-lg border border-white" style="background-color: #ce3375;">SOLD</div>
             </div>
             <div class="w-full md:w-1/2 p-6 flex flex-col">
-                <div class="flex justify-between items-start mb-4">
+                <div class="flex justify-between items-start mb-4 border-b border-stone-100 pb-3">
                     <div>
-                        <h3 class="text-lg font-bold text-stone-800" id="detail-title">Name</h3>
-                        <p class="text-xs text-stone-500" id="detail-sku">SKU</p>
+                        <h3 class="text-lg font-bold text-stone-800 leading-tight" id="detail-title">Name</h3>
+                        <p class="text-xs text-stone-500 mt-1" id="detail-sku">SKU</p>
                         <p class="text-sm font-bold text-stone-700 mt-1" id="detail-price-display">Price: -</p>
                     </div>
-                    <button onclick="window.closeDetailModal()" class="text-stone-400 hover:text-stone-800 text-2xl">&times;</button>
+                    <button onclick="window.closeDetailModal()" class="text-stone-400 hover:text-stone-800 text-2xl transition">&times;</button>
                 </div>
 
                 <div class="space-y-4 flex-grow overflow-y-auto pr-2 custom-scrollbar">
                     
-                    <div class="bg-stone-50 p-3 rounded border border-stone-200">
+                    <div class="bg-stone-50 p-3 rounded border border-stone-200 shadow-sm">
                         <label class="text-[11px] font-bold text-stone-700 uppercase tracking-wider mb-2 block border-b border-stone-200 pb-1">單品專屬設定 (Piece-Level Settings)</label>
-                        <div class="grid grid-cols-2 gap-3">
+                        <div class="grid grid-cols-2 gap-3 mt-2">
                             <div>
                                 <label class="text-[10px] text-stone-500">獨立售價 override (RM)</label>
-                                <input type="number" id="detail-specific-price" placeholder="跟隨主定價" class="w-full border border-stone-300 p-1.5 rounded text-sm bg-white font-bold text-stone-700 shadow-sm focus:border-stone-500 focus:outline-none">
+                                <input type="number" id="detail-specific-price" placeholder="跟隨主定價" class="w-full border border-stone-300 p-1.5 rounded text-sm bg-white font-bold text-stone-700 shadow-sm focus:border-stone-500 focus:outline-none transition">
                             </div>
                             <div>
                                 <label class="text-[10px] text-stone-500">更換單品圖 (選填)</label>
-                                <input type="file" id="detail-photo-upload" accept="image/*" class="w-full text-[10px] p-1 border border-stone-300 rounded bg-white shadow-sm file:mr-2 file:py-0.5 file:px-2 file:border-0 file:rounded file:bg-stone-100 file:text-[10px]">
+                                <input type="file" id="detail-photo-upload" accept="image/*" class="w-full text-[10px] p-1 border border-stone-300 rounded bg-white shadow-sm file:mr-2 file:py-0.5 file:px-2 file:border-0 file:rounded file:bg-stone-100 file:text-[10px] file:font-medium">
                             </div>
                         </div>
                     </div>
 
-                    <div>
-                        <label class="text-[11px] font-bold text-stone-700 uppercase tracking-wider mb-2 block">實體所在地點 (調貨)</label>
+                    <div class="bg-white border border-stone-200 p-3 rounded shadow-sm">
+                        <label class="text-[11px] font-bold text-stone-700 uppercase tracking-wider mb-2 block">1. 實體所在地點 (可跨店調貨)</label>
                         <div class="grid grid-cols-2 gap-2" id="detail-location-options"></div>
-                        <p class="text-[10px] text-amber-600 font-bold mt-2 bg-amber-50 p-1.5 rounded border border-amber-200">* 💡 實體地點 (Studio/Stockist) 只能單選；但「Online」可以點擊疊加與實體地點並存。</p>
+                        <p class="text-[10px] text-stone-400 mt-1">* 實體地點只能單選</p>
+                        
+                        <div class="mt-3 pt-3 border-t border-stone-100" id="detail-online-container">
+                            <label class="text-[11px] font-bold text-stone-700 uppercase tracking-wider mb-2 block">2. 線上商店狀態</label>
+                            </div>
                     </div>
 
                     <div>
                         <label class="text-[11px] font-bold text-stone-700 uppercase tracking-wider mb-2 block">單品備註</label>
-                        <textarea id="detail-notes" rows="2" class="w-full border border-stone-200 rounded p-2 text-sm bg-stone-50 focus:border-stone-500 focus:outline-none shadow-sm" placeholder="微瑕疵、VIP保留等..."></textarea>
+                        <textarea id="detail-notes" rows="2" class="w-full border border-stone-200 rounded p-2 text-sm bg-stone-50 focus:border-stone-500 focus:outline-none shadow-sm transition" placeholder="微瑕疵、VIP保留等..."></textarea>
                     </div>
                 </div>
 
@@ -498,15 +507,15 @@
             <div class="space-y-4">
                 <div>
                     <label class="text-xs font-bold text-stone-700">成交價 (RM)</label>
-                    <input type="number" id="sold-price-input" class="w-full border p-2 rounded text-lg font-bold text-stone-800 focus:border-stone-500 outline-none">
+                    <input type="number" id="sold-price-input" class="w-full border p-2 rounded text-lg font-bold text-stone-800 focus:border-stone-500 outline-none transition">
                 </div>
                 <div>
                     <label class="text-xs font-bold text-stone-700">售出日期 (Sold Date)</label>
-                    <input type="date" id="sold-date-input" class="w-full border p-2 rounded text-sm text-stone-600 outline-none">
+                    <input type="date" id="sold-date-input" class="w-full border p-2 rounded text-sm text-stone-600 outline-none transition">
                 </div>
                 <div>
                     <label class="text-xs text-stone-500">備註 (折扣原因等)</label>
-                    <input type="text" id="sold-note-input" placeholder="例: VIP 9折" class="w-full border p-2 rounded text-sm outline-none">
+                    <input type="text" id="sold-note-input" placeholder="例: VIP 9折" class="w-full border p-2 rounded text-sm outline-none transition">
                 </div>
                 <div class="flex gap-2 justify-end mt-4">
                     <button onclick="document.getElementById('sold-modal').classList.add('hidden')" class="px-4 py-2 text-sm text-stone-500 hover:bg-stone-50 rounded transition-colors">取消</button>
@@ -520,7 +529,7 @@
         <div class="bg-white rounded-lg shadow-2xl max-w-5xl w-full flex flex-col max-h-[90vh]">
             <div class="p-4 border-b border-stone-200 flex justify-between items-center bg-stone-50 rounded-t-lg">
                 <h3 class="text-lg font-bold text-stone-800 flex items-center gap-2" id="list-modal-title">清單</h3>
-                <button onclick="document.getElementById('list-modal').classList.add('hidden')" class="text-stone-400 hover:text-stone-800 text-3xl leading-none">&times;</button>
+                <button onclick="document.getElementById('list-modal').classList.add('hidden')" class="text-stone-400 hover:text-stone-800 text-3xl leading-none transition">&times;</button>
             </div>
             <div class="p-4 overflow-y-auto flex-grow bg-stone-100/50 custom-scrollbar">
                 <div id="list-modal-grid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
@@ -659,9 +668,17 @@
             onSnapshot(doc(dbFirestore, "settings", "config"), (snap) => {
                 if(snap.exists()) {
                     const data = snap.data();
+                    let fetchedLocations = data.locations || appSettings.locations;
+                    // 防呆：強制把核心地點加回去，防止被誤刪導致 UI 崩潰
+                    ['JB Studio', 'PNG Studio', 'Online'].forEach(coreLoc => {
+                        if (!fetchedLocations.includes(coreLoc)) {
+                            fetchedLocations.unshift(coreLoc); // 放回最前面
+                        }
+                    });
+
                     appSettings = {
                         makers: data.makers || appSettings.makers,
-                        locations: data.locations || appSettings.locations,
+                        locations: fetchedLocations,
                         categories: data.categories || appSettings.categories,
                         weekly_goals: data.weekly_goals || {} 
                     };
@@ -797,7 +814,7 @@
                             
                             p.locations.forEach(loc => {
                                 const isStudioLoc = loc.toUpperCase().includes('JB') || loc.toUpperCase().includes('PNG');
-                                if (isStudioLoc && isOnline) return; // 從實體 Studio 圖表數字中扣除
+                                if (isStudioLoc && isOnline) return; // 從實體 Studio 圖表數字中扣除，完全算入Online
                                 if(locStats[loc] !== undefined) locStats[loc]++;
                             });
                         } else {
@@ -1157,7 +1174,8 @@
                     } else if (locFilter === 'Unallocated') { 
                         matchesLoc = photos.some(p => p.status !== 'Sold' && p.locations.length === 0); 
                     } else { 
-                        // 確保即使商品已經 Online，只要它擁有 JB Studio 標籤，用 JB 過濾時依然會顯示
+                        // 精準過濾：只要 locations 陣列中包含該地點字串，就符合顯示條件！
+                        // 讓 Online 跟 Studio 雙標籤的商品能在兩邊都出現
                         matchesLoc = photos.some(p => {
                             if (p.status === 'Sold') return false;
                             return p.locations.includes(locFilter); 
@@ -1220,25 +1238,39 @@
                             }
                         }
                         
+                        // ===== 強大的卡片下拉選單生成 =====
                         let quickDispatchHTML = '';
                         
                         if (!isSold) {
-                            // 允許所有非當前地點且非 Online 的選項作為下拉選單目標 (包含跨工作室調貨)
-                            const availableOptions = appSettings.locations.filter(s => !p.locations.includes(s) && s.toUpperCase() !== 'ONLINE');
+                            let labelText = isOnline ? '🌐 已上線, 調貨至...' : '📦 安排出貨/調貨...';
+                            let bgClass = isOnline ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100' : 'bg-stone-50 text-stone-600 border-stone-200 hover:bg-stone-100';
                             
-                            if (availableOptions.length > 0) {
-                                let options = availableOptions.map(s => `<option value="${s}">${s}</option>`).join('');
-                                let labelText = isOnline ? '🌐 已上線, 調貨至...' : '🚚 安排出貨/調貨...';
-                                let bgClass = isOnline ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-stone-50 text-stone-600 border-stone-200';
-                                
+                            let optionsHTML = '';
+                            
+                            if (!isOnline) {
+                                optionsHTML += `<option value="Online">🌐 上架至 Online</option>`;
+                            }
+                            
+                            const physicalOptions = appSettings.locations.filter(s => !p.locations.includes(s) && s.toUpperCase() !== 'ONLINE');
+                            if (physicalOptions.length > 0) {
+                                optionsHTML += `<optgroup label="實體地點轉移">`;
+                                physicalOptions.forEach(s => {
+                                    optionsHTML += `<option value="${s}">${s}</option>`;
+                                });
+                                optionsHTML += `</optgroup>`;
+                            }
+
+                            if (optionsHTML) {
                                 quickDispatchHTML = `
                                     <div class="mt-2 border-t border-stone-100 pt-2 dispatch-wrapper">
                                         <select onchange="window.quickDispatch(event, '${item.id}', ${idx}, this.value)" class="w-full text-[10px] p-1.5 border rounded font-bold cursor-pointer outline-none transition shadow-sm ${bgClass}" onclick="event.stopPropagation()">
                                             <option value="" disabled selected>${labelText}</option>
-                                            ${options}
+                                            ${optionsHTML}
                                         </select>
                                     </div>
                                 `;
+                            } else if (isOnline) {
+                                quickDispatchHTML = `<div class="mt-2 text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-1.5 text-center w-full shadow-sm">🌐 已上線</div>`;
                             }
                         }
 
@@ -1274,10 +1306,13 @@
 
         window.quickDispatch = async function(e, itemId, photoIdx, toLocation) {
             e.stopPropagation();
-            if(!confirm(`確認將此商品轉移至 ${toLocation}？`)) {
+            if(!confirm(`確認將此商品轉移/上架至 ${toLocation}？`)) {
                 e.target.value = ""; 
                 return;
             }
+            const selectEl = e.target;
+            selectEl.disabled = true;
+            selectEl.options[selectEl.selectedIndex].text = '處理中...';
             try {
                 const item = db.find(i => i.id === itemId);
                 let photos = normalizePhotos(item);
@@ -1285,31 +1320,22 @@
                 const isTargetOnline = toLocation.toUpperCase() === 'ONLINE';
                 
                 if (isTargetOnline) {
-                    if (!photos[photoIdx].locations.includes(toLocation)) {
-                        photos[photoIdx].locations.push(toLocation);
+                    if (!photos[photoIdx].locations.some(l => l.toUpperCase() === 'ONLINE')) {
+                        photos[photoIdx].locations.push('Online');
                     }
                 } else {
                     const hasOnline = photos[photoIdx].locations.some(l => l.toUpperCase() === 'ONLINE');
                     const onlineName = photos[photoIdx].locations.find(l => l.toUpperCase() === 'ONLINE');
+                    // 只替換實體地點，完美保留 Online 狀態
                     photos[photoIdx].locations = hasOnline ? [onlineName, toLocation] : [toLocation]; 
                 }
                 
                 await updateDoc(doc(dbFirestore, "stock_items", itemId), { photos: photos });
-                
-                const wrapper = e.target.parentElement;
-                if (isTargetOnline) {
-                    wrapper.innerHTML = `<div class="mt-1 text-[9px] font-bold text-blue-700 bg-blue-50 border border-blue-200 rounded px-1 py-1 text-center w-full truncate shadow-sm">🌐 已上線出庫</div>`;
-                } else {
-                    const isToStudio = toLocation.toUpperCase().includes('JB') || toLocation.toUpperCase().includes('PNG');
-                    if (isToStudio) {
-                        wrapper.innerHTML = `<div class="mt-1 text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1 py-1 text-center w-full truncate shadow-sm">📦 已調貨至 ${toLocation}</div>`;
-                    } else {
-                        wrapper.innerHTML = `<div class="mt-1 text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1 py-1 text-center w-full truncate shadow-sm">🚚 已出貨</div>`;
-                    }
-                }
+                // 成功後，Firebase 的 onSnapshot 會自動重繪 UI，無需手動 DOM 操作
             } catch (err) {
                 alert("轉移失敗：" + err.message);
-                e.target.value = "";
+                selectEl.disabled = false;
+                selectEl.value = "";
             }
         };
 
@@ -1380,18 +1406,26 @@
                         let quickDispatchHTML = '';
                         
                         if (p.status !== 'Sold') {
-                            const availableOptions = appSettings.locations.filter(s => !p.locations.includes(s) && s.toUpperCase() !== 'ONLINE');
+                            let labelText = isOnline ? '🌐 已上線, 調貨至...' : '📦 安排出貨/調貨...';
+                            let bgClass = isOnline ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100' : 'bg-stone-50 text-stone-600 border-stone-200 hover:bg-stone-100';
                             
-                            if (availableOptions.length > 0) {
-                                let options = availableOptions.map(s => `<option value="${s}">${s}</option>`).join('');
-                                let labelText = isOnline ? '🌐 已上線, 調貨至...' : '🚚 安排出貨/調貨...';
-                                let bgClass = isOnline ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-stone-50 text-stone-600 border-stone-200 hover:bg-stone-100';
+                            let optionsHTML = '';
+                            if (!isOnline) {
+                                optionsHTML += `<option value="Online">🌐 上架至 Online</option>`;
+                            }
+                            const physicalOptions = appSettings.locations.filter(s => !p.locations.includes(s) && s.toUpperCase() !== 'ONLINE');
+                            if (physicalOptions.length > 0) {
+                                optionsHTML += `<optgroup label="實體地點轉移">`;
+                                physicalOptions.forEach(s => { optionsHTML += `<option value="${s}">${s}</option>`; });
+                                optionsHTML += `</optgroup>`;
+                            }
 
+                            if (optionsHTML) {
                                 quickDispatchHTML = `
                                     <div class="mt-2 border-t border-stone-100 pt-2 dispatch-wrapper">
                                         <select onchange="window.quickDispatch(event, '${item.id}', ${idx}, this.value)" class="w-full text-[10px] p-1.5 border rounded font-bold cursor-pointer outline-none transition shadow-sm ${bgClass}" onclick="event.stopPropagation()">
                                             <option value="" disabled selected>${labelText}</option>
-                                            ${options}
+                                            ${optionsHTML}
                                         </select>
                                     </div>
                                 `;
@@ -1462,21 +1496,38 @@
         
         window.renderDetailLocationButtons = function() {
             const container = document.getElementById('detail-location-options'); container.innerHTML = '';
+            const onlineContainer = document.getElementById('detail-online-container');
             const p = normalizePhotos(currentDetailItem)[currentDetailPhotoIdx];
-            if(p.status === 'Sold') { container.innerHTML = `<div class="col-span-2 text-center text-stone-400 text-xs py-2 bg-stone-50 rounded">已售出商品無法編輯地點</div>`; return; }
-            appSettings.locations.forEach(loc => {
+            
+            if(p.status === 'Sold') { 
+                container.innerHTML = `<div class="col-span-2 text-center text-stone-400 text-xs py-2 bg-stone-50 rounded">已售出商品無法編輯地點</div>`; 
+                onlineContainer.innerHTML = ''; 
+                return; 
+            }
+            
+            // 繪製實體地點
+            const physicalLocs = appSettings.locations.filter(l => l.toUpperCase() !== 'ONLINE');
+            physicalLocs.forEach(loc => {
                 const isSelected = tempLocations.includes(loc);
                 const btnClass = isSelected ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white text-stone-500 border-stone-200 hover:border-blue-300';
                 container.innerHTML += `<button onclick="window.toggleDetailLocation('${loc}')" class="border rounded py-2 text-xs font-bold transition-colors ${btnClass}">${loc} ${isSelected ? '✓' : ''}</button>`;
             });
+
+            // 繪製獨立的 Online 開關
+            const isOnlineSelected = tempLocations.some(l => l.toUpperCase() === 'ONLINE');
+            const onlineBtnClass = isOnlineSelected ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm' : 'bg-white text-stone-500 border-stone-200 hover:border-emerald-300';
+            onlineContainer.innerHTML = `
+                <label class="text-[11px] font-bold text-stone-700 uppercase tracking-wider mb-2 block">2. 線上商店狀態</label>
+                <button onclick="window.toggleDetailLocation('Online')" class="w-full border rounded py-2 text-xs font-bold transition-colors ${onlineBtnClass}">🌐 上架至 Online (網店營運中) ${isOnlineSelected ? '✓' : ''}</button>
+            `;
         };
         
         window.toggleDetailLocation = function(loc) { 
             const isTargetOnline = loc.toUpperCase() === 'ONLINE';
             
             if (isTargetOnline) {
-                if (tempLocations.includes(loc)) {
-                    tempLocations = tempLocations.filter(l => l !== loc);
+                if (tempLocations.some(l => l.toUpperCase() === 'ONLINE')) {
+                    tempLocations = tempLocations.filter(l => l.toUpperCase() !== 'ONLINE');
                 } else {
                     tempLocations.push(loc);
                 }
@@ -1484,8 +1535,10 @@
                 const onlineLoc = tempLocations.find(l => l.toUpperCase() === 'ONLINE');
                 
                 if (tempLocations.includes(loc)) {
+                    // 若取消當前實體地點，等於無地點遺漏狀態
                     tempLocations = tempLocations.filter(l => l !== loc);
                 } else {
+                    // 單選邏輯：覆寫先前的實體地點
                     tempLocations = onlineLoc ? [onlineLoc, loc] : [loc];
                 }
             }
@@ -1673,7 +1726,13 @@
         };
         
         window.addSetting = async function(type) { const map = {'makers':'new-maker-input', 'locations':'new-location-input', 'categories':'new-category-input'}; let val = document.getElementById(map[type]).value; if (type === 'categories') val = getCleanCategory(val); else val = val.trim(); if(val) { await updateDoc(doc(dbFirestore, "settings", "config"), { [type]: [...appSettings[type], val] }); document.getElementById(map[type]).value = ''; } };
-        window.removeSetting = async function(type, val) { if(confirm(`Remove ${val}?`)) await updateDoc(doc(dbFirestore, "settings", "config"), { [type]: appSettings[type].filter(x => (type==='categories'?getCleanCategory(x):x) !== val) }); }
+        window.removeSetting = async function(type, val) { 
+            if (type === 'locations' && ['JB Studio', 'PNG Studio', 'Online'].includes(val)) {
+                alert("此為系統預設核心地點，為保證運作正常，無法被刪除！");
+                return;
+            }
+            if(confirm(`確定要刪除 ${val}?`)) await updateDoc(doc(dbFirestore, "settings", "config"), { [type]: appSettings[type].filter(x => (type==='categories'?getCleanCategory(x):x) !== val) }); 
+        }
         
         window.updateDropdowns = function() { 
             const distinctMakers = [...new Set([...appSettings.makers, ...db.map(i => i.maker)])].filter(Boolean).sort(); 
@@ -1682,19 +1741,23 @@
             const locSelect = document.getElementById('alloc-filter-location'); 
             if(locSelect) { 
                 const currentVal = locSelect.value; 
-                let html = `<option value="all">全部庫存 (All)</option><option value="Sold">已售出 (Sold)</option><option value="Unallocated">無地點 (Unallocated)</option>`; 
+                // 硬寫入核心選單結構，保證這幾個重要地點永遠可以選！
+                let html = `
+                    <option value="all">全部庫存 (All)</option>
+                    <option value="Sold">已售出 (Sold)</option>
+                    <option value="Unallocated">無地點 (Unallocated)</option>
+                    
+                    <optgroup label="🌐 線上商店">
+                        <option value="Online">Online (已上線總覽)</option>
+                    </optgroup>
+                    
+                    <optgroup label="🏠 工作室 (Studio庫存/調貨)">
+                        <option value="JB Studio">JB Studio</option>
+                        <option value="PNG Studio">PNG Studio</option>
+                    </optgroup>
+                `; 
                 
-                let studios = appSettings.locations.filter(l => l.toUpperCase().includes('JB') || l.toUpperCase().includes('PNG'));
-                // 防呆：強制補回 JB / PNG，確保下拉選單一定能點擊
-                if (studios.length === 0) {
-                    studios = ['JB Studio', 'PNG Studio'];
-                }
-
-                const stockists = appSettings.locations.filter(l => !(l.toUpperCase().includes('JB') || l.toUpperCase().includes('PNG')));
-                
-                html += `<optgroup label="🏠 工作室 (Studio庫存/調貨)">`;
-                studios.forEach(l => html += `<option value="${l}">${l}</option>`);
-                html += `</optgroup>`;
+                const stockists = appSettings.locations.filter(l => !(l.toUpperCase().includes('JB') || l.toUpperCase().includes('PNG') || l.toUpperCase() === 'ONLINE'));
                 
                 if(stockists.length > 0) {
                     html += `<optgroup label="🚚 已出貨 (Stockists)">`;
