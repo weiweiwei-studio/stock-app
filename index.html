@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weiweiwei ERP (v11.18.12 Color Palette & Anti-Multi Fix)</title>
+    <title>Weiweiwei ERP (v11.18.14 Performance Dashboard)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -24,7 +24,8 @@
         
         /* Badges */
         .status-badge { position: absolute; bottom: 0; right: 0; left: 0; padding: 2px 0; font-size: 8px; font-weight: bold; color: white; text-align: center; border-radius: 0 0 4px 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .badge-sold { background-color: #ce3375; color: white; } /* Updated Sold Out Color */
+        .badge-sold { background-color: #ce3375; color: white; } 
+        .badge-multi { background-color: #3b82f6; color: white; } 
         .badge-none { background-color: #e5e7eb; color: #9ca3af; border-top: 1px solid #d1d5db; }
         .sold-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; border-radius: 4px; }
         .has-note-dot { position: absolute; top: -3px; right: -3px; width: 8px; height: 8px; background-color: #ef4444; border-radius: 50%; border: 1px solid white; z-index: 20; }
@@ -68,7 +69,7 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center gap-4">
                     <div class="flex-shrink-0 flex items-center">
-                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.18.12</span></span>
+                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.18.14</span></span>
                         <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] bg-stone-100 text-stone-400">Loading...</span>
                     </div>
                     <div class="hidden sm:ml-6 sm:flex sm:space-x-4">
@@ -97,7 +98,7 @@
 
     <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
-        <section id="view-dashboard" class="space-y-8 animate-fade-in pb-10">
+        <section id="view-dashboard" class="space-y-6 animate-fade-in pb-10">
             <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
                  <div onclick="window.openListModal('kpi', 'Total')" class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-stone-800 cursor-pointer hover:-translate-y-1 hover:shadow-md transition-all">
                     <div class="text-stone-500 text-xs font-bold uppercase tracking-wider">總生產件數 (Total)</div>
@@ -118,6 +119,38 @@
                 <div onclick="window.openListModal('kpi', 'Sold')" class="bg-stone-800 p-6 rounded-lg shadow-md border-l-4 text-white cursor-pointer hover:-translate-y-1 hover:shadow-lg transition-all" style="border-color: #ce3375;">
                     <div class="text-xs font-bold uppercase" style="color: #fbcfe8;">已售出 (件)</div>
                     <div class="mt-2 text-3xl font-bold" id="kpi-sold">0</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="md:col-span-2 bg-white p-5 rounded-lg shadow-sm border border-stone-200">
+                    <h3 class="text-xs font-bold text-stone-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+                        <i data-lucide="bar-chart-2" class="w-4 h-4 text-stone-400"></i> 近六個月 生產與銷售趨勢
+                    </h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left">
+                            <thead>
+                                <tr class="border-b border-stone-200 text-stone-400 bg-stone-50">
+                                    <th class="py-2 px-3 font-medium rounded-tl">月份 (Month)</th>
+                                    <th class="py-2 px-3 font-medium">總生產件數 (Produced)</th>
+                                    <th class="py-2 px-3 font-medium">總售出件數 (Sold)</th>
+                                    <th class="py-2 px-3 font-medium rounded-tr">售出率 (Sell-through)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="perf-monthly-tbody" class="divide-y divide-stone-100">
+                                </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-lg shadow-sm border border-stone-200 flex flex-col">
+                    <h3 class="text-xs font-bold text-stone-500 uppercase tracking-wide mb-4 flex items-center justify-between">
+                        <span class="flex items-center gap-2"><i data-lucide="check-circle" class="w-4 h-4 text-stone-400"></i> 該月每週完工件數</span>
+                        <span id="perf-weekly-month" class="bg-stone-100 border border-stone-200 px-2 py-1 rounded text-[10px] text-stone-600 font-bold tracking-wider">Current</span>
+                    </h3>
+                    <div id="perf-weekly-container" class="space-y-4 flex-grow">
+                        </div>
+                    <p class="text-[9px] text-stone-400 mt-4 border-t border-stone-100 pt-2">* 隨下方日曆選定的月份連動更新</p>
                 </div>
             </div>
 
@@ -451,9 +484,9 @@
 
                 <div class="space-y-6 flex-grow overflow-y-auto pr-2">
                     <div>
-                        <label class="text-xs font-bold text-stone-600 uppercase tracking-wider mb-2 block">切換所在地點 (單品只能有一處實體位置)</label>
+                        <label class="text-xs font-bold text-stone-600 uppercase tracking-wider mb-2 block">切換所在地點</label>
                         <div class="grid grid-cols-2 gap-2" id="detail-location-options"></div>
-                        <p class="text-[10px] text-amber-600 font-bold mt-2 bg-amber-50 p-1 rounded border border-amber-200">* 💡 點擊按鈕直接切換地點。系統已強制避免出現重疊 (MULTI) 狀態。</p>
+                        <p class="text-[10px] text-amber-600 font-bold mt-2 bg-amber-50 p-1 rounded border border-amber-200">* 💡 實體地點 (Studio/Stockist) 只能單選；但「Online」可以點擊疊加與任何實體地點並存。</p>
                     </div>
                     <div>
                         <label class="text-xs font-bold text-stone-600 uppercase tracking-wider mb-2 block">單品備註</label>
@@ -512,7 +545,6 @@
         let currentCalDate = new Date(); 
         let categoryChart = null, allocChart = null;
         
-        // 預設地點陣列
         let appSettings = { 
             makers: ['Kim', 'Kelly', 'Lijin'], 
             locations: ['JB Studio', 'PNG Studio', 'Online', 'Bev C', 'Fifth', 'Tamara Malas', 'Pop Up', 'Snub', 'Loan', 'Hahhah Store'], 
@@ -522,25 +554,23 @@
         let currentDetailItem = null, currentDetailPhotoIdx = -1, tempLocations = []; 
         const catColors = ['#f472b6', '#60a5fa', '#a78bfa', '#34d399', '#fbbf24', '#9ca3af'];
 
-        // 👉 全域色彩對應引擎 (包含微調後的防撞色設計)
         window.getLocColorObj = function(loc) {
             const map = {
-                'ONLINE': { bg: '#49bb76', text: '#ffffff' }, // 原綠色
-                'BEV C': { bg: '#d50000', text: '#ffffff' }, // 從 #f6114a 調整為正紅，避免與 Sold Out 撞色
+                'ONLINE': { bg: '#49bb76', text: '#ffffff' }, 
+                'BEV C': { bg: '#d50000', text: '#ffffff' }, 
                 'FIFTH': { bg: '#0aa0bf', text: '#ffffff' },
                 'TAMARA MALAS': { bg: '#f36e98', text: '#ffffff' }, 
-                'POP UP': { bg: '#64748b', text: '#ffffff' }, // 從 #78b177 調整為板岩藍灰，避免與 Online 撞色
+                'POP UP': { bg: '#64748b', text: '#ffffff' }, 
                 'SNUB': { bg: '#9862a2', text: '#ffffff' },
                 'LOAN': { bg: '#f05006', text: '#ffffff' },
-                'HAHHAH STORE': { bg: '#1e3a8a', text: '#ffffff' }, // 從 #25998f 調整為深海軍藍，避免與 Fifth 撞色
-                'JB STUDIO': { bg: '#fca00c', text: '#1c1917' }, // 橘色 + 深字
-                'PNG STUDIO': { bg: '#00ff99', text: '#1c1917' }  // 螢光綠 + 深字
+                'HAHHAH STORE': { bg: '#1e3a8a', text: '#ffffff' }, 
+                'JB STUDIO': { bg: '#fca00c', text: '#1c1917' }, 
+                'PNG STUDIO': { bg: '#00ff99', text: '#1c1917' } 
             };
             const upperLoc = String(loc).toUpperCase();
             for (const key in map) {
                 if (upperLoc.includes(key)) return map[key];
             }
-            // 隨機替補色盤
             const fallbackPalette = ['#f59e0b', '#8b5cf6', '#ec4899', '#6366f1', '#14b8a6'];
             let hash = 0;
             for (let i = 0; i < String(loc).length; i++) hash = String(loc).charCodeAt(i) + ((hash << 5) - hash);
@@ -554,6 +584,43 @@
             const month = String(d.getMonth() + 1).padStart(2, '0');
             const day = String(d.getDate()).padStart(2, '0');
             return `${year}-${month}-${day}`;
+        }
+
+        // 👉 計算指定月份的生產與銷售數據
+        function getStatsForMonth(year, month) {
+            let stats = { produced: 0, sold: 0, weeks: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } };
+            const firstDay = new Date(year, month, 1).getDay();
+
+            db.forEach(item => {
+                // 1. 計算生產件數 (依據完工日)
+                let pDate = null;
+                if (item.completedAt) pDate = new Date(item.completedAt.seconds ? item.completedAt.seconds * 1000 : item.completedAt);
+                else if (['Ready', 'In Studio', 'Sold', 'Partial Sold'].includes(item.status) && item.createdAt) {
+                    pDate = new Date(item.createdAt.seconds ? item.createdAt.seconds * 1000 : item.createdAt);
+                }
+
+                if (pDate && pDate.getFullYear() === year && pDate.getMonth() === month) {
+                    const qty = parseInt(item.quantity) || 1;
+                    stats.produced += qty;
+                    const d = pDate.getDate();
+                    const weekNum = Math.min(5, Math.ceil((d + firstDay) / 7));
+                    stats.weeks[weekNum] = (stats.weeks[weekNum] || 0) + qty;
+                }
+
+                // 2. 計算售出件數 (依據照片單品層級的售出日)
+                const photos = normalizePhotos(item);
+                photos.forEach(p => {
+                    if (p.status === 'Sold') {
+                        let sDate = p.soldAt ? new Date(p.soldAt.seconds ? p.soldAt.seconds * 1000 : p.soldAt) : null;
+                        if (!sDate) sDate = pDate; // 如果沒有明確售出日，暫用完工日歸檔
+
+                        if (sDate && sDate.getFullYear() === year && sDate.getMonth() === month) {
+                            stats.sold++;
+                        }
+                    }
+                });
+            });
+            return stats;
         }
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -637,15 +704,24 @@
                     locs = [fallbackStudio];
                 }
                 
-                // 👉 徹底修復 MULTI 的向下相容邏輯：如果同時存在 Studio 和 Stockist，強制刪除 Studio
-                const studios = ['JB Studio', 'PNG Studio'];
-                const stockists = locs.filter(l => !studios.includes(l));
+                const isOnline = locs.some(l => l.toUpperCase() === 'ONLINE');
+                const onlineName = locs.find(l => l.toUpperCase() === 'ONLINE');
+                const physicals = locs.filter(l => l.toUpperCase() !== 'ONLINE');
                 
+                const studios = ['JB Studio', 'PNG Studio'];
+                const stockists = physicals.filter(l => !studios.includes(l));
+                
+                let finalLocs = [];
                 if (stockists.length > 0) {
-                    locs = [stockists[0]]; // 只取第一個真正的 Stockist
-                } else if (locs.length > 0) {
-                    locs = [locs[0]]; // 如果都在 Studio 範圍內，也只取一個
+                    finalLocs.push(stockists[0]); 
+                } else if (physicals.length > 0) {
+                    finalLocs.push(physicals[0]);
                 }
+                if (isOnline) {
+                    finalLocs.push(onlineName);
+                }
+                
+                locs = finalLocs;
                 
                 return {
                     url: p.url || '',
@@ -724,7 +800,65 @@
             renderLocationButtons(locStats);
             updateCharts(locStats, catStats);
             renderCalendar(); 
+            window.renderPerformanceStats(); // 👉 呼叫新面板渲染
         }
+
+        // 👉 渲染營運績效面板
+        window.renderPerformanceStats = function() {
+            const displayDate = currentCalDate;
+            const currentYear = displayDate.getFullYear();
+            const currentMonth = displayDate.getMonth();
+            
+            document.getElementById('perf-weekly-month').innerText = displayDate.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+
+            // 1. 本月每週生產進度
+            const currentMonthStats = getStatsForMonth(currentYear, currentMonth);
+            const weeklyContainer = document.getElementById('perf-weekly-container');
+            weeklyContainer.innerHTML = '';
+            
+            let maxWeekQty = Math.max(...Object.values(currentMonthStats.weeks), 1); 
+
+            for(let w=1; w<=5; w++) {
+                const qty = currentMonthStats.weeks[w];
+                const pct = (qty / maxWeekQty) * 100;
+                weeklyContainer.innerHTML += `
+                    <div class="flex items-center gap-3">
+                        <span class="text-xs font-bold text-stone-500 w-12 text-right">Week ${w}</span>
+                        <div class="flex-grow bg-stone-100 rounded-full h-2.5 overflow-hidden">
+                            <div class="bg-emerald-400 h-full rounded-full transition-all duration-500" style="width: ${pct}%"></div>
+                        </div>
+                        <span class="text-xs font-bold text-stone-700 w-8">${qty}</span>
+                    </div>
+                `;
+            }
+
+            // 2. 近六個月生產與銷售趨勢
+            const monthlyTbody = document.getElementById('perf-monthly-tbody');
+            monthlyTbody.innerHTML = '';
+            
+            let iterDate = new Date(currentYear, currentMonth, 1);
+            let rowsHTML = '';
+            
+            for(let i=0; i<6; i++) {
+                const y = iterDate.getFullYear();
+                const m = iterDate.getMonth();
+                const mStats = getStatsForMonth(y, m);
+                const monthLabel = iterDate.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+                
+                let sellThrough = mStats.produced > 0 ? Math.round((mStats.sold / mStats.produced) * 100) : (mStats.sold > 0 ? 100 : 0);
+                
+                rowsHTML += `
+                    <tr class="border-b border-stone-100 hover:bg-stone-50 transition-colors">
+                        <td class="py-2.5 px-3 font-bold text-stone-600">${monthLabel}</td>
+                        <td class="py-2.5 px-3"><span class="bg-emerald-50 text-emerald-700 px-2 py-1 rounded text-xs font-bold border border-emerald-100">${mStats.produced} 件</span></td>
+                        <td class="py-2.5 px-3"><span class="bg-pink-50 text-pink-700 px-2 py-1 rounded text-xs font-bold border border-pink-100">${mStats.sold} 件</span></td>
+                        <td class="py-2.5 px-3 text-xs text-stone-500 font-bold">${sellThrough}%</td>
+                    </tr>
+                `;
+                iterDate.setMonth(iterDate.getMonth() - 1);
+            }
+            monthlyTbody.innerHTML = rowsHTML;
+        };
         
         window.setCalendarMode = function(mode) {
             calendarMode = mode;
@@ -748,6 +882,7 @@
         window.changeMonth = function(delta) {
             currentCalDate.setMonth(currentCalDate.getMonth() + delta);
             renderCalendar();
+            window.renderPerformanceStats(); // 日曆換月時，連動更新數據板
         };
 
         window.setWeeklyGoal = async function(year, month, week) {
@@ -936,7 +1071,6 @@
             const labels = [...appSettings.locations, 'Unallocated', 'Sold'];
             const data = [...appSettings.locations.map(l => locStats[l]), locStats['Unallocated'], locStats['Sold']];
             
-            // 套用新色系統到圖表背景 (#ce3375 for sold)
             const bgColors = [...appSettings.locations.map(l => window.getLocColorObj(l).bg), '#e5e7eb', '#ce3375'];
             
             allocChart.data.labels = labels;
@@ -1045,7 +1179,6 @@
                         } 
                         else {
                             if (p.locations.length > 1) { 
-                                // Because of the fix, this should rarely/never trigger, but keeping as ultimate fallback
                                 badgeText = 'MULTI'; 
                                 badgeClass = 'badge-multi'; 
                             } 
@@ -1063,9 +1196,10 @@
                         }
                         
                         let quickDispatchHTML = '';
-                        const isStudio = p.locations.length === 1 && (p.locations[0].toUpperCase().includes('JB') || p.locations[0].toUpperCase().includes('PNG'));
-                        if (isStudio && !isSold) {
-                            const stockists = appSettings.locations.filter(l => !(l.toUpperCase().includes('JB') || l.toUpperCase().includes('PNG')));
+                        const isPhysicalStudio = p.locations.some(loc => loc.toUpperCase().includes('JB') || loc.toUpperCase().includes('PNG'));
+                        
+                        if (isPhysicalStudio && !isSold) {
+                            const stockists = appSettings.locations.filter(l => !(l.toUpperCase().includes('JB') || l.toUpperCase().includes('PNG') || l.toUpperCase() === 'ONLINE'));
                             let options = stockists.map(s => `<option value="${s}">${s}</option>`).join('');
                             quickDispatchHTML = `
                                 <select onchange="window.quickDispatch(event, '${item.id}', ${idx}, this.value)" class="mt-1 w-full text-[9px] p-1 border border-stone-200 rounded bg-white text-stone-600 font-bold cursor-pointer outline-none hover:bg-stone-50 shadow-sm" onclick="event.stopPropagation()">
@@ -1115,7 +1249,12 @@
             try {
                 const item = db.find(i => i.id === itemId);
                 let photos = normalizePhotos(item);
-                photos[photoIdx].locations = [toLocation]; // 原本就是直接覆蓋，這裡沒問題
+                
+                const hasOnline = photos[photoIdx].locations.some(l => l.toUpperCase() === 'ONLINE');
+                const onlineName = photos[photoIdx].locations.find(l => l.toUpperCase() === 'ONLINE');
+                
+                photos[photoIdx].locations = hasOnline ? [onlineName, toLocation] : [toLocation]; 
+                
                 await updateDoc(doc(dbFirestore, "stock_items", itemId), { photos: photos });
                 
                 const wrapper = e.target.parentElement;
@@ -1169,7 +1308,9 @@
                         
                         if (p.status === 'Sold') {
                             cardBadgeHTML = `<div class="mt-2 text-[10px] font-bold px-1.5 py-0.5 rounded w-fit text-white shadow-sm border" style="background-color: #ce3375; border-color: #a31f5b;">SOLD</div>`;
-                        } else if (p.locations.length > 0) {
+                        } else if (p.locations.length > 1) {
+                            cardBadgeHTML = `<div class="mt-2 text-[10px] font-bold px-1.5 py-0.5 rounded w-fit bg-blue-500 text-white shadow-sm border border-blue-600">MULTI</div>`;
+                        } else if (p.locations.length === 1) {
                             let loc0 = p.locations[0];
                             const colors = window.getLocColorObj(loc0);
                             cardBadgeHTML = `<div class="mt-2 text-[10px] font-bold px-1.5 py-0.5 rounded w-fit border border-black/10" style="background-color: ${colors.bg}; color: ${colors.text};">${loc0}</div>`;
@@ -1178,9 +1319,9 @@
                         }
                         
                         let quickDispatchHTML = '';
-                        const isStudio = p.locations.length === 1 && (p.locations[0].toUpperCase().includes('JB') || p.locations[0].toUpperCase().includes('PNG'));
-                        if (isStudio && p.status !== 'Sold') {
-                            const stockists = appSettings.locations.filter(l => !(l.toUpperCase().includes('JB') || l.toUpperCase().includes('PNG')));
+                        const isPhysicalStudio = p.locations.some(loc => loc.toUpperCase().includes('JB') || loc.toUpperCase().includes('PNG'));
+                        if (isPhysicalStudio && p.status !== 'Sold') {
+                            const stockists = appSettings.locations.filter(l => !(l.toUpperCase().includes('JB') || l.toUpperCase().includes('PNG') || l.toUpperCase() === 'ONLINE'));
                             let options = stockists.map(s => `<option value="${s}">${s}</option>`).join('');
                             quickDispatchHTML = `
                                 <div class="mt-2 border-t border-stone-100 pt-2 dispatch-wrapper">
@@ -1253,12 +1394,31 @@
             appSettings.locations.forEach(loc => {
                 const isSelected = tempLocations.includes(loc);
                 const btnClass = isSelected ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-stone-500 border-stone-200 hover:border-blue-300';
-                // 👉 修改為 onClick 時呼叫 setDetailLocation，確保單選
-                container.innerHTML += `<button onclick="window.setDetailLocation('${loc}')" class="border rounded py-2 text-xs font-bold transition-colors ${btnClass}">${loc} ${isSelected ? '✓' : ''}</button>`;
+                container.innerHTML += `<button onclick="window.toggleDetailLocation('${loc}')" class="border rounded py-2 text-xs font-bold transition-colors ${btnClass}">${loc} ${isSelected ? '✓' : ''}</button>`;
             });
         };
-        // 👉 將原本的 toggle 改為直接覆蓋 (單選)，杜絕 MULTI 狀態
-        window.setDetailLocation = function(loc) { tempLocations = [loc]; renderDetailLocationButtons(); };
+        
+        window.toggleDetailLocation = function(loc) { 
+            const isTargetOnline = loc.toUpperCase() === 'ONLINE';
+            
+            if (isTargetOnline) {
+                if (tempLocations.includes(loc)) {
+                    tempLocations = tempLocations.filter(l => l !== loc);
+                } else {
+                    tempLocations.push(loc);
+                }
+            } else {
+                const onlineLoc = tempLocations.find(l => l.toUpperCase() === 'ONLINE');
+                
+                if (tempLocations.includes(loc)) {
+                    tempLocations = tempLocations.filter(l => l !== loc);
+                } else {
+                    tempLocations = onlineLoc ? [onlineLoc, loc] : [loc];
+                }
+            }
+            renderDetailLocationButtons(); 
+        };
+        
         window.saveItemDetails = async function() { if(!currentDetailItem) return; let photos = normalizePhotos(currentDetailItem); photos[currentDetailPhotoIdx].notes = document.getElementById('detail-notes').value; photos[currentDetailPhotoIdx].locations = tempLocations; try { await updateDoc(doc(dbFirestore, "stock_items", currentDetailItem.id), { photos: photos }); window.closeDetailModal(); } catch(e) { alert("Save failed"); } };
         
         window.triggerSoldFlow = function() {
