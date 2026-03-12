@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weiweiwei ERP (v11.18.14 Performance Dashboard)</title>
+    <title>Weiweiwei ERP (v11.18.15 Online Dispatch Fix)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -69,7 +69,7 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center gap-4">
                     <div class="flex-shrink-0 flex items-center">
-                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.18.14</span></span>
+                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.18.15</span></span>
                         <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] bg-stone-100 text-stone-400">Loading...</span>
                     </div>
                     <div class="hidden sm:ml-6 sm:flex sm:space-x-4">
@@ -586,13 +586,11 @@
             return `${year}-${month}-${day}`;
         }
 
-        // 👉 計算指定月份的生產與銷售數據
         function getStatsForMonth(year, month) {
             let stats = { produced: 0, sold: 0, weeks: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } };
             const firstDay = new Date(year, month, 1).getDay();
 
             db.forEach(item => {
-                // 1. 計算生產件數 (依據完工日)
                 let pDate = null;
                 if (item.completedAt) pDate = new Date(item.completedAt.seconds ? item.completedAt.seconds * 1000 : item.completedAt);
                 else if (['Ready', 'In Studio', 'Sold', 'Partial Sold'].includes(item.status) && item.createdAt) {
@@ -607,12 +605,11 @@
                     stats.weeks[weekNum] = (stats.weeks[weekNum] || 0) + qty;
                 }
 
-                // 2. 計算售出件數 (依據照片單品層級的售出日)
                 const photos = normalizePhotos(item);
                 photos.forEach(p => {
                     if (p.status === 'Sold') {
                         let sDate = p.soldAt ? new Date(p.soldAt.seconds ? p.soldAt.seconds * 1000 : p.soldAt) : null;
-                        if (!sDate) sDate = pDate; // 如果沒有明確售出日，暫用完工日歸檔
+                        if (!sDate) sDate = pDate; 
 
                         if (sDate && sDate.getFullYear() === year && sDate.getMonth() === month) {
                             stats.sold++;
@@ -800,10 +797,9 @@
             renderLocationButtons(locStats);
             updateCharts(locStats, catStats);
             renderCalendar(); 
-            window.renderPerformanceStats(); // 👉 呼叫新面板渲染
+            window.renderPerformanceStats(); 
         }
 
-        // 👉 渲染營運績效面板
         window.renderPerformanceStats = function() {
             const displayDate = currentCalDate;
             const currentYear = displayDate.getFullYear();
@@ -811,7 +807,6 @@
             
             document.getElementById('perf-weekly-month').innerText = displayDate.toLocaleString('en-US', { month: 'short', year: 'numeric' });
 
-            // 1. 本月每週生產進度
             const currentMonthStats = getStatsForMonth(currentYear, currentMonth);
             const weeklyContainer = document.getElementById('perf-weekly-container');
             weeklyContainer.innerHTML = '';
@@ -832,7 +827,6 @@
                 `;
             }
 
-            // 2. 近六個月生產與銷售趨勢
             const monthlyTbody = document.getElementById('perf-monthly-tbody');
             monthlyTbody.innerHTML = '';
             
@@ -882,7 +876,7 @@
         window.changeMonth = function(delta) {
             currentCalDate.setMonth(currentCalDate.getMonth() + delta);
             renderCalendar();
-            window.renderPerformanceStats(); // 日曆換月時，連動更新數據板
+            window.renderPerformanceStats();
         };
 
         window.setWeeklyGoal = async function(year, month, week) {
@@ -1173,22 +1167,34 @@
                         const hasImg = p.url && p.url.length > 0;
                         let badgeText = '', badgeClass = '', badgeStyle = '';
                         
+                        const isOnline = p.locations.some(l => l.toUpperCase() === 'ONLINE');
+                        const physicalLocs = p.locations.filter(l => l.toUpperCase() !== 'ONLINE');
+
                         if (isSold) { 
                             badgeText = p.soldPrice ? `SOLD` : 'SOLD'; 
                             badgeClass = 'badge-sold'; 
                         } 
                         else {
-                            if (p.locations.length > 1) { 
+                            if (physicalLocs.length > 1) { 
                                 badgeText = 'MULTI'; 
                                 badgeClass = 'badge-multi'; 
                             } 
-                            else if (p.locations.length === 1) { 
-                                const loc0 = p.locations[0];
+                            else if (physicalLocs.length === 1) { 
+                                const loc0 = physicalLocs[0];
                                 badgeText = loc0.substring(0,12).toUpperCase(); 
+                                if (isOnline) {
+                                    badgeText = '🌐 ' + badgeText; 
+                                }
                                 const colors = window.getLocColorObj(loc0);
                                 badgeClass = ''; 
                                 badgeStyle = `background-color: ${colors.bg}; color: ${colors.text};`; 
                             } 
+                            else if (isOnline) {
+                                badgeText = 'ONLINE'; 
+                                const colors = window.getLocColorObj('Online');
+                                badgeClass = ''; 
+                                badgeStyle = `background-color: ${colors.bg}; color: ${colors.text};`; 
+                            }
                             else { 
                                 badgeText = '無地點'; 
                                 badgeClass = 'badge-none'; 
@@ -1199,14 +1205,20 @@
                         const isPhysicalStudio = p.locations.some(loc => loc.toUpperCase().includes('JB') || loc.toUpperCase().includes('PNG'));
                         
                         if (isPhysicalStudio && !isSold) {
-                            const stockists = appSettings.locations.filter(l => !(l.toUpperCase().includes('JB') || l.toUpperCase().includes('PNG') || l.toUpperCase() === 'ONLINE'));
-                            let options = stockists.map(s => `<option value="${s}">${s}</option>`).join('');
-                            quickDispatchHTML = `
-                                <select onchange="window.quickDispatch(event, '${item.id}', ${idx}, this.value)" class="mt-1 w-full text-[9px] p-1 border border-stone-200 rounded bg-white text-stone-600 font-bold cursor-pointer outline-none hover:bg-stone-50 shadow-sm" onclick="event.stopPropagation()">
-                                    <option value="" disabled selected>📦 安排出貨..</option>
-                                    ${options}
-                                </select>
-                            `;
+                            // 過濾掉 JB, PNG，剩下實體 Stockists 和 Online
+                            const stockists = appSettings.locations.filter(l => !(l.toUpperCase().includes('JB') || l.toUpperCase().includes('PNG')));
+                            // 只顯示該單品「尚未擁有」的地點
+                            const availableOptions = stockists.filter(s => !p.locations.includes(s));
+                            
+                            if (availableOptions.length > 0) {
+                                let options = availableOptions.map(s => `<option value="${s}">${s}</option>`).join('');
+                                quickDispatchHTML = `
+                                    <select onchange="window.quickDispatch(event, '${item.id}', ${idx}, this.value)" class="mt-1 w-full text-[9px] p-1 border border-stone-200 rounded bg-white text-stone-600 font-bold cursor-pointer outline-none hover:bg-stone-50 shadow-sm" onclick="event.stopPropagation()">
+                                        <option value="" disabled selected>📦 安排出貨..</option>
+                                        ${options}
+                                    </select>
+                                `;
+                            }
                         }
 
                         gridHTML += `
@@ -1242,7 +1254,7 @@
 
         window.quickDispatch = async function(e, itemId, photoIdx, toLocation) {
             e.stopPropagation();
-            if(!confirm(`確認將此商品出貨至 ${toLocation}？`)) {
+            if(!confirm(`確認將此商品標記至 ${toLocation}？`)) {
                 e.target.value = ""; 
                 return;
             }
@@ -1250,15 +1262,28 @@
                 const item = db.find(i => i.id === itemId);
                 let photos = normalizePhotos(item);
                 
-                const hasOnline = photos[photoIdx].locations.some(l => l.toUpperCase() === 'ONLINE');
-                const onlineName = photos[photoIdx].locations.find(l => l.toUpperCase() === 'ONLINE');
+                const isTargetOnline = toLocation.toUpperCase() === 'ONLINE';
                 
-                photos[photoIdx].locations = hasOnline ? [onlineName, toLocation] : [toLocation]; 
+                if (isTargetOnline) {
+                    // 若是選擇 Online，保留現有地點，僅將 Online 加入
+                    if (!photos[photoIdx].locations.includes(toLocation)) {
+                        photos[photoIdx].locations.push(toLocation);
+                    }
+                } else {
+                    // 若是選擇其他實體地點，則更換實體位置，但保留可能已存在的 Online 標籤
+                    const hasOnline = photos[photoIdx].locations.some(l => l.toUpperCase() === 'ONLINE');
+                    const onlineName = photos[photoIdx].locations.find(l => l.toUpperCase() === 'ONLINE');
+                    photos[photoIdx].locations = hasOnline ? [onlineName, toLocation] : [toLocation]; 
+                }
                 
                 await updateDoc(doc(dbFirestore, "stock_items", itemId), { photos: photos });
                 
                 const wrapper = e.target.parentElement;
-                wrapper.innerHTML = `<div class="mt-1 text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1 py-1 text-center w-full truncate">🚚 已出貨</div>`;
+                if (isTargetOnline) {
+                    wrapper.innerHTML = `<div class="mt-1 text-[9px] font-bold text-blue-700 bg-blue-50 border border-blue-200 rounded px-1 py-1 text-center w-full truncate">🌐 已上線</div>`;
+                } else {
+                    wrapper.innerHTML = `<div class="mt-1 text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1 py-1 text-center w-full truncate">🚚 已出貨</div>`;
+                }
             } catch (err) {
                 alert("出貨失敗：" + err.message);
                 e.target.value = "";
@@ -1306,12 +1331,20 @@
                         let cardColorClass = getStatusColorClass(p.status === 'Sold' ? 'Sold' : item.status);
                         let cardBadgeHTML = '';
                         
+                        const isOnline = p.locations.some(l => l.toUpperCase() === 'ONLINE');
+                        const physicalLocs = p.locations.filter(l => l.toUpperCase() !== 'ONLINE');
+
                         if (p.status === 'Sold') {
                             cardBadgeHTML = `<div class="mt-2 text-[10px] font-bold px-1.5 py-0.5 rounded w-fit text-white shadow-sm border" style="background-color: #ce3375; border-color: #a31f5b;">SOLD</div>`;
-                        } else if (p.locations.length > 1) {
+                        } else if (physicalLocs.length > 1) {
                             cardBadgeHTML = `<div class="mt-2 text-[10px] font-bold px-1.5 py-0.5 rounded w-fit bg-blue-500 text-white shadow-sm border border-blue-600">MULTI</div>`;
-                        } else if (p.locations.length === 1) {
-                            let loc0 = p.locations[0];
+                        } else if (physicalLocs.length === 1) {
+                            let loc0 = physicalLocs[0];
+                            const colors = window.getLocColorObj(loc0);
+                            let displayLoc = isOnline ? '🌐 ' + loc0 : loc0;
+                            cardBadgeHTML = `<div class="mt-2 text-[10px] font-bold px-1.5 py-0.5 rounded w-fit border border-black/10" style="background-color: ${colors.bg}; color: ${colors.text};">${displayLoc}</div>`;
+                        } else if (isOnline) {
+                            let loc0 = 'Online';
                             const colors = window.getLocColorObj(loc0);
                             cardBadgeHTML = `<div class="mt-2 text-[10px] font-bold px-1.5 py-0.5 rounded w-fit border border-black/10" style="background-color: ${colors.bg}; color: ${colors.text};">${loc0}</div>`;
                         } else {
@@ -1321,16 +1354,20 @@
                         let quickDispatchHTML = '';
                         const isPhysicalStudio = p.locations.some(loc => loc.toUpperCase().includes('JB') || loc.toUpperCase().includes('PNG'));
                         if (isPhysicalStudio && p.status !== 'Sold') {
-                            const stockists = appSettings.locations.filter(l => !(l.toUpperCase().includes('JB') || l.toUpperCase().includes('PNG') || l.toUpperCase() === 'ONLINE'));
-                            let options = stockists.map(s => `<option value="${s}">${s}</option>`).join('');
-                            quickDispatchHTML = `
-                                <div class="mt-2 border-t border-stone-100 pt-2 dispatch-wrapper">
-                                    <select onchange="window.quickDispatch(event, '${item.id}', ${idx}, this.value)" class="w-full text-[10px] p-1.5 border border-stone-200 rounded bg-stone-50 text-stone-600 font-bold cursor-pointer outline-none hover:bg-stone-100 transition" onclick="event.stopPropagation()">
-                                        <option value="" disabled selected>🚚 安排出貨至...</option>
-                                        ${options}
-                                    </select>
-                                </div>
-                            `;
+                            const stockists = appSettings.locations.filter(l => !(l.toUpperCase().includes('JB') || l.toUpperCase().includes('PNG')));
+                            const availableOptions = stockists.filter(s => !p.locations.includes(s));
+                            
+                            if (availableOptions.length > 0) {
+                                let options = availableOptions.map(s => `<option value="${s}">${s}</option>`).join('');
+                                quickDispatchHTML = `
+                                    <div class="mt-2 border-t border-stone-100 pt-2 dispatch-wrapper">
+                                        <select onchange="window.quickDispatch(event, '${item.id}', ${idx}, this.value)" class="w-full text-[10px] p-1.5 border border-stone-200 rounded bg-stone-50 text-stone-600 font-bold cursor-pointer outline-none hover:bg-stone-100 transition" onclick="event.stopPropagation()">
+                                            <option value="" disabled selected>🚚 安排出貨至...</option>
+                                            ${options}
+                                        </select>
+                                    </div>
+                                `;
+                            }
                         }
 
                         gridContainer.innerHTML += `
