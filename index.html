@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weiweiwei ERP (v11.18.10 Studio Filter Force Update)</title>
+    <title>Weiweiwei ERP (v11.18.11 Custom Brand Colors)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -24,8 +24,8 @@
         
         /* Badges */
         .status-badge { position: absolute; bottom: 0; right: 0; left: 0; padding: 2px 0; font-size: 8px; font-weight: bold; color: white; text-align: center; border-radius: 0 0 4px 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .badge-sold { background-color: #1c1917; } 
-        .badge-multi { background-color: #3b82f6; } 
+        .badge-sold { background-color: #1c1917; color: white; } 
+        .badge-multi { background-color: #3b82f6; color: white; } 
         .badge-none { background-color: #e5e7eb; color: #9ca3af; border-top: 1px solid #d1d5db; }
         .sold-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; border-radius: 4px; }
         .has-note-dot { position: absolute; top: -3px; right: -3px; width: 8px; height: 8px; background-color: #ef4444; border-radius: 50%; border: 1px solid white; z-index: 20; }
@@ -69,7 +69,7 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center gap-4">
                     <div class="flex-shrink-0 flex items-center">
-                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.18.10</span></span>
+                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.18.11</span></span>
                         <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] bg-stone-100 text-stone-400">Loading...</span>
                     </div>
                     <div class="hidden sm:ml-6 sm:flex sm:space-x-4">
@@ -513,15 +513,40 @@
         let currentCalDate = new Date(); 
         let categoryChart = null, allocChart = null;
         
+        // 👉 初始化時寫入所有你指定的預設地點，方便選單使用
         let appSettings = { 
             makers: ['Kim', 'Kelly', 'Lijin'], 
-            locations: ['JB Studio', 'PNG Studio', 'Online', 'Bev C', 'Tamara Malas', 'tamago store', 'tumbpeak', 'Opener'], 
+            locations: ['JB Studio', 'PNG Studio', 'Online', 'Bev C', 'Fifth', 'Tamara Malas', 'Pop Up', 'Snub', 'Loan', 'Hahhah Store'], 
             categories: ['Top', 'Dress', 'Pants'], 
             weekly_goals: {} 
         };
         let currentDetailItem = null, currentDetailPhotoIdx = -1, tempLocations = []; 
         const catColors = ['#f472b6', '#60a5fa', '#a78bfa', '#34d399', '#fbbf24', '#9ca3af'];
-        const locColors = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#6366f1', '#14b8a6'];
+
+        // 👉 全域地點顏色對應引擎 (支援 HEX 背景與智慧字體顏色)
+        window.getLocColorObj = function(loc) {
+            const map = {
+                'ONLINE': { bg: '#4b5563', text: '#ffffff' }, // 深灰
+                'BEV C': { bg: '#f6114a', text: '#ffffff' },
+                'FIFTH': { bg: '#0aa0bf', text: '#ffffff' },
+                'TAMARA MALAS': { bg: '#f36e98', text: '#ffffff' },
+                'POP UP': { bg: '#78b177', text: '#ffffff' },
+                'SNUB': { bg: '#9862a2', text: '#ffffff' },
+                'LOAN': { bg: '#f05006', text: '#ffffff' },
+                'HAHHAH STORE': { bg: '#25998f', text: '#ffffff' },
+                'JB STUDIO': { bg: '#fca00c', text: '#1c1917' }, // 亮橘配深字
+                'PNG STUDIO': { bg: '#00ff99', text: '#1c1917' }  // 螢光綠配深字
+            };
+            const upperLoc = String(loc).toUpperCase();
+            for (const key in map) {
+                if (upperLoc.includes(key)) return map[key];
+            }
+            // 隨機替補色盤 (如果有新增未定義地點)
+            const fallbackPalette = ['#f59e0b', '#8b5cf6', '#ec4899', '#6366f1', '#14b8a6'];
+            let hash = 0;
+            for (let i = 0; i < String(loc).length; i++) hash = String(loc).charCodeAt(i) + ((hash << 5) - hash);
+            return { bg: fallbackPalette[Math.abs(hash) % fallbackPalette.length], text: '#ffffff' };
+        };
 
         function formatDateForInput(firebaseTimestamp) {
             if (!firebaseTimestamp) return '';
@@ -860,10 +885,11 @@
             
             appSettings.locations.forEach(l => {
                 if(stats[l] > 0) {
-                    // 只要包含 JB 或 PNG，無論大小寫，都算 Studio
                     const isStudio = l.toUpperCase().includes('JB') || l.toUpperCase().includes('PNG');
-                    let colorCls = isStudio ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100';
-                    const btn = `<button onclick="window.openListModal('location', '${l}')" class="${colorCls} px-3 py-1.5 rounded shadow-sm border text-xs transition-colors font-medium">${l}: <b class="font-bold">${stats[l]}</b></button>`;
+                    // 套用新色系統
+                    const colors = window.getLocColorObj(l);
+                    const btnStyle = `background-color: ${colors.bg}; color: ${colors.text}; border-color: rgba(0,0,0,0.1);`;
+                    const btn = `<button onclick="window.openListModal('location', '${l}')" class="px-3 py-1.5 rounded shadow-sm border text-xs transition-colors font-medium hover:opacity-80" style="${btnStyle}">${l}: <b class="font-bold">${stats[l]}</b></button>`;
                     
                     if (isStudio) studiosHTML += btn;
                     else stockistsHTML += btn;
@@ -901,7 +927,10 @@
         function updateCharts(locStats, catStats) {
             const labels = [...appSettings.locations, 'Unallocated', 'Sold'];
             const data = [...appSettings.locations.map(l => locStats[l]), locStats['Unallocated'], locStats['Sold']];
-            const bgColors = [...appSettings.locations.map((_, i) => locColors[i % locColors.length]), '#e5e7eb', '#1c1917'];
+            
+            // 套用新色系統到圖表背景
+            const bgColors = [...appSettings.locations.map(l => window.getLocColorObj(l).bg), '#e5e7eb', '#1c1917'];
+            
             allocChart.data.labels = labels;
             allocChart.data.datasets[0].data = data;
             allocChart.data.datasets[0].backgroundColor = bgColors;
@@ -966,7 +995,6 @@
             filteredDb.forEach(item => {
                 const photos = normalizePhotos(item);
                 
-                // 👉 強制寬鬆比對：包含 JB 或 PNG 就符合 Studio
                 let matchesLoc = true;
                 if (locFilter !== 'all') {
                     if (locFilter === 'Sold') { 
@@ -1001,25 +1029,29 @@
                         const isSold = p.status === 'Sold';
                         const hasNote = p.notes && p.notes.length > 0;
                         const hasImg = p.url && p.url.length > 0;
-                        let badgeText = '', badgeClass = '';
+                        let badgeText = '', badgeClass = '', badgeStyle = '';
                         
-                        if (isSold) { badgeText = p.soldPrice ? `SOLD` : 'SOLD'; badgeClass = 'badge-sold'; } 
+                        // 👉 在清單內套用新版色彩引擎
+                        if (isSold) { 
+                            badgeText = p.soldPrice ? `SOLD` : 'SOLD'; 
+                            badgeClass = 'badge-sold'; 
+                        } 
                         else {
-                            if (p.locations.length > 1) { badgeText = 'MULTI'; badgeClass = 'badge-multi'; } 
+                            if (p.locations.length > 1) { 
+                                badgeText = 'MULTI'; 
+                                badgeClass = 'badge-multi'; 
+                            } 
                             else if (p.locations.length === 1) { 
                                 const loc0 = p.locations[0];
-                                badgeText = loc0.substring(0,8).toUpperCase(); 
-                                if (loc0.toUpperCase().includes('JB')) badgeClass = 'bg-emerald-600 text-white';
-                                else if (loc0.toUpperCase().includes('PNG')) badgeClass = 'bg-sky-600 text-white';
-                                else { 
-                                    const stockists = appSettings.locations.filter(l => !(l.toUpperCase().includes('JB') || l.toUpperCase().includes('PNG')));
-                                    const palette = ['bg-amber-600', 'bg-purple-600', 'bg-pink-600', 'bg-indigo-600', 'bg-teal-600', 'bg-rose-600', 'bg-orange-600'];
-                                    let sIdx = stockists.indexOf(loc0);
-                                    if(sIdx === -1) sIdx = 0;
-                                    badgeClass = `${palette[sIdx % palette.length]} text-white`; 
-                                }
+                                badgeText = loc0.substring(0,12).toUpperCase(); // 放寬字數顯示
+                                const colors = window.getLocColorObj(loc0);
+                                badgeClass = ''; // 清空預設 class
+                                badgeStyle = `background-color: ${colors.bg}; color: ${colors.text};`; 
                             } 
-                            else { badgeText = '無地點'; badgeClass = 'badge-none'; }
+                            else { 
+                                badgeText = '無地點'; 
+                                badgeClass = 'badge-none'; 
+                            }
                         }
                         
                         let quickDispatchHTML = '';
@@ -1039,7 +1071,7 @@
                         <div class="flex flex-col items-center w-[64px] flex-shrink-0 dispatch-card">
                             <div class="relative w-full h-[84px] cursor-pointer transition-transform hover:scale-105 bg-white rounded shadow-sm border border-stone-200" onclick="window.openDetailModal('${item.id}', ${idx})">
                                 ${hasImg ? `<img src="${p.url}" class="w-full h-full object-cover rounded ${isSold ? 'opacity-50 grayscale' : ''}">` : `<div class="w-full h-full bg-stone-50 flex items-center justify-center text-[8px] text-stone-400 rounded">No Img</div>`}
-                                <div class="status-badge ${badgeClass}">${badgeText}</div>
+                                <div class="status-badge ${badgeClass}" style="${badgeStyle}">${badgeText}</div>
                                 ${isSold ? `<div class="sold-overlay"><i data-lucide="check" class="text-white w-4 h-4"></i></div>` : ''}
                                 ${hasNote ? `<div class="has-note-dot"></div>` : ''}
                             </div>
@@ -1127,15 +1159,13 @@
                         let cardColorClass = getStatusColorClass(p.status === 'Sold' ? 'Sold' : item.status);
                         let cardBadgeHTML = '';
                         
+                        // 👉 清單內動態套用新色系統
                         if (p.status === 'Sold') {
                             cardBadgeHTML = `<div class="mt-2 text-[10px] font-bold px-1.5 py-0.5 rounded w-fit bg-stone-800 text-white shadow-sm border border-stone-900">SOLD</div>`;
                         } else if (p.locations.length > 0) {
                             let loc0 = p.locations[0];
-                            let bg = 'bg-stone-200 text-stone-700 border-stone-300';
-                            if (loc0.toUpperCase().includes('JB')) bg = 'bg-emerald-100 text-emerald-800 border-emerald-200';
-                            if (loc0.toUpperCase().includes('PNG')) bg = 'bg-sky-100 text-sky-800 border-sky-200';
-                            if (!loc0.toUpperCase().includes('JB') && !loc0.toUpperCase().includes('PNG')) bg = 'bg-indigo-100 text-indigo-800 border-indigo-200';
-                            cardBadgeHTML = `<div class="mt-2 text-[10px] font-bold px-1.5 py-0.5 rounded w-fit border ${bg}">${loc0}</div>`;
+                            const colors = window.getLocColorObj(loc0);
+                            cardBadgeHTML = `<div class="mt-2 text-[10px] font-bold px-1.5 py-0.5 rounded w-fit border border-black/10" style="background-color: ${colors.bg}; color: ${colors.text};">${loc0}</div>`;
                         } else {
                             cardBadgeHTML = `<div class="mt-2 text-[10px] font-bold px-1.5 py-0.5 rounded w-fit border border-black/5 ${cardColorClass}">${item.status}</div>`;
                         }
@@ -1372,11 +1402,9 @@
                 const currentVal = locSelect.value; 
                 let html = `<option value="all">全部庫存 (All)</option><option value="Sold">已售出 (Sold)</option><option value="Unallocated">無地點 (Unallocated)</option>`; 
                 
-                // 👉 改為寬鬆比對：不管大小寫，包含 JB 或 PNG 就是 Studio
                 const studios = appSettings.locations.filter(l => l.toUpperCase().includes('JB') || l.toUpperCase().includes('PNG'));
                 const stockists = appSettings.locations.filter(l => !(l.toUpperCase().includes('JB') || l.toUpperCase().includes('PNG')));
                 
-                // 強制渲染 Studio 選項，就算上述 filter 為空也照常產生
                 html += `<optgroup label="📦 待出貨 (Studio在庫)">`;
                 html += `<option value="Studio">全部 Studio (JB & PNG)</option>`;
                 studios.forEach(l => html += `<option value="${l}">${l}</option>`);
