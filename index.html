@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weiweiwei ERP (v11.18.18 Piece-Level Edit & Logic)</title>
+    <title>Weiweiwei ERP (v11.18.19 Studio Transfer & Online UI)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -69,7 +69,7 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center gap-4">
                     <div class="flex-shrink-0 flex items-center">
-                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.18.18</span></span>
+                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.18.19</span></span>
                         <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] bg-stone-100 text-stone-400">Loading...</span>
                     </div>
                     <div class="hidden sm:ml-6 sm:flex sm:space-x-4">
@@ -109,7 +109,7 @@
                     <div class="mt-2 text-3xl font-bold text-stone-800" id="kpi-making">0</div>
                 </div>
                 <div onclick="window.openListModal('kpi', 'Studio')" class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-emerald-500 cursor-pointer hover:-translate-y-1 hover:shadow-md transition-all relative">
-                    <div class="text-emerald-600 text-xs font-bold uppercase">待出貨 (Studio在庫)</div>
+                    <div class="text-emerald-600 text-xs font-bold uppercase">待出貨 (實體在庫 未上線)</div>
                     <div class="mt-2 text-3xl font-bold text-stone-800" id="kpi-studio">0</div>
                 </div>
                 <div onclick="window.openListModal('kpi', 'Unallocated')" class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-gray-400 cursor-pointer hover:-translate-y-1 hover:shadow-md transition-all">
@@ -276,7 +276,7 @@
                 <h2 class="text-xl font-bold text-stone-800">庫存與出貨管理</h2>
                 <p class="text-stone-500 text-sm mt-1">
                     這裡顯示的過濾器代表的是商品**現在正躺在哪裡**。<br>
-                    你可以直接從下方的單品圖下方下拉選單一鍵出貨；若需**單品修改照片或定價**，請點擊單品圖展開詳細介面。
+                    即使商品已經發佈上線(Online)，它仍然會顯示在所屬的工作室清單中，你可以隨時點擊卡片下方的下拉選單進行「跨工作室調貨」或「出庫」。
                 </p>
             </div>
             <div class="flex flex-wrap items-center gap-4 bg-white p-3 rounded-lg shadow-sm">
@@ -294,7 +294,7 @@
                 <div class="overflow-x-auto custom-scrollbar">
                     <table class="min-w-full text-left text-sm">
                         <thead class="bg-stone-100 text-stone-600 uppercase font-semibold">
-                            <tr><th class="px-6 py-3 w-[500px]">單品圖列 (直接選擇出貨 / 點擊編輯單品)</th><th class="px-6 py-3">Item Detail</th><th class="px-6 py-3">Category</th></tr>
+                            <tr><th class="px-6 py-3 w-[500px]">單品圖列 (直接選擇出貨/調貨)</th><th class="px-6 py-3">Item Detail</th><th class="px-6 py-3">Category</th></tr>
                         </thead>
                         <tbody id="allocation-table-body" class="divide-y divide-stone-100"></tbody>
                     </table>
@@ -468,7 +468,7 @@
                     </div>
 
                     <div>
-                        <label class="text-[11px] font-bold text-stone-700 uppercase tracking-wider mb-2 block">所在地點</label>
+                        <label class="text-[11px] font-bold text-stone-700 uppercase tracking-wider mb-2 block">實體所在地點 (調貨)</label>
                         <div class="grid grid-cols-2 gap-2" id="detail-location-options"></div>
                         <p class="text-[10px] text-amber-600 font-bold mt-2 bg-amber-50 p-1.5 rounded border border-amber-200">* 💡 實體地點 (Studio/Stockist) 只能單選；但「Online」可以點擊疊加與實體地點並存。</p>
                     </div>
@@ -790,7 +790,7 @@
                             const isOnline = p.locations.some(loc => loc.toUpperCase() === 'ONLINE');
                             const hasStudio = p.locations.some(loc => loc.toUpperCase().includes('JB') || loc.toUpperCase().includes('PNG'));
                             
-                            // 安排Online後不計算在待出貨 KPI 內
+                            // 上線後不計算在待出貨 KPI 內
                             if (hasStudio && !isOnline) {
                                 studioCount++;
                             }
@@ -1157,10 +1157,10 @@
                     } else if (locFilter === 'Unallocated') { 
                         matchesLoc = photos.some(p => p.status !== 'Sold' && p.locations.length === 0); 
                     } else { 
+                        // 確保即使商品已經 Online，只要它擁有 JB Studio 標籤，用 JB 過濾時依然會顯示
                         matchesLoc = photos.some(p => {
                             if (p.status === 'Sold') return false;
-                            // 只要擁有此地點的標籤就會顯示，無論是否已經上架Online
-                            return p.locations.includes(locFilter);
+                            return p.locations.includes(locFilter); 
                         });
                     }
                 }
@@ -1176,7 +1176,7 @@
                         const isOnline = p.locations.some(l => l.toUpperCase() === 'ONLINE');
                         
                         if (locFilter !== 'all' && locFilter !== 'Sold' && locFilter !== 'Unallocated') {
-                            if (!p.locations.includes(locFilter)) return;
+                            if (!p.locations.includes(locFilter)) return; 
                         }
                         
                         if (locFilter === 'Sold' && p.status !== 'Sold') return;
@@ -1221,25 +1221,24 @@
                         }
                         
                         let quickDispatchHTML = '';
-                        const isPhysicalStudio = p.locations.some(loc => loc.toUpperCase().includes('JB') || loc.toUpperCase().includes('PNG'));
                         
-                        if (isPhysicalStudio && !isSold) {
-                            if (isOnline) {
-                                // 已經上架Online的Studio商品顯示為已出庫
-                                quickDispatchHTML = `<div class="mt-1 text-[9px] font-bold text-blue-700 bg-blue-50 border border-blue-200 rounded px-1 py-1 text-center w-full truncate">🌐 已上線出庫</div>`;
-                            } else {
-                                const stockists = appSettings.locations.filter(l => !(l.toUpperCase().includes('JB') || l.toUpperCase().includes('PNG')));
-                                const availableOptions = stockists.filter(s => !p.locations.includes(s));
+                        if (!isSold) {
+                            // 允許所有非當前地點且非 Online 的選項作為下拉選單目標 (包含跨工作室調貨)
+                            const availableOptions = appSettings.locations.filter(s => !p.locations.includes(s) && s.toUpperCase() !== 'ONLINE');
+                            
+                            if (availableOptions.length > 0) {
+                                let options = availableOptions.map(s => `<option value="${s}">${s}</option>`).join('');
+                                let labelText = isOnline ? '🌐 已上線, 調貨至...' : '🚚 安排出貨/調貨...';
+                                let bgClass = isOnline ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-stone-50 text-stone-600 border-stone-200';
                                 
-                                if (availableOptions.length > 0) {
-                                    let options = availableOptions.map(s => `<option value="${s}">${s}</option>`).join('');
-                                    quickDispatchHTML = `
-                                        <select onchange="window.quickDispatch(event, '${item.id}', ${idx}, this.value)" class="mt-1 w-full text-[9px] p-1 border border-stone-200 rounded bg-white text-stone-600 font-bold cursor-pointer outline-none hover:bg-stone-50 shadow-sm transition-colors" onclick="event.stopPropagation()">
-                                            <option value="" disabled selected>📦 安排出貨..</option>
+                                quickDispatchHTML = `
+                                    <div class="mt-2 border-t border-stone-100 pt-2 dispatch-wrapper">
+                                        <select onchange="window.quickDispatch(event, '${item.id}', ${idx}, this.value)" class="w-full text-[10px] p-1.5 border rounded font-bold cursor-pointer outline-none transition shadow-sm ${bgClass}" onclick="event.stopPropagation()">
+                                            <option value="" disabled selected>${labelText}</option>
                                             ${options}
                                         </select>
-                                    `;
-                                }
+                                    </div>
+                                `;
                             }
                         }
 
@@ -1275,7 +1274,7 @@
 
         window.quickDispatch = async function(e, itemId, photoIdx, toLocation) {
             e.stopPropagation();
-            if(!confirm(`確認將此商品標記至 ${toLocation}？`)) {
+            if(!confirm(`確認將此商品轉移至 ${toLocation}？`)) {
                 e.target.value = ""; 
                 return;
             }
@@ -1299,12 +1298,17 @@
                 
                 const wrapper = e.target.parentElement;
                 if (isTargetOnline) {
-                    wrapper.innerHTML = `<div class="mt-1 text-[9px] font-bold text-blue-700 bg-blue-50 border border-blue-200 rounded px-1 py-1 text-center w-full truncate">🌐 已上線出庫</div>`;
+                    wrapper.innerHTML = `<div class="mt-1 text-[9px] font-bold text-blue-700 bg-blue-50 border border-blue-200 rounded px-1 py-1 text-center w-full truncate shadow-sm">🌐 已上線出庫</div>`;
                 } else {
-                    wrapper.innerHTML = `<div class="mt-1 text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1 py-1 text-center w-full truncate">🚚 已出貨</div>`;
+                    const isToStudio = toLocation.toUpperCase().includes('JB') || toLocation.toUpperCase().includes('PNG');
+                    if (isToStudio) {
+                        wrapper.innerHTML = `<div class="mt-1 text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1 py-1 text-center w-full truncate shadow-sm">📦 已調貨至 ${toLocation}</div>`;
+                    } else {
+                        wrapper.innerHTML = `<div class="mt-1 text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1 py-1 text-center w-full truncate shadow-sm">🚚 已出貨</div>`;
+                    }
                 }
             } catch (err) {
-                alert("出貨失敗：" + err.message);
+                alert("轉移失敗：" + err.message);
                 e.target.value = "";
             }
         };
@@ -1334,7 +1338,6 @@
                     if (type === 'kpi') {
                         if (value === 'Total') match = true;
                         if (value === 'Making' && item.status === 'Making') match = true;
-                        // Dashboard 點擊待出貨，隱藏已上線商品
                         if (value === 'Studio' && p.locations.some(loc => loc.toUpperCase().includes('JB') || loc.toUpperCase().includes('PNG')) && p.status !== 'Sold' && !isOnline) match = true;
                         if (value === 'Unallocated' && p.locations.length === 0 && p.status !== 'Sold') match = true;
                         if (value === 'Sold' && p.status === 'Sold') match = true;
@@ -1375,25 +1378,23 @@
                         }
                         
                         let quickDispatchHTML = '';
-                        const isPhysicalStudio = p.locations.some(loc => loc.toUpperCase().includes('JB') || loc.toUpperCase().includes('PNG'));
-                        if (isPhysicalStudio && p.status !== 'Sold') {
-                            if (isOnline) {
-                                quickDispatchHTML = `<div class="mt-2 text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-1.5 text-center w-full shadow-sm">🌐 已上線 (出庫)</div>`;
-                            } else {
-                                const stockists = appSettings.locations.filter(l => !(l.toUpperCase().includes('JB') || l.toUpperCase().includes('PNG')));
-                                const availableOptions = stockists.filter(s => !p.locations.includes(s));
-                                
-                                if (availableOptions.length > 0) {
-                                    let options = availableOptions.map(s => `<option value="${s}">${s}</option>`).join('');
-                                    quickDispatchHTML = `
-                                        <div class="mt-2 border-t border-stone-100 pt-2 dispatch-wrapper">
-                                            <select onchange="window.quickDispatch(event, '${item.id}', ${idx}, this.value)" class="w-full text-[10px] p-1.5 border border-stone-200 rounded bg-stone-50 text-stone-600 font-bold cursor-pointer outline-none hover:bg-stone-100 transition shadow-sm" onclick="event.stopPropagation()">
-                                                <option value="" disabled selected>🚚 安排出貨至...</option>
-                                                ${options}
-                                            </select>
-                                        </div>
-                                    `;
-                                }
+                        
+                        if (p.status !== 'Sold') {
+                            const availableOptions = appSettings.locations.filter(s => !p.locations.includes(s) && s.toUpperCase() !== 'ONLINE');
+                            
+                            if (availableOptions.length > 0) {
+                                let options = availableOptions.map(s => `<option value="${s}">${s}</option>`).join('');
+                                let labelText = isOnline ? '🌐 已上線, 調貨至...' : '🚚 安排出貨/調貨...';
+                                let bgClass = isOnline ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-stone-50 text-stone-600 border-stone-200 hover:bg-stone-100';
+
+                                quickDispatchHTML = `
+                                    <div class="mt-2 border-t border-stone-100 pt-2 dispatch-wrapper">
+                                        <select onchange="window.quickDispatch(event, '${item.id}', ${idx}, this.value)" class="w-full text-[10px] p-1.5 border rounded font-bold cursor-pointer outline-none transition shadow-sm ${bgClass}" onclick="event.stopPropagation()">
+                                            <option value="" disabled selected>${labelText}</option>
+                                            ${options}
+                                        </select>
+                                    </div>
+                                `;
                             }
                         }
 
@@ -1433,7 +1434,6 @@
             document.getElementById('detail-title').innerText = currentDetailItem.itemName;
             document.getElementById('detail-sku').innerText = `${getCleanCategory(currentDetailItem.category)} / ${currentDetailItem.color}`;
             
-            // 處理獨立定價顯示
             let basePrice = currentDetailItem.price || '';
             let displaySpecPrice = p.specificPrice !== undefined && p.specificPrice !== null ? p.specificPrice : basePrice;
             document.getElementById('detail-specific-price').value = p.specificPrice !== undefined && p.specificPrice !== null ? p.specificPrice : '';
@@ -1448,7 +1448,7 @@
             document.getElementById('detail-price-display').innerText = `Price: ${priceText}`;
             
             document.getElementById('detail-notes').value = p.notes;
-            document.getElementById('detail-photo-upload').value = ''; // 清空上傳欄位
+            document.getElementById('detail-photo-upload').value = ''; 
             
             tempLocations = [...p.locations]; 
             const btnSold = document.getElementById('btn-toggle-sold');
@@ -1501,11 +1501,9 @@
                 photos[currentDetailPhotoIdx].notes = document.getElementById('detail-notes').value; 
                 photos[currentDetailPhotoIdx].locations = tempLocations; 
                 
-                // 儲存獨立售價
                 const specPrice = document.getElementById('detail-specific-price').value;
                 photos[currentDetailPhotoIdx].specificPrice = specPrice !== '' ? Number(specPrice) : null;
                 
-                // 處理單獨照片上傳
                 const fileInput = document.getElementById('detail-photo-upload');
                 if (fileInput.files.length > 0) {
                     const file = fileInput.files[0];
@@ -1527,7 +1525,6 @@
             let photos = normalizePhotos(currentDetailItem); const currentStatus = photos[currentDetailPhotoIdx].status;
             if (currentStatus === 'Sold') { if(confirm("確認取消售出？物品將回到庫存中。")) { photos[currentDetailPhotoIdx].status = 'Available'; photos[currentDetailPhotoIdx].soldPrice = null; updateItemStatus(photos); } } 
             else { 
-                // 售出時自動填入單品專屬價格或主定價
                 let basePrice = currentDetailItem.price || '';
                 let piecePrice = photos[currentDetailPhotoIdx].specificPrice !== undefined && photos[currentDetailPhotoIdx].specificPrice !== null ? photos[currentDetailPhotoIdx].specificPrice : basePrice;
                 
@@ -1687,10 +1684,15 @@
                 const currentVal = locSelect.value; 
                 let html = `<option value="all">全部庫存 (All)</option><option value="Sold">已售出 (Sold)</option><option value="Unallocated">無地點 (Unallocated)</option>`; 
                 
-                const studios = appSettings.locations.filter(l => l.toUpperCase().includes('JB') || l.toUpperCase().includes('PNG'));
+                let studios = appSettings.locations.filter(l => l.toUpperCase().includes('JB') || l.toUpperCase().includes('PNG'));
+                // 防呆：強制補回 JB / PNG，確保下拉選單一定能點擊
+                if (studios.length === 0) {
+                    studios = ['JB Studio', 'PNG Studio'];
+                }
+
                 const stockists = appSettings.locations.filter(l => !(l.toUpperCase().includes('JB') || l.toUpperCase().includes('PNG')));
                 
-                html += `<optgroup label="🏠 工作室 (Studio庫存/出庫)">`;
+                html += `<optgroup label="🏠 工作室 (Studio庫存/調貨)">`;
                 studios.forEach(l => html += `<option value="${l}">${l}</option>`);
                 html += `</optgroup>`;
                 
