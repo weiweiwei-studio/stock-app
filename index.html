@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weiweiwei ERP (v11.18.6 Dispatch Update)</title>
+    <title>Weiweiwei ERP (v11.18.7 Logic Fix Update)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -71,7 +71,7 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center gap-4">
                     <div class="flex-shrink-0 flex items-center">
-                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.18.6</span></span>
+                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.18.7</span></span>
                         <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] bg-stone-100 text-stone-400">Loading...</span>
                     </div>
                     <div class="hidden sm:ml-6 sm:flex sm:space-x-4">
@@ -244,7 +244,10 @@
         <section id="view-allocation" class="space-y-6 hidden animate-fade-in pb-10">
             <div class="bg-white rounded-lg p-6 shadow-sm border-l-4 border-blue-500">
                 <h2 class="text-xl font-bold text-stone-800">庫存與出貨管理</h2>
-                <p class="text-stone-500 text-sm mt-1">選擇 <b>JB Studio</b> 或 <b>PNG Studio</b> 即可查詢待出貨商品。</p>
+                <p class="text-stone-500 text-sm mt-1">
+                    當商品狀態改為 <b>Ready</b> 後，才會出現在這裡。<br>
+                    選擇 <b>JB Studio</b> 或 <b>PNG Studio</b> 即可查詢待出貨商品。
+                </p>
             </div>
             <div class="flex flex-wrap items-center gap-4 bg-white p-3 rounded-lg shadow-sm">
                 <div class="flex items-center gap-2">
@@ -505,7 +508,6 @@
         let currentCalDate = new Date(); 
         let categoryChart = null, allocChart = null;
         
-        // 預設將通路加入 locations，方便快速出貨
         let appSettings = { 
             makers: ['Kim', 'Kelly', 'Lijin'], 
             locations: ['JB Studio', 'PNG Studio', 'Online', 'Bev C', 'Tamara Malas', 'tamago store', 'tumbpeak', 'Opener'], 
@@ -588,16 +590,27 @@
 
             const fallbackStudio = item.originStudio || 'JB Studio';
 
+            // 防呆處理：沒有照片但有數量
             if (raw.length === 0 && item.quantity > 0) {
                  return Array.from({ length: item.quantity }, () => ({ url: '', status: 'Available', locations: [fallbackStudio], notes: '', soldPrice: null }));
             }
 
             return raw.map(p => {
+                // 防呆處理：舊的字串格式
                 if (typeof p === 'string') return { url: p, status: 'Available', locations: [fallbackStudio], notes: '', soldPrice: null };
+                
                 let locs = [];
-                if (Array.isArray(p.locations) && p.locations.length > 0) locs = p.locations;
-                else if (p.location && p.location !== 'Studio') locs = [p.location]; 
-                else if (!p.status || p.status !== 'Sold') locs = [fallbackStudio]; 
+                if (Array.isArray(p.locations) && p.locations.length > 0) {
+                    // 👉 核心邏輯修正：將陣列裡面的舊 "Studio" 標籤，強制映射到具體的 originStudio (JB/PNG)
+                    locs = p.locations.map(l => l === 'Studio' ? fallbackStudio : l);
+                }
+                else if (p.location && p.location !== 'Studio') {
+                    locs = [p.location];
+                }
+                else if (!p.status || p.status !== 'Sold') {
+                    // 如果陣列是空的 []，而且還沒賣出，強制塞入預設 Studio
+                    locs = [fallbackStudio];
+                }
                 
                 return {
                     url: p.url || '',
@@ -654,7 +667,6 @@
                         soldCount++; locStats['Sold']++; 
                     } else {
                         if (p.locations.length > 0) {
-                            // 計算在 JB 或 PNG Studio 的總數作為 "待出貨 (Studio在庫)"
                             if (p.locations.includes('JB Studio') || p.locations.includes('PNG Studio')) {
                                 studioCount++;
                             }
@@ -842,7 +854,6 @@
             const container = document.getElementById('location-stats-container');
             container.innerHTML = '';
             
-            // 視覺分組：待出貨(工作室) vs 已出貨(Stockists)
             let studiosHTML = '<div class="w-full flex gap-2 mb-3 items-center flex-wrap"><span class="text-xs font-bold text-stone-400 w-16 whitespace-nowrap"><i data-lucide="package" class="w-4 h-4 inline pb-0.5"></i> 待出貨:</span>';
             let stockistsHTML = '<div class="w-full flex gap-2 flex-wrap items-center"><span class="text-xs font-bold text-stone-400 w-16 whitespace-nowrap"><i data-lucide="truck" class="w-4 h-4 inline pb-0.5"></i> 已出貨:</span>';
             
@@ -944,6 +955,7 @@
             const catFilter = document.getElementById('alloc-filter-category').value;
             tbody.innerHTML = '';
 
+            // ⚠️ 狀態邏輯：只有 Ready 以上的實體庫存才會出現在這裡
             let filteredDb = db.filter(i => i.status === 'Ready' || i.status === 'In Studio' || i.status === 'Sold' || i.status === 'Partial Sold');
             
             if (catFilter !== 'all') {
@@ -1013,21 +1025,18 @@
             lucide.createIcons();
         };
 
-        // 快速出貨功能
         window.quickDispatch = async function(e, itemId, photoIdx, toLocation) {
             e.stopPropagation();
             if(!confirm(`確認將此商品出貨至 ${toLocation}？`)) {
-                e.target.value = ""; // 取消則重設選單
+                e.target.value = ""; 
                 return;
             }
             try {
                 const item = db.find(i => i.id === itemId);
                 let photos = normalizePhotos(item);
-                // 更新地點為所選的 Stockist
                 photos[photoIdx].locations = [toLocation]; 
                 await updateDoc(doc(dbFirestore, "stock_items", itemId), { photos: photos });
                 
-                // 視覺回饋：將該卡片直接變成已出貨狀態
                 const card = e.target.closest('.group');
                 card.innerHTML = `<div class="flex items-center justify-center h-full text-xs font-bold text-emerald-600 bg-emerald-50 rounded"><i data-lucide="check-circle" class="w-4 h-4 mr-1"></i> 已轉移至 ${toLocation}</div>`;
                 lucide.createIcons();
@@ -1091,11 +1100,9 @@
                             cardBadgeHTML = `<div class="mt-2 text-[10px] font-bold px-1.5 py-0.5 rounded w-fit border border-black/5 ${cardColorClass}">${item.status}</div>`;
                         }
                         
-                        // 判斷是否顯示「快速出貨」選單
                         let quickDispatchHTML = '';
                         const isStudio = p.locations.length === 1 && (p.locations[0] === 'JB Studio' || p.locations[0] === 'PNG Studio');
                         if (isStudio && p.status !== 'Sold') {
-                            // 過濾出所有非 Studio 的地點作為 Stockists 選項
                             const stockists = appSettings.locations.filter(l => l !== 'JB Studio' && l !== 'PNG Studio');
                             let options = stockists.map(s => `<option value="${s}">${s}</option>`).join('');
                             quickDispatchHTML = `
