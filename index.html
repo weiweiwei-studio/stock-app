@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weiweiwei ERP (v11.18.15 Online Dispatch Fix)</title>
+    <title>Weiweiwei ERP (v11.18.16 Logic & Accuracy Update)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -69,7 +69,7 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center gap-4">
                     <div class="flex-shrink-0 flex items-center">
-                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.18.15</span></span>
+                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.18.16</span></span>
                         <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] bg-stone-100 text-stone-400">Loading...</span>
                     </div>
                     <div class="hidden sm:ml-6 sm:flex sm:space-x-4">
@@ -138,7 +138,7 @@
                                 </tr>
                             </thead>
                             <tbody id="perf-monthly-tbody" class="divide-y divide-stone-100">
-                                </tbody>
+                            </tbody>
                         </table>
                     </div>
                 </div>
@@ -149,7 +149,7 @@
                         <span id="perf-weekly-month" class="bg-stone-100 border border-stone-200 px-2 py-1 rounded text-[10px] text-stone-600 font-bold tracking-wider">Current</span>
                     </h3>
                     <div id="perf-weekly-container" class="space-y-4 flex-grow">
-                        </div>
+                    </div>
                     <p class="text-[9px] text-stone-400 mt-4 border-t border-stone-100 pt-2">* 隨下方日曆選定的月份連動更新</p>
                 </div>
             </div>
@@ -597,15 +597,17 @@
                     pDate = new Date(item.createdAt.seconds ? item.createdAt.seconds * 1000 : item.createdAt);
                 }
 
+                const photos = normalizePhotos(item);
+
                 if (pDate && pDate.getFullYear() === year && pDate.getMonth() === month) {
-                    const qty = parseInt(item.quantity) || 1;
+                    // 優化 2: 改用真實生成的照片插槽數 (實際物理庫存數)，而不是僅僅依賴 Quantity 數字
+                    const qty = photos.length > 0 ? photos.length : (parseInt(item.quantity) || 1);
                     stats.produced += qty;
                     const d = pDate.getDate();
                     const weekNum = Math.min(5, Math.ceil((d + firstDay) / 7));
                     stats.weeks[weekNum] = (stats.weeks[weekNum] || 0) + qty;
                 }
 
-                const photos = normalizePhotos(item);
                 photos.forEach(p => {
                     if (p.status === 'Sold') {
                         let sDate = p.soldAt ? new Date(p.soldAt.seconds ? p.soldAt.seconds * 1000 : p.soldAt) : null;
@@ -1205,9 +1207,7 @@
                         const isPhysicalStudio = p.locations.some(loc => loc.toUpperCase().includes('JB') || loc.toUpperCase().includes('PNG'));
                         
                         if (isPhysicalStudio && !isSold) {
-                            // 過濾掉 JB, PNG，剩下實體 Stockists 和 Online
                             const stockists = appSettings.locations.filter(l => !(l.toUpperCase().includes('JB') || l.toUpperCase().includes('PNG')));
-                            // 只顯示該單品「尚未擁有」的地點
                             const availableOptions = stockists.filter(s => !p.locations.includes(s));
                             
                             if (availableOptions.length > 0) {
@@ -1265,12 +1265,10 @@
                 const isTargetOnline = toLocation.toUpperCase() === 'ONLINE';
                 
                 if (isTargetOnline) {
-                    // 若是選擇 Online，保留現有地點，僅將 Online 加入
                     if (!photos[photoIdx].locations.includes(toLocation)) {
                         photos[photoIdx].locations.push(toLocation);
                     }
                 } else {
-                    // 若是選擇其他實體地點，則更換實體位置，但保留可能已存在的 Online 標籤
                     const hasOnline = photos[photoIdx].locations.some(l => l.toUpperCase() === 'ONLINE');
                     const onlineName = photos[photoIdx].locations.find(l => l.toUpperCase() === 'ONLINE');
                     photos[photoIdx].locations = hasOnline ? [onlineName, toLocation] : [toLocation]; 
@@ -1465,7 +1463,7 @@
         };
         window.confirmSoldAction = function() {
             const soldPrice = document.getElementById('sold-price-input').value; const note = document.getElementById('sold-note-input').value; const dateVal = document.getElementById('sold-date-input').value;
-            let photos = normalizePhotos(currentDetailItem); photos[currentDetailPhotoIdx].status = 'Sold'; photos[currentDetailPhotoIdx].soldPrice = soldPrice; photos[currentDetailPhotoIdx].soldAt = dateVal ? new Date(dateVal) : new Date(); photos[currentDetailPhotoIdx].locations = tempLocations;
+            let photos = normalizePhotos(currentDetailItem); photos[currentDetailPhotoIdx].status = 'Sold'; photos[currentDetailPhotoIdx].soldPrice = soldPrice; photos[currentDetailPhotoIdx].soldAt = dateVal ? new Date(dateVal.replace(/-/g, '/')) : new Date(); photos[currentDetailPhotoIdx].locations = tempLocations;
             if(note) photos[currentDetailPhotoIdx].notes = (photos[currentDetailPhotoIdx].notes ? photos[currentDetailPhotoIdx].notes + " | " : "") + note;
             document.getElementById('sold-modal').classList.add('hidden'); updateItemStatus(photos);
         };
@@ -1547,17 +1545,24 @@
                     price: document.getElementById('edit-price').value 
                 }; 
                 
-                data.makingAt = sDateVal ? new Date(sDateVal) : null;
-                data.completedAt = cDateVal ? new Date(cDateVal) : null;
+                // 優化 3: 防止 iOS Safari 日期選擇導致的跨時區偏移 (Date Offset Bug)
+                data.makingAt = sDateVal ? new Date(sDateVal.replace(/-/g, '/')) : null;
+                data.completedAt = cDateVal ? new Date(cDateVal.replace(/-/g, '/')) : null;
                 
                 const photoInput = document.getElementById('edit-addPhotos'); 
                 const item = db.find(i=>i.id===id); 
                 let existingPhotos = item.photos || []; 
                 let photosModified = false;
                 
+                const oldOriginStudio = item.originStudio || 'JB Studio';
+
+                // 優化 1: 當「編輯工單」更換生產地時，同步將還沒出貨的實體商品地點換掉
                 existingPhotos.forEach(p => {
                     if (!p.locations || p.locations.length === 0 || (p.locations.length === 1 && p.locations[0] === 'Studio')) {
                         p.locations = [newOriginStudio];
+                        photosModified = true;
+                    } else if (p.locations.includes(oldOriginStudio)) {
+                        p.locations = p.locations.map(l => l === oldOriginStudio ? newOriginStudio : l);
                         photosModified = true;
                     }
                 });
