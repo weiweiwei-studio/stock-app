@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weiweiwei ERP (v11.18.16 Logic & Accuracy Update)</title>
+    <title>Weiweiwei ERP (v11.18.17 Online Allocation Logic)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -69,7 +69,7 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center gap-4">
                     <div class="flex-shrink-0 flex items-center">
-                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.18.16</span></span>
+                        <span class="text-2xl font-bold tracking-tight text-stone-800">WEIWEIWEI<span class="text-stone-400 text-xs tracking-widest ml-1">v11.18.17</span></span>
                         <span id="connection-status" class="ml-2 px-2 py-0.5 rounded text-[10px] bg-stone-100 text-stone-400">Loading...</span>
                     </div>
                     <div class="hidden sm:ml-6 sm:flex sm:space-x-4">
@@ -600,7 +600,6 @@
                 const photos = normalizePhotos(item);
 
                 if (pDate && pDate.getFullYear() === year && pDate.getMonth() === month) {
-                    // 優化 2: 改用真實生成的照片插槽數 (實際物理庫存數)，而不是僅僅依賴 Quantity 數字
                     const qty = photos.length > 0 ? photos.length : (parseInt(item.quantity) || 1);
                     stats.produced += qty;
                     const d = pDate.getDate();
@@ -777,10 +776,19 @@
                         soldCount++; locStats['Sold']++; 
                     } else {
                         if (p.locations.length > 0) {
-                            if (p.locations.some(loc => loc.toUpperCase().includes('JB') || loc.toUpperCase().includes('PNG'))) {
+                            const isOnline = p.locations.some(loc => loc.toUpperCase() === 'ONLINE');
+                            const hasStudio = p.locations.some(loc => loc.toUpperCase().includes('JB') || loc.toUpperCase().includes('PNG'));
+                            
+                            // 只有在實體 Studio 且「尚未上架 Online」的才算待出貨 KPI
+                            if (hasStudio && !isOnline) {
                                 studioCount++;
                             }
+                            
                             p.locations.forEach(loc => {
+                                const isStudioLoc = loc.toUpperCase().includes('JB') || loc.toUpperCase().includes('PNG');
+                                // 如果已經是 Online 狀態，就不要再把數量加到實體 Studio 的統計數字中
+                                if (isStudioLoc && isOnline) return;
+                                
                                 if(locStats[loc] !== undefined) locStats[loc]++;
                             });
                         } else {
@@ -1140,9 +1148,19 @@
                     } else if (locFilter === 'Unallocated') { 
                         matchesLoc = photos.some(p => p.status !== 'Sold' && p.locations.length === 0); 
                     } else if (locFilter === 'Studio') {
-                        matchesLoc = photos.some(p => p.status !== 'Sold' && p.locations.some(loc => loc.toUpperCase().includes('JB') || loc.toUpperCase().includes('PNG')));
+                        // 當過濾「待出貨 (Studio)」時，過濾掉已經上線 (Online) 的商品
+                        matchesLoc = photos.some(p => {
+                            const isOnline = p.locations.some(l => l.toUpperCase() === 'ONLINE');
+                            return p.status !== 'Sold' && !isOnline && p.locations.some(loc => loc.toUpperCase().includes('JB') || loc.toUpperCase().includes('PNG'));
+                        });
                     } else { 
-                        matchesLoc = photos.some(p => p.locations.includes(locFilter)); 
+                        matchesLoc = photos.some(p => {
+                            if (p.status === 'Sold') return false;
+                            const isOnline = p.locations.some(l => l.toUpperCase() === 'ONLINE');
+                            const isStudioReq = locFilter.toUpperCase().includes('JB') || locFilter.toUpperCase().includes('PNG');
+                            // 如果選了 JB Studio，但商品已經是 Online，就不會被顯示出來
+                            return p.locations.includes(locFilter) && !(isStudioReq && isOnline);
+                        });
                     }
                 }
 
@@ -1154,11 +1172,13 @@
                 if(photos.length === 0) gridHTML = `<span class="text-xs text-stone-400">無照片資料</span>`;
                 else {
                     photos.forEach((p, idx) => {
+                        const isOnline = p.locations.some(l => l.toUpperCase() === 'ONLINE');
                         if (locFilter !== 'all' && locFilter !== 'Sold' && locFilter !== 'Unallocated') {
                             if (locFilter === 'Studio') {
-                                if (!p.locations.some(loc => loc.toUpperCase().includes('JB') || loc.toUpperCase().includes('PNG'))) return;
+                                if (isOnline || !p.locations.some(loc => loc.toUpperCase().includes('JB') || loc.toUpperCase().includes('PNG'))) return;
                             } else {
-                                if (!p.locations.includes(locFilter)) return;
+                                const isStudioReq = locFilter.toUpperCase().includes('JB') || locFilter.toUpperCase().includes('PNG');
+                                if (!p.locations.includes(locFilter) || (isStudioReq && isOnline)) return;
                             }
                         }
                         if (locFilter === 'Sold' && p.status !== 'Sold') return;
@@ -1169,7 +1189,6 @@
                         const hasImg = p.url && p.url.length > 0;
                         let badgeText = '', badgeClass = '', badgeStyle = '';
                         
-                        const isOnline = p.locations.some(l => l.toUpperCase() === 'ONLINE');
                         const physicalLocs = p.locations.filter(l => l.toUpperCase() !== 'ONLINE');
 
                         if (isSold) { 
@@ -1308,17 +1327,28 @@
                 
                 photos.forEach((p, idx) => {
                     let match = false;
+                    const isOnline = p.locations.some(l => l.toUpperCase() === 'ONLINE');
+                    
                     if (type === 'kpi') {
                         if (value === 'Total') match = true;
                         if (value === 'Making' && item.status === 'Making') match = true;
-                        if (value === 'Studio' && p.locations.some(loc => loc.toUpperCase().includes('JB') || loc.toUpperCase().includes('PNG')) && p.status !== 'Sold') match = true;
+                        // 當點擊 KPI 待出貨 (Studio) 時，過濾掉已上線的商品
+                        if (value === 'Studio' && p.locations.some(loc => loc.toUpperCase().includes('JB') || loc.toUpperCase().includes('PNG')) && p.status !== 'Sold' && !isOnline) match = true;
                         if (value === 'Unallocated' && p.locations.length === 0 && p.status !== 'Sold') match = true;
                         if (value === 'Sold' && p.status === 'Sold') match = true;
                     } else if (type === 'category') {
                         if (cleanCat === value) match = true;
                     } else if (type === 'location') {
                         if (value === 'Unallocated' && p.locations.length === 0 && p.status !== 'Sold') match = true;
-                        else if (p.locations.includes(value)) match = true;
+                        else if (p.locations.includes(value)) {
+                            const isStudioReq = value.toUpperCase().includes('JB') || value.toUpperCase().includes('PNG');
+                            // 當點擊 JB/PNG Studio 按鈕時，同樣隱藏已經上線的商品
+                            if (isStudioReq && isOnline) {
+                                match = false;
+                            } else {
+                                match = true;
+                            }
+                        }
                     }
 
                     if (match) {
@@ -1329,7 +1359,6 @@
                         let cardColorClass = getStatusColorClass(p.status === 'Sold' ? 'Sold' : item.status);
                         let cardBadgeHTML = '';
                         
-                        const isOnline = p.locations.some(l => l.toUpperCase() === 'ONLINE');
                         const physicalLocs = p.locations.filter(l => l.toUpperCase() !== 'ONLINE');
 
                         if (p.status === 'Sold') {
@@ -1545,7 +1574,6 @@
                     price: document.getElementById('edit-price').value 
                 }; 
                 
-                // 優化 3: 防止 iOS Safari 日期選擇導致的跨時區偏移 (Date Offset Bug)
                 data.makingAt = sDateVal ? new Date(sDateVal.replace(/-/g, '/')) : null;
                 data.completedAt = cDateVal ? new Date(cDateVal.replace(/-/g, '/')) : null;
                 
@@ -1556,7 +1584,6 @@
                 
                 const oldOriginStudio = item.originStudio || 'JB Studio';
 
-                // 優化 1: 當「編輯工單」更換生產地時，同步將還沒出貨的實體商品地點換掉
                 existingPhotos.forEach(p => {
                     if (!p.locations || p.locations.length === 0 || (p.locations.length === 1 && p.locations[0] === 'Studio')) {
                         p.locations = [newOriginStudio];
