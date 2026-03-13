@@ -1,129 +1,63 @@
-Weiweiwei Brand ERP System (v11.3)
-專為 Upcycling（升級再造）與 Remake 服裝品牌設計的輕量級 ERP 系統。
+🌟 weiweiwei 內部系統操作指南 (v11.18.20)
+歡迎使用 weiweiwei 的專屬 ERP 系統！這套系統的核心目標是讓每一件衣服從「排程製作」到「在庫調度」，最後到「順利售出」的過程都清清楚楚。
 
-不同於傳統成衣業以 SKU 數量為主的管理邏輯，本系統核心採用 「單品管理 (Unique Piece Tracking)」 架構。針對每一件由不同布料拼接、獨一無二的服裝進行全生命週期管理——從生產排程、照片建檔到多通路庫存分配。
+一、 系統權限與基本認知
+切換身份：進入系統後，請先在右上角確認自己的身份。
 
-✨ 主要功能 (Key Features)
-1. 📊 總覽儀表板 (Dashboard & Analytics)
-視覺化數據：即時顯示「製作中」、「在庫」、「未分配」與「已售出」的關鍵指標 (KPI)。
+Admin (Rie & Raina)：擁有最高權限，可看總覽數據、調整系統設定與新增工單。
 
-生產結構分析：透過堆疊長條圖 (Stacked Bar Chart) 分析每個月的品項生產比例 (e.g., Dress vs Top)。
+Maker (例如 Kim, Kelly)：專注於「生產排程」，只能看到與自己相關的製作任務，版面更簡潔。
 
-庫存去向佔比：圓餅圖顯示庫存目前分佈於工作室、官網或是寄賣點。
+二、 生產排程 (製作團隊日常操作)
+當有新的工單建立後，商品會出現在「生產排程」板塊。
 
-2. 🧵 生產排程管理 (Production)
-可視化進度：涵蓋 Pending -> Making -> QC -> Ready 完整流程。
+查看任務：利用上方的下拉選單過濾「自己的名字」，找出分配給你的製作任務。
 
-Reel View (滑動預覽)：針對同一款版型但不同花色的商品，提供水平滑動的照片預覽列。
+更新進度：點擊列表最右側的「齒輪按鈕 ⚙️」，可以更改該批商品的狀態。
 
-精確日期追蹤：記錄每一張工單的「開始製作日」與「完成日」。
+流程規範：Pending (待定) ➔ To Make (準備製作) ➔ Making (製作中) ➔ QC (品檢) ➔ Ready (完工入庫)。
 
-彈性補圖：支援工單建立後，隨時追加上傳成品照片。
+完工入庫：當狀態改為 Ready 並設定好「入庫地 (JB Studio 或 PNG Studio)」後，該商品就會正式進入庫存看板，交接給理貨人員。
 
-3. 📦 庫存與去向 (Inventory Allocation)
-單品視覺化：以照片為單位的庫存檢視，所見即所得。
+三、 庫存與調貨管理 (日常出貨/理貨必看)
+這是系統最靈活的地方，請務必了解「實體地點」與「線上商店」的雙重邏輯。
 
-多通路管理 (Multi-Location)：支援單件商品同時上架多個通路 (例如：同時在 Online 與 Pop-up store)。
+看懂狀態標籤：
 
-未分配提醒：自動標示尚未歸庫的商品為 None (未分配)，避免庫存遺漏。
+卡片上的顏色標籤代表它實體在哪裡（JB Studio、PNG Studio 或是外部 Stockist）。
 
-售出標記：一鍵標記 SOLD，並保留售出紀錄供分析。
+如果標籤前面帶有 🌐 符號（例如 🌐 JB Studio），代表這件衣服「實體躺在 JB，但已經同步刊登上 Online 網店」。
 
-4. 👥 權限分流 (Role-Based View)
-Admin View：擁有完整權限，包含數據分析與系統設定 (新增類別、地點、製作人)。
+一鍵出貨 / 調貨 (最常用)：
+不需要點進商品，直接在單品卡片下方的下拉選單操作：
 
-Maker View：專注於生產列表，介面簡潔，方便製作人查看工單。
+上線販售：選擇 🌐 上架至 Online。
 
-🛠 技術架構 (Tech Stack)
-本專案採用 Serverless (無伺服器) 架構，無須維護後端主機，直接透過瀏覽器運行。
+跨店調貨：選擇 JB Studio 或 PNG Studio（系統會自動將商品調過去，若原本是 Online 狀態也會無縫保留）。
 
-Frontend: HTML5, Vanilla JavaScript (ES Modules)
+發給寄賣點：選擇外部的 Stockist 名稱。
 
-Styling: Tailwind CSS (CDN)
+四、 單品進階編輯 (特例處理)
+如果遇到「同一批工單中，某一件衣服特別不一樣」的狀況，請點擊該單品的圖片，打開「詳細資訊」彈窗：
 
-Icons: Lucide Icons
+獨立定價：如果這件衣服因為微瑕疵要打折，或有特殊定價，可以在「獨立售價 (RM)」輸入新價格，它會直接覆蓋原本的預設主定價。
 
-Charts: Chart.js
+更換單品圖：如果這件衣服有單獨重拍的照片，可以在這裡上傳替換。
 
-Backend & Database: Google Firebase
+單品備註：可記錄「微瑕疵」、「VIP保留款」等重要備註。有備註的商品，列表卡片右上角會出現一個紅點提示大家注意。
 
-Firestore: 即時資料庫 (NoSQL)
+五、 售出結帳 (Mark as Sold)
+當商品確認售出並收到款項後：
 
-Storage: 儲存服裝照片
+點擊商品圖片進入詳細資訊。
 
-Authentication: 匿名登入驗證
+點擊最下方的黑色按鈕 「標記為已售出」。
 
-🚀 快速開始 (Setup & Installation)
-由於使用了 ES Modules 與 Firebase，請勿直接雙擊 .html 檔案開啟，需透過本機伺服器運行。
+輸入最終成交價（系統會自動帶入原本的定價，若有折扣請自行修改金額），並選好售出日期。
 
-1. 取得專案
-Bash
+按下確認後，該商品會變成灰色 SOLD 狀態，並正式計入當月的銷售業績中。
 
-git clone https://github.com/your-username/weiweiwei-erp.git
-cd weiweiwei-erp
-2. 設定 Firebase
-前往 Firebase Console 建立新專案。
+六、 防呆與救援須知 (🚨 重要)
+照片上傳請耐心等候：新增工單或替換照片時，按下儲存後按鈕會顯示「處理中...」，請給系統 1~3 秒鐘將照片傳上雲端，千萬不要急著重整網頁。
 
-啟用 Firestore Database (設定規則為測試模式或自行設定讀寫權限)。
-
-啟用 Storage (用於儲存圖片)。
-
-啟用 Authentication (開啟 Anonymous 匿名登入)。
-
-複製您的 Web App 設定檔 (包含 apiKey, projectId 等)。
-
-3. 更新設定
-打開 index.html (或您的主檔名)，找到以下區塊並替換為您的 Firebase 設定：
-
-JavaScript
-
-const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.firebasestorage.app",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
-};
-4. 啟動專案
-推薦使用 VS Code 的 Live Server 插件：
-
-在 VS Code 安裝 Live Server。
-
-在 HTML 檔案上按右鍵 -> Open with Live Server。
-
-系統將自動在瀏覽器開啟。
-
-📖 使用指南 (Workflow)
-建立工單 (Create)
-點擊「生產排程」頁面的 + 新增工單。
-
-填寫品名、類別、製作人。
-
-關鍵步驟：若布料已確定，可直接上傳多張布料/半成品照片；若無，可先輸入數量建立空單。
-
-生產回報 (Update)
-製作人完成後，點擊工單的 鉛筆 (Edit) 按鈕。
-
-更新狀態為 Ready。
-
-若先前未上傳照片，在此步驟使用 追加照片 功能上傳成品圖。
-
-庫存分配 (Allocate)
-進入「庫存管理」頁面。
-
-點擊照片打開詳情卡片。
-
-勾選商品所在位置 (如 Studio, Online)。
-
-若商品售出，點擊 標記為已售出 (SOLD)。
-
-📝 授權 (License)
-Copyright © 2025 Weiweiwei. 本系統為品牌內部管理工具，未經授權請勿商業轉載。
-
-💡 開發者筆記 (Dev Notes)
-目前版本：v11.3 (Stable)
-
-已解決 v11.2 中補上傳照片導致庫存數量重複計算的 Bug。
-
-未來規劃：加入 QR Code 掃描入庫功能、財務報表匯出。
+找不到商品怎麼辦？：如果操作太快，不小心把實體地點跟 Online 都取消掉了，商品會跑到總覽看板的**「無地點標記 (遺漏件)」**區。只要點開該區域，重新賦予它地點即可救援成功。
