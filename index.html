@@ -233,6 +233,20 @@
                     </div>
                 </div>
             </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6 border-t border-stone-200 pt-6">
+                <div class="bg-white p-5 rounded-lg shadow-sm border border-stone-200">
+                    <h4 class="text-sm font-bold text-stone-800 mb-1 uppercase flex items-center gap-2"><i data-lucide="crosshair" class="w-4 h-4 text-amber-500"></i> 商品獲利戰略矩陣</h4>
+                    <p class="text-[10px] text-stone-400 mb-4">右上方: 高利潤高銷量 (金雞母) | 左下方: 低利潤低銷量 (需淘汰)</p>
+                    <div class="relative w-full h-64"><canvas id="matrixChart"></canvas></div>
+                </div>
+                <div class="bg-white p-5 rounded-lg shadow-sm border border-stone-200">
+                    <h4 class="text-sm font-bold text-stone-800 mb-1 uppercase flex items-center gap-2"><i data-lucide="trending-up" class="w-4 h-4 text-emerald-500"></i> 通路戰力分析</h4>
+                    <p class="text-[10px] text-stone-400 mb-4">柱狀圖: 總營業額 (量) | 折線圖: 客單價 (質)</p>
+                    <div class="relative w-full h-64"><canvas id="channelChart"></canvas></div>
+                </div>
+            </div>
+
         </section>
 
         <section id="view-production" class="space-y-6 hidden animate-fade-in pb-10">
@@ -334,14 +348,18 @@
                     <input type="text" name="color" class="border p-2 rounded text-sm" placeholder="顏色">
                     <select name="size" class="border p-2 rounded text-sm bg-white"><option value="F">F</option><option value="S">S</option><option value="M">M</option><option value="L">L</option></select>
                 </div>
-                 <div class="grid grid-cols-2 gap-4">
+                <div class="grid grid-cols-3 gap-4">
                     <div>
                         <label class="block text-xs font-medium text-stone-500 mb-1">總數量</label>
                         <input type="number" name="quantity" value="1" min="1" class="w-full border-stone-300 rounded-md shadow-sm text-sm p-2 border">
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-stone-500 mb-1">統一預設定價 (RM)</label>
-                        <input type="number" name="price" placeholder="RM" class="w-full border-stone-300 rounded-md shadow-sm text-sm p-2 border">
+                        <label class="block text-xs font-medium text-stone-500 mb-1">單件成本 (Cost RM)</label>
+                        <input type="number" name="cost" placeholder="RM" required class="w-full border-stone-300 rounded-md shadow-sm text-sm p-2 border">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-stone-500 mb-1">主定價 (Price RM)</label>
+                        <input type="number" name="price" placeholder="RM" required class="w-full border-stone-300 rounded-md shadow-sm text-sm p-2 border">
                     </div>
                 </div>
                 <div class="grid grid-cols-2 gap-4">
@@ -402,9 +420,15 @@
                 </div>
                 <div class="grid grid-cols-2 gap-2">
                     <div>
-                        <label class="text-xs text-stone-500 font-bold">主定價 (RM)</label>
+                        <label class="text-xs text-stone-500 font-bold">單件成本 (Cost RM)</label>
+                        <input type="number" id="edit-cost" class="w-full border p-2 rounded text-sm text-stone-700">
+                    </div>
+                    <div>
+                        <label class="text-xs text-stone-500 font-bold">主定價 (Price RM)</label>
                         <input type="number" id="edit-price" class="w-full border p-2 rounded text-sm font-bold text-stone-700">
                     </div>
+                </div>
+                <div class="grid grid-cols-1 gap-2">
                     <div>
                         <label class="text-xs text-stone-500">入庫地 (覆寫未出庫)</label>
                         <select id="edit-originStudio" class="w-full border p-2 rounded text-sm bg-white font-bold">
@@ -562,7 +586,10 @@
         let currentRole = 'admin';
         let calendarMode = 'production'; 
         let currentCalDate = new Date(); 
+        
+        // 🌟 圖表變數
         let categoryChart = null, allocChart = null;
+        let matrixChart = null, channelChart = null;
         
         let appSettings = { 
             makers: ['Kim', 'Kelly', 'Lijin'], 
@@ -669,10 +696,9 @@
                 if(snap.exists()) {
                     const data = snap.data();
                     let fetchedLocations = data.locations || appSettings.locations;
-                    // 防呆：強制把核心地點加回去，防止被誤刪導致 UI 崩潰
                     ['JB Studio', 'PNG Studio', 'Online'].forEach(coreLoc => {
                         if (!fetchedLocations.includes(coreLoc)) {
-                            fetchedLocations.unshift(coreLoc); // 放回最前面
+                            fetchedLocations.unshift(coreLoc);
                         }
                     });
 
@@ -807,14 +833,13 @@
                             const isOnline = p.locations.some(loc => loc.toUpperCase() === 'ONLINE');
                             const hasStudio = p.locations.some(loc => loc.toUpperCase().includes('JB') || loc.toUpperCase().includes('PNG'));
                             
-                            // 上線後不計算在待出貨 KPI 內
                             if (hasStudio && !isOnline) {
                                 studioCount++;
                             }
                             
                             p.locations.forEach(loc => {
                                 const isStudioLoc = loc.toUpperCase().includes('JB') || loc.toUpperCase().includes('PNG');
-                                if (isStudioLoc && isOnline) return; // 從實體 Studio 圖表數字中扣除，完全算入Online
+                                if (isStudioLoc && isOnline) return; 
                                 if(locStats[loc] !== undefined) locStats[loc]++;
                             });
                         } else {
@@ -834,6 +859,9 @@
             updateCharts(locStats, catStats);
             renderCalendar(); 
             window.renderPerformanceStats(); 
+            
+            // 🌟 觸發商業戰略圖表更新
+            window.updateBusinessAnalytics();
         }
 
         window.renderPerformanceStats = function() {
@@ -1081,6 +1109,7 @@
         }
 
         function initCharts() {
+            // 既有圖表
             categoryChart = new Chart(document.getElementById('categoryChart'), {
                 type: 'bar',
                 data: { labels: [], datasets: [] },
@@ -1094,6 +1123,36 @@
                 type: 'doughnut',
                 data: { labels: [], datasets: [{ data: [], backgroundColor: [] }] },
                 options: { maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: {size: 10} } } } }
+            });
+
+            // 🌟 獲利矩陣初始化 (已修復 Y軸起點 與 點的大小)
+            matrixChart = new Chart(document.getElementById('matrixChart'), {
+                type: 'scatter',
+                data: { datasets: [] },
+                options: {
+                    maintainAspectRatio: false,
+                    plugins: {
+                        tooltip: { callbacks: { label: (ctx) => `${ctx.raw.name}: 賣出 ${ctx.raw.x} 件 | 均利 RM${ctx.raw.y}` } },
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: { beginAtZero: true, title: { display: true, text: '總銷量 (件)' } },
+                        y: { beginAtZero: true, title: { display: true, text: '單件平均淨利 (RM)' } }
+                    }
+                }
+            });
+
+            // 🌟 通路戰力初始化 (已修復 Y軸起點)
+            channelChart = new Chart(document.getElementById('channelChart'), {
+                type: 'bar',
+                data: { labels: [], datasets: [] },
+                options: {
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, type: 'linear', display: true, position: 'left', title: { display: true, text: '總營業額 (RM)' } },
+                        y1: { beginAtZero: true, type: 'linear', display: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: '客單價 (RM)' } }
+                    }
+                }
             });
         }
 
@@ -1125,6 +1184,86 @@
             categoryChart.data.datasets = datasets;
             categoryChart.update();
         }
+
+        // 🌟 全新：商業分析邏輯（計算矩陣與通路）
+        window.updateBusinessAnalytics = function() {
+            const productStats = {};
+            const channelStats = {};
+
+            db.forEach(item => {
+                const cost = Number(item.cost) || 0;
+                const itemName = item.itemName || 'Unknown Item';
+                const photos = normalizePhotos(item);
+                
+                photos.forEach(p => {
+                    if (p.status === 'Sold') {
+                        // 1. 矩陣計算
+                        const soldPrice = Number(p.soldPrice) || Number(item.price) || 0;
+                        const profit = soldPrice - cost;
+                        
+                        if (!productStats[itemName]) productStats[itemName] = { qty: 0, totalProfit: 0 };
+                        productStats[itemName].qty += 1;
+                        productStats[itemName].totalProfit += profit;
+
+                        // 2. 通路計算
+                        let loc = p.locations.length > 0 ? p.locations[p.locations.length - 1] : 'Unknown';
+                        if (p.locations.some(l => l.toUpperCase() === 'ONLINE')) loc = 'Online';
+
+                        if (!channelStats[loc]) channelStats[loc] = { revenue: 0, qty: 0 };
+                        channelStats[loc].revenue += soldPrice;
+                        channelStats[loc].qty += 1;
+                    }
+                });
+            });
+
+            // 更新矩陣圖表 (已修復透明度與點的大小)
+            const matrixData = Object.keys(productStats).map(name => {
+                const stat = productStats[name];
+                return {
+                    name: name,
+                    x: stat.qty,
+                    y: stat.qty > 0 ? Math.round(stat.totalProfit / stat.qty) : 0, // 安全防護除以0
+                };
+            });
+            
+            matrixChart.data.datasets = [{
+                label: '商品獲利分佈',
+                data: matrixData,
+                backgroundColor: 'rgba(252, 160, 12, 0.7)', // 70% 橘色透明，重疊才看得見
+                borderColor: '#ea580c',
+                borderWidth: 1,
+                pointRadius: 8,      // 🌟 強制放大點的大小
+                pointHoverRadius: 10 // 🌟 滑鼠移過去變更大
+            }];
+            matrixChart.update();
+
+            // 更新通路圖表 (已修復除以0的安全防護)
+            const channelNames = Object.keys(channelStats);
+            const revenues = channelNames.map(c => channelStats[c].revenue);
+            const aovs = channelNames.map(c => channelStats[c].qty > 0 ? Math.round(channelStats[c].revenue / channelStats[c].qty) : 0);
+
+            channelChart.data.labels = channelNames;
+            channelChart.data.datasets = [
+                {
+                    type: 'bar',
+                    label: '總營業額 (RM)',
+                    data: revenues,
+                    backgroundColor: '#34d399',
+                    yAxisID: 'y'
+                },
+                {
+                    type: 'line',
+                    label: '客單價 AOV (RM)',
+                    data: aovs,
+                    borderColor: '#3b82f6',
+                    backgroundColor: '#3b82f6',
+                    borderWidth: 3,
+                    tension: 0.3,
+                    yAxisID: 'y1'
+                }
+            ];
+            channelChart.update();
+        };
 
         window.renderProductionList = function() {
             const tbody = document.getElementById('production-table-body');
@@ -1174,8 +1313,6 @@
                     } else if (locFilter === 'Unallocated') { 
                         matchesLoc = photos.some(p => p.status !== 'Sold' && p.locations.length === 0); 
                     } else { 
-                        // 精準過濾：只要 locations 陣列中包含該地點字串，就符合顯示條件！
-                        // 讓 Online 跟 Studio 雙標籤的商品能在兩邊都出現
                         matchesLoc = photos.some(p => {
                             if (p.status === 'Sold') return false;
                             return p.locations.includes(locFilter); 
@@ -1238,7 +1375,6 @@
                             }
                         }
                         
-                        // ===== 強大的卡片下拉選單生成 =====
                         let quickDispatchHTML = '';
                         
                         if (!isSold) {
@@ -1326,12 +1462,10 @@
                 } else {
                     const hasOnline = photos[photoIdx].locations.some(l => l.toUpperCase() === 'ONLINE');
                     const onlineName = photos[photoIdx].locations.find(l => l.toUpperCase() === 'ONLINE');
-                    // 只替換實體地點，完美保留 Online 狀態
                     photos[photoIdx].locations = hasOnline ? [onlineName, toLocation] : [toLocation]; 
                 }
                 
                 await updateDoc(doc(dbFirestore, "stock_items", itemId), { photos: photos });
-                // 成功後，Firebase 的 onSnapshot 會自動重繪 UI，無需手動 DOM 操作
             } catch (err) {
                 alert("轉移失敗：" + err.message);
                 selectEl.disabled = false;
@@ -1505,7 +1639,6 @@
                 return; 
             }
             
-            // 繪製實體地點
             const physicalLocs = appSettings.locations.filter(l => l.toUpperCase() !== 'ONLINE');
             physicalLocs.forEach(loc => {
                 const isSelected = tempLocations.includes(loc);
@@ -1513,7 +1646,6 @@
                 container.innerHTML += `<button onclick="window.toggleDetailLocation('${loc}')" class="border rounded py-2 text-xs font-bold transition-colors ${btnClass}">${loc} ${isSelected ? '✓' : ''}</button>`;
             });
 
-            // 繪製獨立的 Online 開關
             const isOnlineSelected = tempLocations.some(l => l.toUpperCase() === 'ONLINE');
             const onlineBtnClass = isOnlineSelected ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm' : 'bg-white text-stone-500 border-stone-200 hover:border-emerald-300';
             onlineContainer.innerHTML = `
@@ -1535,10 +1667,8 @@
                 const onlineLoc = tempLocations.find(l => l.toUpperCase() === 'ONLINE');
                 
                 if (tempLocations.includes(loc)) {
-                    // 若取消當前實體地點，等於無地點遺漏狀態
                     tempLocations = tempLocations.filter(l => l !== loc);
                 } else {
-                    // 單選邏輯：覆寫先前的實體地點
                     tempLocations = onlineLoc ? [onlineLoc, loc] : [loc];
                 }
             }
@@ -1596,6 +1726,7 @@
         async function updateItemStatus(photos) { const allSold = photos.every(p => p.status === 'Sold'); const anySold = photos.some(p => p.status === 'Sold'); let globalStatus = allSold ? 'Sold' : (anySold ? 'Partial Sold' : 'Ready'); await updateDoc(doc(dbFirestore, "stock_items", currentDetailItem.id), { photos: photos, status: globalStatus }); window.closeDetailModal(); }
         window.closeDetailModal = () => document.getElementById('detail-modal').classList.add('hidden');
         
+        // 🌟 更新：新增資料時寫入 Cost
         window.handleAddItem = async function(e) { 
             e.preventDefault(); 
             const btn = document.getElementById('btn-submit'); btn.innerText = '處理中...'; btn.disabled = true; 
@@ -1623,6 +1754,7 @@
                     size: form.get('size'), 
                     originStudio: originStudio, 
                     quantity: parseInt(form.get('quantity')) || 1, 
+                    cost: Number(form.get('cost')) || 0, // 👈 寫入成本
                     price: form.get('price'), 
                     status: 'To Make', 
                     photos: photoObjs, 
@@ -1633,6 +1765,7 @@
             } catch (error) { console.error(error); alert("Error: " + error.message); } finally { btn.innerText = '確認新增'; btn.disabled = false; } 
         };
         
+        // 🌟 修正 Bug：編輯彈窗載入 Cost (防護 0 被吃掉)
         window.openEditModal = (id) => { 
             const item = db.find(i=>i.id===id); 
             document.getElementById('edit-id').value = id; 
@@ -1641,7 +1774,8 @@
             document.getElementById('edit-status').value = item.status; 
             document.getElementById('edit-maker').value = item.maker || ''; 
             document.getElementById('edit-category').value = getCleanCategory(item.category); 
-            document.getElementById('edit-price').value = item.price || ''; 
+            document.getElementById('edit-cost').value = item.cost !== undefined ? item.cost : ''; // 👈 修復 0 被吃掉的 Bug
+            document.getElementById('edit-price').value = item.price !== undefined ? item.price : ''; 
             document.getElementById('edit-originStudio').value = item.originStudio || 'JB Studio'; 
             document.getElementById('edit-addPhotos').value = ''; 
             document.getElementById('edit-startDate').value = formatDateForInput(item.makingAt); 
@@ -1652,6 +1786,7 @@
         
         window.closeEditModal = () => document.getElementById('edit-modal').classList.add('hidden');
         
+        // 🌟 修正 Bug：儲存編輯資料時寫入 Cost
         window.handleEditSubmit = async () => { 
             const id = document.getElementById('edit-id').value; 
             const btn = document.getElementById('btn-edit-save'); 
@@ -1668,6 +1803,7 @@
                     originStudio: newOriginStudio,
                     itemName: document.getElementById('edit-itemName').value, 
                     month: document.getElementById('edit-month').value, 
+                    cost: Number(document.getElementById('edit-cost').value) || 0, // 👈 安全儲存成本
                     price: document.getElementById('edit-price').value 
                 }; 
                 
@@ -1741,7 +1877,6 @@
             const locSelect = document.getElementById('alloc-filter-location'); 
             if(locSelect) { 
                 const currentVal = locSelect.value; 
-                // 硬寫入核心選單結構，保證這幾個重要地點永遠可以選！
                 let html = `
                     <option value="all">全部庫存 (All)</option>
                     <option value="Sold">已售出 (Sold)</option>
