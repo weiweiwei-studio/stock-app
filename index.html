@@ -263,6 +263,15 @@
                 <span class="text-sm font-medium text-stone-600 flex-shrink-0">過濾:</span>
                 <select id="prod-filter-maker" onchange="window.renderProductionList()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5 dynamic-maker-select"><option value="all">全部製作人</option></select>
                 <select id="prod-filter-category" onchange="window.renderProductionList()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5 dynamic-category-select"><option value="all">全部類別</option></select>
+                
+                <select id="prod-filter-status" onchange="window.renderProductionList()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5">
+                    <option value="all">全部狀態</option>
+                    <option value="Pending">Pending</option>
+                    <option value="To Make">To Make</option>
+                    <option value="Making">Making</option>
+                    <option value="QC">QC</option>
+                    <option value="Ready">Ready</option>
+                </select>
             </div>
             <div class="bg-white rounded-lg shadow-sm overflow-hidden border border-stone-200">
                 <div class="overflow-x-auto custom-scrollbar">
@@ -1269,10 +1278,15 @@
             const tbody = document.getElementById('production-table-body');
             const makerFilter = document.getElementById('prod-filter-maker').value;
             const catFilter = document.getElementById('prod-filter-category').value;
+            const statusFilter = document.getElementById('prod-filter-status').value;
+            
             tbody.innerHTML = '';
             let data = db;
+            
             if (makerFilter !== 'all') data = data.filter(i => i.maker === makerFilter);
             if (catFilter !== 'all') data = data.filter(i => getCleanCategory(i.category) === catFilter);
+            if (statusFilter !== 'all') data = data.filter(i => i.status === statusFilter);
+            
             data.forEach(item => {
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-stone-50 transition-colors border-b border-stone-50';
