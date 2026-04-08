@@ -1386,7 +1386,7 @@
                 filteredDb = filteredDb.filter(i => getCleanCategory(i.category) === catFilter);
             }
 
-            let totalMatchingPieces = 0; // 🌟 統計匹配的總件數
+            let totalMatchingPieces = 0;
 
             filteredDb.forEach(item => {
                 const photos = normalizePhotos(item);
@@ -1426,7 +1426,13 @@
                         if (locFilter === 'Sold' && p.status !== 'Sold') return;
                         if (locFilter === 'Unallocated' && (p.status === 'Sold' || p.locations.length > 0)) return;
 
-                        totalMatchingPieces++; // 🌟 加總此單品
+                        // 🌟 核心邏輯：只加總「未售出」的庫存 (除非故意選擇Sold過濾器)
+                        if (locFilter === 'Sold') {
+                            totalMatchingPieces++; 
+                        } else if (p.status !== 'Sold') {
+                            totalMatchingPieces++; 
+                        }
+                        
                         hasRenderedAnyPhoto = true;
 
                         const isSold = p.status === 'Sold';
@@ -1539,8 +1545,11 @@
             const displayLoc = locFilter === 'all' ? '全部地點' : displayLocRaw.replace(/[\(🌐🚚🏠\)]/g, '').trim();
             const displayCat = catFilter === 'all' ? '全部類別' : catFilter;
             
+            // 如果剛好選擇 Sold 過濾器，文字要提示是算售出的。其他情況都是算未售出(真實庫存)
+            const summaryLabel = locFilter === 'Sold' ? '已售出總計' : '未售出庫存';
+
             summaryText.innerHTML = `
-                <span class="text-stone-500 font-bold text-xs mr-2"><i data-lucide="calculator" class="w-4 h-4 inline pb-0.5"></i> 篩選統計:</span> 
+                <span class="text-stone-500 font-bold text-xs mr-2"><i data-lucide="package-check" class="w-4 h-4 inline pb-0.5"></i> ${summaryLabel}:</span> 
                 <span class="bg-white px-2 py-0.5 rounded shadow-sm border border-blue-100 text-stone-700 text-xs font-bold">${displayCat}</span> 
                 <span class="text-blue-300 mx-1 font-bold">+</span> 
                 <span class="bg-white px-2 py-0.5 rounded shadow-sm border border-blue-100 text-stone-700 text-xs font-bold">${displayLoc}</span> 
