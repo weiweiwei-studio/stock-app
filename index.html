@@ -608,7 +608,6 @@
         let calendarMode = 'production'; 
         let currentCalDate = new Date(); 
         
-        // 🌟 圖表變數
         let categoryChart = null, allocChart = null;
         let matrixChart = null, channelChart = null;
         
@@ -881,14 +880,10 @@
             renderCalendar(); 
             window.renderPerformanceStats(); 
             
-            // 🌟 觸發類別與地點分佈渲染
             window.updateCatLocDistribution();
-            
-            // 🌟 觸發商業戰略圖表更新
             window.updateBusinessAnalytics();
         }
 
-        // 🌟 新增：類別選擇 -> 顯示各地點庫存數量的視覺化邏輯
         window.updateCatLocDistribution = function() {
             const selectEl = document.getElementById('dash-filter-cat-loc');
             if (!selectEl) return;
@@ -935,8 +930,9 @@
                 const pct = (count / max) * 100;
                 const bgHex = loc === 'Unallocated' ? '#9ca3af' : window.getLocColorObj(loc).bg;
                 
+                // 🌟 改為點擊觸發雙重條件 (Category + Location) 
                 html += `
-                    <div class="flex items-center justify-between text-[10px] mb-1.5 group cursor-pointer" onclick="window.openListModal('location', '${loc}')">
+                    <div class="flex items-center justify-between text-[10px] mb-1.5 group cursor-pointer" onclick="window.openListModal('cat_loc', '${selectedCat}|${loc}')">
                         <span class="font-bold text-stone-600 truncate w-24 text-left group-hover:text-stone-900 transition-colors">${loc}</span>
                         <div class="flex-grow mx-2 bg-stone-100 rounded-full h-1.5 overflow-hidden">
                             <div class="h-full rounded-full transition-all duration-500 opacity-80 group-hover:opacity-100" style="width: ${pct}%; background-color: ${bgHex};"></div>
@@ -1193,7 +1189,6 @@
         }
 
         function initCharts() {
-            // 既有圖表
             categoryChart = new Chart(document.getElementById('categoryChart'), {
                 type: 'bar',
                 data: { labels: [], datasets: [] },
@@ -1209,7 +1204,6 @@
                 options: { maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: {size: 10} } } } }
             });
 
-            // 🌟 獲利矩陣初始化
             matrixChart = new Chart(document.getElementById('matrixChart'), {
                 type: 'scatter',
                 data: { datasets: [] },
@@ -1226,7 +1220,6 @@
                 }
             });
 
-            // 🌟 通路戰力初始化
             channelChart = new Chart(document.getElementById('channelChart'), {
                 type: 'bar',
                 data: { labels: [], datasets: [] },
@@ -1565,6 +1558,12 @@
             if (type === 'kpi') titleEl.innerText = titleMap[value] || value;
             else if (type === 'category') titleEl.innerText = `類別: ${value}`;
             else if (type === 'location') titleEl.innerText = `地點: ${value}`;
+            // 🌟 處理新的雙重過濾標題
+            else if (type === 'cat_loc') {
+                const parts = value.split('|');
+                const catLabel = parts[0] === 'all' ? '全部類別' : parts[0];
+                titleEl.innerText = `${catLabel} @ ${parts[1]}`;
+            }
             
             const gridContainer = document.getElementById('list-modal-grid');
             gridContainer.innerHTML = '';
@@ -1591,6 +1590,19 @@
                         if (value === 'Unallocated' && p.locations.length === 0 && p.status !== 'Sold') match = true;
                         else if (p.locations.includes(value)) {
                             match = true; 
+                        }
+                    } 
+                    // 🌟 處理新的雙重過濾邏輯
+                    else if (type === 'cat_loc') {
+                        const parts = value.split('|');
+                        const targetCat = parts[0];
+                        const targetLoc = parts[1];
+                        
+                        const catMatches = (targetCat === 'all' || cleanCat === targetCat);
+                        const locMatches = (targetLoc === 'Unallocated' ? (p.locations.length === 0 && p.status !== 'Sold') : p.locations.includes(targetLoc));
+                        
+                        if (catMatches && locMatches) {
+                            match = true;
                         }
                     }
 
