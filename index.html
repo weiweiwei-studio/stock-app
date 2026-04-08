@@ -223,6 +223,18 @@
                         <h3 class="font-bold text-stone-700 mb-2 text-xs uppercase tracking-wide">類別總計 (點擊看照片)</h3>
                         <div id="category-stats-container" class="flex flex-wrap gap-2"></div>
                     </div>
+                    
+                    <div class="bg-white p-4 rounded-lg shadow-sm border-l-4 border-blue-400">
+                        <h4 class="text-xs font-bold text-stone-700 mb-3 uppercase tracking-wide flex items-center justify-between border-b border-stone-100 pb-2">
+                            <span>📍 類別庫存地點分佈</span>
+                        </h4>
+                        <select id="dash-filter-cat-loc" onchange="window.updateCatLocDistribution()" class="w-full bg-stone-50 border border-stone-200 text-xs rounded p-2 mb-3 font-bold text-stone-600 dynamic-category-select focus:outline-none focus:border-stone-400 transition-colors cursor-pointer shadow-sm">
+                            <option value="all">全部類別</option>
+                        </select>
+                        <div id="dash-cat-loc-container" class="space-y-1">
+                            </div>
+                    </div>
+
                     <div class="bg-white p-4 rounded-lg shadow-sm">
                         <h4 class="text-xs font-bold text-stone-500 mb-2 uppercase">類別生產趨勢</h4>
                         <div class="relative w-full h-40"><canvas id="categoryChart"></canvas></div>
@@ -869,9 +881,72 @@
             renderCalendar(); 
             window.renderPerformanceStats(); 
             
+            // 🌟 觸發類別與地點分佈渲染
+            window.updateCatLocDistribution();
+            
             // 🌟 觸發商業戰略圖表更新
             window.updateBusinessAnalytics();
         }
+
+        // 🌟 新增：類別選擇 -> 顯示各地點庫存數量的視覺化邏輯
+        window.updateCatLocDistribution = function() {
+            const selectEl = document.getElementById('dash-filter-cat-loc');
+            if (!selectEl) return;
+            const selectedCat = selectEl.value;
+            const container = document.getElementById('dash-cat-loc-container');
+            container.innerHTML = '';
+            
+            let locStats = {};
+            appSettings.locations.forEach(l => locStats[l] = 0);
+            locStats['Unallocated'] = 0;
+            
+            db.forEach(item => {
+                const cleanCat = getCleanCategory(item.category);
+                if (selectedCat !== 'all' && cleanCat !== selectedCat) return;
+                
+                const photos = normalizePhotos(item);
+                photos.forEach(p => {
+                    if (p.status !== 'Sold') {
+                        if (p.locations.length > 0) {
+                            const isOnline = p.locations.some(loc => loc.toUpperCase() === 'ONLINE');
+                            p.locations.forEach(loc => {
+                                const isStudioLoc = loc.toUpperCase().includes('JB') || loc.toUpperCase().includes('PNG');
+                                if (isStudioLoc && isOnline) return; 
+                                if(locStats[loc] !== undefined) locStats[loc]++;
+                            });
+                        } else {
+                            locStats['Unallocated']++;
+                        }
+                    }
+                });
+            });
+            
+            const sortedLocs = Object.keys(locStats).filter(l => locStats[l] > 0).sort((a,b) => locStats[b] - locStats[a]);
+            
+            if (sortedLocs.length === 0) {
+                container.innerHTML = '<div class="text-[10px] text-stone-400 text-center py-3 bg-stone-50 rounded">此類別目前無相關庫存資料</div>';
+                return;
+            }
+            
+            const max = locStats[sortedLocs[0]];
+            let html = '';
+            sortedLocs.forEach(loc => {
+                const count = locStats[loc];
+                const pct = (count / max) * 100;
+                const bgHex = loc === 'Unallocated' ? '#9ca3af' : window.getLocColorObj(loc).bg;
+                
+                html += `
+                    <div class="flex items-center justify-between text-[10px] mb-1.5 group cursor-pointer" onclick="window.openListModal('location', '${loc}')">
+                        <span class="font-bold text-stone-600 truncate w-24 text-left group-hover:text-stone-900 transition-colors">${loc}</span>
+                        <div class="flex-grow mx-2 bg-stone-100 rounded-full h-1.5 overflow-hidden">
+                            <div class="h-full rounded-full transition-all duration-500 opacity-80 group-hover:opacity-100" style="width: ${pct}%; background-color: ${bgHex};"></div>
+                        </div>
+                        <span class="font-bold text-stone-800 w-8 text-right bg-stone-50 px-1 rounded border border-stone-100">${count}</span>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        };
 
         window.renderPerformanceStats = function() {
             const displayDate = currentCalDate;
@@ -1134,7 +1209,7 @@
                 options: { maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: {size: 10} } } } }
             });
 
-            // 🌟 獲利矩陣初始化 (已修復 Y軸起點 與 點的大小)
+            // 🌟 獲利矩陣初始化
             matrixChart = new Chart(document.getElementById('matrixChart'), {
                 type: 'scatter',
                 data: { datasets: [] },
@@ -1151,7 +1226,7 @@
                 }
             });
 
-            // 🌟 通路戰力初始化 (已修復 Y軸起點)
+            // 🌟 通路戰力初始化
             channelChart = new Chart(document.getElementById('channelChart'), {
                 type: 'bar',
                 data: { labels: [], datasets: [] },
@@ -1194,7 +1269,6 @@
             categoryChart.update();
         }
 
-        // 🌟 全新：商業分析邏輯（計算矩陣與通路）
         window.updateBusinessAnalytics = function() {
             const productStats = {};
             const channelStats = {};
@@ -1206,7 +1280,6 @@
                 
                 photos.forEach(p => {
                     if (p.status === 'Sold') {
-                        // 1. 矩陣計算
                         const soldPrice = Number(p.soldPrice) || Number(item.price) || 0;
                         const profit = soldPrice - cost;
                         
@@ -1214,7 +1287,6 @@
                         productStats[itemName].qty += 1;
                         productStats[itemName].totalProfit += profit;
 
-                        // 2. 通路計算
                         let loc = p.locations.length > 0 ? p.locations[p.locations.length - 1] : 'Unknown';
                         if (p.locations.some(l => l.toUpperCase() === 'ONLINE')) loc = 'Online';
 
@@ -1225,28 +1297,26 @@
                 });
             });
 
-            // 更新矩陣圖表 (已修復透明度與點的大小)
             const matrixData = Object.keys(productStats).map(name => {
                 const stat = productStats[name];
                 return {
                     name: name,
                     x: stat.qty,
-                    y: stat.qty > 0 ? Math.round(stat.totalProfit / stat.qty) : 0, // 安全防護除以0
+                    y: stat.qty > 0 ? Math.round(stat.totalProfit / stat.qty) : 0, 
                 };
             });
             
             matrixChart.data.datasets = [{
                 label: '商品獲利分佈',
                 data: matrixData,
-                backgroundColor: 'rgba(252, 160, 12, 0.7)', // 70% 橘色透明，重疊才看得見
+                backgroundColor: 'rgba(252, 160, 12, 0.7)', 
                 borderColor: '#ea580c',
                 borderWidth: 1,
-                pointRadius: 8,      // 🌟 強制放大點的大小
-                pointHoverRadius: 10 // 🌟 滑鼠移過去變更大
+                pointRadius: 8,      
+                pointHoverRadius: 10 
             }];
             matrixChart.update();
 
-            // 更新通路圖表 (已修復除以0的安全防護)
             const channelNames = Object.keys(channelStats);
             const revenues = channelNames.map(c => channelStats[c].revenue);
             const aovs = channelNames.map(c => channelStats[c].qty > 0 ? Math.round(channelStats[c].revenue / channelStats[c].qty) : 0);
@@ -1740,7 +1810,6 @@
         async function updateItemStatus(photos) { const allSold = photos.every(p => p.status === 'Sold'); const anySold = photos.some(p => p.status === 'Sold'); let globalStatus = allSold ? 'Sold' : (anySold ? 'Partial Sold' : 'Ready'); await updateDoc(doc(dbFirestore, "stock_items", currentDetailItem.id), { photos: photos, status: globalStatus }); window.closeDetailModal(); }
         window.closeDetailModal = () => document.getElementById('detail-modal').classList.add('hidden');
         
-        // 🌟 更新：新增資料時寫入 Cost
         window.handleAddItem = async function(e) { 
             e.preventDefault(); 
             const btn = document.getElementById('btn-submit'); btn.innerText = '處理中...'; btn.disabled = true; 
@@ -1768,7 +1837,7 @@
                     size: form.get('size'), 
                     originStudio: originStudio, 
                     quantity: parseInt(form.get('quantity')) || 1, 
-                    cost: Number(form.get('cost')) || 0, // 👈 寫入成本
+                    cost: Number(form.get('cost')) || 0, 
                     price: form.get('price'), 
                     status: 'To Make', 
                     photos: photoObjs, 
@@ -1779,7 +1848,6 @@
             } catch (error) { console.error(error); alert("Error: " + error.message); } finally { btn.innerText = '確認新增'; btn.disabled = false; } 
         };
         
-        // 🌟 修正 Bug：編輯彈窗載入 Cost (防護 0 被吃掉)
         window.openEditModal = (id) => { 
             const item = db.find(i=>i.id===id); 
             document.getElementById('edit-id').value = id; 
@@ -1788,7 +1856,7 @@
             document.getElementById('edit-status').value = item.status; 
             document.getElementById('edit-maker').value = item.maker || ''; 
             document.getElementById('edit-category').value = getCleanCategory(item.category); 
-            document.getElementById('edit-cost').value = item.cost !== undefined ? item.cost : ''; // 👈 修復 0 被吃掉的 Bug
+            document.getElementById('edit-cost').value = item.cost !== undefined ? item.cost : ''; 
             document.getElementById('edit-price').value = item.price !== undefined ? item.price : ''; 
             document.getElementById('edit-originStudio').value = item.originStudio || 'JB Studio'; 
             document.getElementById('edit-addPhotos').value = ''; 
@@ -1800,7 +1868,6 @@
         
         window.closeEditModal = () => document.getElementById('edit-modal').classList.add('hidden');
         
-        // 🌟 修正 Bug：儲存編輯資料時寫入 Cost
         window.handleEditSubmit = async () => { 
             const id = document.getElementById('edit-id').value; 
             const btn = document.getElementById('btn-edit-save'); 
@@ -1817,7 +1884,7 @@
                     originStudio: newOriginStudio,
                     itemName: document.getElementById('edit-itemName').value, 
                     month: document.getElementById('edit-month').value, 
-                    cost: Number(document.getElementById('edit-cost').value) || 0, // 👈 安全儲存成本
+                    cost: Number(document.getElementById('edit-cost').value) || 0, 
                     price: document.getElementById('edit-price').value 
                 }; 
                 
