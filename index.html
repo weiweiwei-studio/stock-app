@@ -840,6 +840,7 @@
             const making = db.filter(i => i.status === 'Making').reduce((sum, item) => sum + (parseInt(item.quantity) || 1), 0);
             let soldCount = 0, studioCount = 0, unallocatedCount = 0;
             const catStats = {};
+            const catUnshippedStats = {}; // 新增: 統計未出庫數量
             const locStats = { 'Unallocated': 0, 'Sold': 0 };
             
             appSettings.locations.forEach(l => {
@@ -849,13 +850,27 @@
             db.forEach(i => {
                 const count = i.photos && i.photos.length > 0 ? i.photos.length : (parseInt(i.quantity)||1);
                 const cat = getCleanCategory(i.category);
-                if (cat) catStats[cat] = (catStats[cat] || 0) + count;
+                if (cat) {
+                    catStats[cat] = (catStats[cat] || 0) + count;
+                    catUnshippedStats[cat] = catUnshippedStats[cat] || 0;
+                }
                 
                 const photos = normalizePhotos(i);
                 photos.forEach((p, idx) => {
                     if (p.status === 'Sold') {
                         soldCount++; locStats['Sold']++; 
                     } else {
+                        // 判斷是否「未出庫」(不在其他實體 Stockist，只在 Studio/未分配 或單純 Online)
+                        if (cat) {
+                            const isPhysicalShipped = p.locations.some(loc => {
+                                const u = loc.toUpperCase();
+                                return !u.includes('JB') && !u.includes('PNG') && u !== 'ONLINE';
+                            });
+                            if (!isPhysicalShipped) {
+                                catUnshippedStats[cat]++;
+                            }
+                        }
+
                         if (p.locations.length > 0) {
                             const isOnline = p.locations.some(loc => loc.toUpperCase() === 'ONLINE');
                             const hasStudio = p.locations.some(loc => loc.toUpperCase().includes('JB') || loc.toUpperCase().includes('PNG'));
@@ -881,7 +896,7 @@
             document.getElementById('kpi-unallocated').textContent = unallocatedCount;
             document.getElementById('kpi-sold').textContent = soldCount;
 
-            renderCategoryBadges(catStats);
+            renderCategoryBadges(catStats, catUnshippedStats);
             renderLocationButtons(locStats);
             updateCharts(locStats, catStats);
             renderCalendar(); 
@@ -1152,14 +1167,23 @@
             }
         }
 
-        function renderCategoryBadges(stats) {
+        // --- 這裡更新 UI 呈現為 上下兩行：總量 與 未出庫 ---
+        function renderCategoryBadges(stats, unshippedStats) {
             const container = document.getElementById('category-stats-container');
             container.innerHTML = '';
             const sortedKeys = Object.keys(stats).sort((a,b) => stats[b] - stats[a]);
 
             sortedKeys.forEach(c => {
                 if(stats[c] > 0) {
-                    container.innerHTML += `<button onclick="window.openListModal('category', '${c}')" class="bg-white px-3 py-1 rounded shadow-sm border border-stone-200 text-xs text-stone-600 hover:shadow-md transition-shadow">${c}: <b class="text-stone-800">${stats[c]}</b></button>`;
+                    const unshipped = unshippedStats[c] || 0;
+                    container.innerHTML += `
+                    <button onclick="window.openListModal('category', '${c}')" class="bg-white px-3 py-2 rounded shadow-sm border border-stone-200 text-left hover:shadow-md transition-all flex flex-col min-w-[110px]">
+                        <span class="font-bold text-stone-700 text-xs mb-1">${c}</span>
+                        <div class="flex items-center justify-between w-full text-[10px]">
+                            <span class="text-stone-500">總量: <b class="text-stone-800">${stats[c]}</b></span>
+                            <span class="text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-medium">未出庫: <b>${unshipped}</b></span>
+                        </div>
+                    </button>`;
                 }
             });
         }
@@ -1426,7 +1450,6 @@
                         if (locFilter === 'Sold' && p.status !== 'Sold') return;
                         if (locFilter === 'Unallocated' && (p.status === 'Sold' || p.locations.length > 0)) return;
 
-                        // 🌟 核心邏輯：只加總「未售出」的庫存 (除非故意選擇Sold過濾器)
                         if (locFilter === 'Sold') {
                             totalMatchingPieces++; 
                         } else if (p.status !== 'Sold') {
@@ -1538,14 +1561,12 @@
                 }
             });
 
-            // 🌟 渲染動態統計 UI
             const summaryText = document.getElementById('alloc-summary-text');
             const locSelectEl = document.getElementById('alloc-filter-location');
             const displayLocRaw = locSelectEl.options[locSelectEl.selectedIndex]?.text || locFilter;
             const displayLoc = locFilter === 'all' ? '全部地點' : displayLocRaw.replace(/[\(🌐🚚🏠\)]/g, '').trim();
             const displayCat = catFilter === 'all' ? '全部類別' : catFilter;
             
-            // 如果剛好選擇 Sold 過濾器，文字要提示是算售出的。其他情況都是算未售出(真實庫存)
             const summaryLabel = locFilter === 'Sold' ? '已售出總計' : '未售出庫存';
 
             summaryText.innerHTML = `
