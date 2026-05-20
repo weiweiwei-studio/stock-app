@@ -247,13 +247,13 @@
             </div>
             
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6 border-t border-stone-200 pt-6">
-                <!-- 新增區域：每月冠軍類別 -->
+                <!-- 更新區域：每月各類別銷量 (展開版) -->
                 <div class="bg-white p-5 rounded-lg shadow-sm border border-stone-200 flex flex-col">
                     <h4 class="text-sm font-bold text-stone-800 mb-1 uppercase flex items-center gap-2">
-                        <i data-lucide="award" class="w-4 h-4 text-amber-500"></i> 近半年每月冠軍類別
+                        <i data-lucide="layers" class="w-4 h-4 text-amber-500"></i> 近半年每月各類別銷量
                     </h4>
-                    <p class="text-[10px] text-stone-400 mb-4">顯示每個月銷量最高的商品類別與件數 (隨日曆月份連動)</p>
-                    <div id="best-sellers-container" class="flex-grow flex flex-col justify-center gap-1">
+                    <p class="text-[10px] text-stone-400 mb-4">顯示每個月售出的所有商品類別與件數 (隨日曆月份連動)</p>
+                    <div id="monthly-category-sales-container" class="flex-grow flex flex-col justify-start gap-1 overflow-y-auto custom-scrollbar" style="max-height: 260px;">
                         <!-- JS 動態生成 -->
                     </div>
                 </div>
@@ -926,15 +926,15 @@
             updateCharts(locStats, catUnsoldStats);
             renderCalendar(); 
             window.renderPerformanceStats(); 
-            window.renderBestSellers();
+            window.renderMonthlyCategorySales();
             
             window.updateCatLocDistribution();
             window.updateBusinessAnalytics();
         }
         
-        // --- 新增：渲染近半年每月冠軍類別 ---
-        window.renderBestSellers = function() {
-            const container = document.getElementById('best-sellers-container');
+        // --- 更新：渲染近半年每月各類別銷量 (清單標籤版) ---
+        window.renderMonthlyCategorySales = function() {
+            const container = document.getElementById('monthly-category-sales-container');
             if (!container) return;
             container.innerHTML = '';
 
@@ -947,6 +947,7 @@
                 const monthLabel = iterDate.toLocaleString('en-US', { month: 'short', year: 'numeric' });
                 
                 let catSales = {};
+                let totalSalesThisMonth = 0;
                 
                 db.forEach(item => {
                     const cleanCat = getCleanCategory(item.category);
@@ -967,34 +968,37 @@
 
                             if (sDate && sDate.getFullYear() === y && sDate.getMonth() === m) {
                                 catSales[cleanCat] = (catSales[cleanCat] || 0) + 1;
+                                totalSalesThisMonth++;
                             }
                         }
                     });
                 });
 
-                let topCat = '-';
-                let maxQty = 0;
-                for (let cat in catSales) {
-                    if (catSales[cat] > maxQty) {
-                        maxQty = catSales[cat];
-                        topCat = cat;
-                    } else if (catSales[cat] === maxQty && maxQty > 0) {
-                        topCat += `, ${cat}`;
-                    }
-                }
+                const sortedCats = Object.keys(catSales).sort((a, b) => catSales[b] - catSales[a]);
 
-                if (maxQty === 0) {
-                    topCat = '<span class="text-stone-400">無售出紀錄</span>';
-                    maxQty = '-';
+                let catHtml = '';
+                if (sortedCats.length === 0) {
+                    catHtml = '<span class="text-[10px] text-stone-400 italic py-1">無售出紀錄</span>';
                 } else {
-                    maxQty = `<b class="text-stone-800">${maxQty}</b> 件`;
+                    sortedCats.forEach(cat => {
+                        catHtml += `
+                            <div class="bg-white border border-stone-200 px-2 py-1 rounded text-[10px] flex items-center justify-between gap-1 shadow-sm whitespace-nowrap group hover:border-amber-300 transition-colors">
+                                <span class="font-bold text-stone-600">${cat}</span>
+                                <span class="text-stone-800 bg-stone-100 px-1.5 rounded font-black">${catSales[cat]}</span>
+                            </div>
+                        `;
+                    });
                 }
 
                 html += `
-                    <div class="flex items-center justify-between py-2 border-b border-stone-100 last:border-0 hover:bg-stone-50 px-2 rounded transition-colors">
-                        <span class="text-xs font-bold text-stone-600 w-24">${monthLabel}</span>
-                        <span class="text-[11px] font-medium text-amber-700 bg-amber-50 px-2 py-1 rounded border border-amber-200 flex-grow mx-2 truncate">${topCat}</span>
-                        <span class="text-[11px] text-stone-500 text-right w-12">${maxQty}</span>
+                    <div class="flex flex-col py-2 border-b border-stone-100 last:border-0 hover:bg-stone-50/50 px-2 rounded transition-colors">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-bold text-stone-700">${monthLabel}</span>
+                            <span class="text-[10px] text-stone-500 font-bold bg-amber-100/50 px-2 py-0.5 rounded text-amber-800 border border-amber-200/50">Total: ${totalSalesThisMonth}</span>
+                        </div>
+                        <div class="flex flex-wrap gap-1.5">
+                            ${catHtml}
+                        </div>
                     </div>
                 `;
                 
@@ -1139,7 +1143,7 @@
             currentCalDate.setMonth(currentCalDate.getMonth() + delta);
             renderCalendar();
             window.renderPerformanceStats();
-            window.renderBestSellers(); 
+            window.renderMonthlyCategorySales(); 
         };
 
         window.setWeeklyGoal = async function(year, month, week) {
