@@ -246,7 +246,18 @@
                 </div>
             </div>
             
-            <div class="grid grid-cols-1 gap-6 mt-6 border-t border-stone-200 pt-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6 border-t border-stone-200 pt-6">
+                <!-- 新增區域：每月冠軍類別 -->
+                <div class="bg-white p-5 rounded-lg shadow-sm border border-stone-200 flex flex-col">
+                    <h4 class="text-sm font-bold text-stone-800 mb-1 uppercase flex items-center gap-2">
+                        <i data-lucide="award" class="w-4 h-4 text-amber-500"></i> 近半年每月冠軍類別
+                    </h4>
+                    <p class="text-[10px] text-stone-400 mb-4">顯示每個月銷量最高的商品類別與件數 (隨日曆月份連動)</p>
+                    <div id="best-sellers-container" class="flex-grow flex flex-col justify-center gap-1">
+                        <!-- JS 動態生成 -->
+                    </div>
+                </div>
+
                 <div class="bg-white p-5 rounded-lg shadow-sm border border-stone-200">
                     <h4 class="text-sm font-bold text-stone-800 mb-1 uppercase flex items-center gap-2"><i data-lucide="trending-up" class="w-4 h-4 text-emerald-500"></i> 通路戰力分析</h4>
                     <p class="text-[10px] text-stone-400 mb-4">柱狀圖: 總營業額 (量) | 折線圖: 客單價 (質)</p>
@@ -440,7 +451,7 @@
                 <div class="grid grid-cols-2 gap-2">
                     <div>
                         <label class="text-xs text-stone-500 font-bold">總數量 (可修改)</label>
-                        <input type="number" id="edit-quantity" class="w-full border p-2 rounded text-sm text-stone-700 bg-yellow-50 focus:bg-white transition-colors">
+                        <input type="number" id="edit-quantity" min="1" class="w-full border p-2 rounded text-sm text-stone-700 bg-yellow-50 focus:bg-white transition-colors">
                     </div>
                     <div>
                         <label class="text-xs text-stone-500 font-bold">主定價 (Price RM)</label>
@@ -614,7 +625,7 @@
         let currentCalDate = new Date(); 
         
         let categoryChart = null, allocChart = null;
-        let channelChart = null; // 移除了 matrixChart 變數
+        let channelChart = null; 
         
         let appSettings = { 
             makers: ['Kim', 'Kelly', 'Lijin'], 
@@ -623,7 +634,7 @@
             weekly_goals: {} 
         };
         let currentDetailItem = null, currentDetailPhotoIdx = -1, tempLocations = []; 
-        window.tempEditPhotos = []; // 用來暫存編輯中的照片陣列
+        window.tempEditPhotos = []; 
         const catColors = ['#f472b6', '#60a5fa', '#a78bfa', '#34d399', '#fbbf24', '#9ca3af'];
 
         window.getPhotoRank = function(p) {
@@ -848,7 +859,6 @@
             const making = db.filter(i => i.status === 'Making').reduce((sum, item) => sum + (parseInt(item.quantity) || 1), 0);
             let soldCount = 0, studioCount = 0, unallocatedCount = 0;
             
-            // 【修改重點 1】：類別只統計「未售出」與「未出庫」
             const catUnsoldStats = {};
             const catUnshippedStats = {}; 
             const locStats = { 'Unallocated': 0, 'Sold': 0 };
@@ -874,14 +884,14 @@
                         soldCount++; locStats['Sold']++; 
                     } else {
                         if (cat) {
-                            catUnsoldStats[cat]++; // 未售出加一
+                            catUnsoldStats[cat]++;
                             
                             const isPhysicalShipped = p.locations.some(loc => {
                                 const u = loc.toUpperCase();
                                 return !u.includes('JB') && !u.includes('PNG') && u !== 'ONLINE';
                             });
                             if (!isPhysicalShipped && !isUnderProduction) {
-                                catUnshippedStats[cat]++; // 未出庫且已完工的才算
+                                catUnshippedStats[cat]++; 
                             }
                         }
 
@@ -913,14 +923,85 @@
             renderCategoryBadges(catUnsoldStats, catUnshippedStats);
             renderLocationButtons(locStats);
             
-            // 這裡原本傳入總量 catStats 來畫圖，現在傳入 unsold 避免出錯
             updateCharts(locStats, catUnsoldStats);
             renderCalendar(); 
             window.renderPerformanceStats(); 
+            window.renderBestSellers();
             
             window.updateCatLocDistribution();
             window.updateBusinessAnalytics();
         }
+        
+        // --- 新增：渲染近半年每月冠軍類別 ---
+        window.renderBestSellers = function() {
+            const container = document.getElementById('best-sellers-container');
+            if (!container) return;
+            container.innerHTML = '';
+
+            let iterDate = new Date(currentCalDate.getFullYear(), currentCalDate.getMonth(), 1);
+            let html = '';
+
+            for (let i = 0; i < 6; i++) {
+                const y = iterDate.getFullYear();
+                const m = iterDate.getMonth();
+                const monthLabel = iterDate.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+                
+                let catSales = {};
+                
+                db.forEach(item => {
+                    const cleanCat = getCleanCategory(item.category);
+                    if (!cleanCat) return;
+
+                    const photos = normalizePhotos(item);
+                    
+                    let pDate = null;
+                    if (item.completedAt) pDate = new Date(item.completedAt.seconds ? item.completedAt.seconds * 1000 : item.completedAt);
+                    else if (['Ready', 'In Studio', 'Sold', 'Partial Sold'].includes(item.status) && item.createdAt) {
+                        pDate = new Date(item.createdAt.seconds ? item.createdAt.seconds * 1000 : item.createdAt);
+                    }
+
+                    photos.forEach(p => {
+                        if (p.status === 'Sold') {
+                            let sDate = p.soldAt ? new Date(p.soldAt.seconds ? p.soldAt.seconds * 1000 : p.soldAt) : null;
+                            if (!sDate) sDate = pDate; 
+
+                            if (sDate && sDate.getFullYear() === y && sDate.getMonth() === m) {
+                                catSales[cleanCat] = (catSales[cleanCat] || 0) + 1;
+                            }
+                        }
+                    });
+                });
+
+                let topCat = '-';
+                let maxQty = 0;
+                for (let cat in catSales) {
+                    if (catSales[cat] > maxQty) {
+                        maxQty = catSales[cat];
+                        topCat = cat;
+                    } else if (catSales[cat] === maxQty && maxQty > 0) {
+                        topCat += `, ${cat}`;
+                    }
+                }
+
+                if (maxQty === 0) {
+                    topCat = '<span class="text-stone-400">無售出紀錄</span>';
+                    maxQty = '-';
+                } else {
+                    maxQty = `<b class="text-stone-800">${maxQty}</b> 件`;
+                }
+
+                html += `
+                    <div class="flex items-center justify-between py-2 border-b border-stone-100 last:border-0 hover:bg-stone-50 px-2 rounded transition-colors">
+                        <span class="text-xs font-bold text-stone-600 w-24">${monthLabel}</span>
+                        <span class="text-[11px] font-medium text-amber-700 bg-amber-50 px-2 py-1 rounded border border-amber-200 flex-grow mx-2 truncate">${topCat}</span>
+                        <span class="text-[11px] text-stone-500 text-right w-12">${maxQty}</span>
+                    </div>
+                `;
+                
+                iterDate.setMonth(iterDate.getMonth() - 1);
+            }
+            container.innerHTML = html;
+        };
 
         window.updateCatLocDistribution = function() {
             const selectEl = document.getElementById('dash-filter-cat-loc');
@@ -1058,6 +1139,7 @@
             currentCalDate.setMonth(currentCalDate.getMonth() + delta);
             renderCalendar();
             window.renderPerformanceStats();
+            window.renderBestSellers(); 
         };
 
         window.setWeeklyGoal = async function(year, month, week) {
@@ -1249,8 +1331,6 @@
                 data: { labels: [], datasets: [{ data: [], backgroundColor: [] }] },
                 options: { maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: {size: 10} } } } }
             });
-
-            // 【修改重點 2】移除了 matrixChart 的初始化
 
             channelChart = new Chart(document.getElementById('channelChart'), {
                 type: 'bar',
@@ -1897,7 +1977,7 @@
                     size: form.get('size'), 
                     originStudio: originStudio, 
                     quantity: parseInt(form.get('quantity')) || 1, 
-                    cost: 0, // 單件成本已拿掉，預設傳0以免破壞資料結構
+                    cost: 0, 
                     price: form.get('price'), 
                     status: 'To Make', 
                     photos: photoObjs, 
@@ -1908,7 +1988,6 @@
             } catch (error) { console.error(error); alert("Error: " + error.message); } finally { btn.innerText = '確認新增'; btn.disabled = false; } 
         };
         
-        // 【修改重點 3】: 開啟主工單編輯時，將現有照片載入快取並呈現 UI
         window.openEditModal = (id) => { 
             const item = db.find(i=>i.id===id); 
             document.getElementById('edit-id').value = id; 
@@ -1924,14 +2003,12 @@
             document.getElementById('edit-startDate').value = formatDateForInput(item.makingAt); 
             document.getElementById('edit-completedDate').value = formatDateForInput(item.completedAt); 
             
-            // 載入照片進入暫存陣列
             window.tempEditPhotos = JSON.parse(JSON.stringify(normalizePhotos(item)));
             window.renderEditPhotos();
 
             document.getElementById('edit-modal').classList.remove('hidden'); 
         };
 
-        // 【修改重點 3】: 渲染現有照片的 UI (包含垃圾桶按鈕)
         window.renderEditPhotos = () => {
             const container = document.getElementById('edit-existing-photos');
             container.innerHTML = '';
@@ -1955,7 +2032,6 @@
             lucide.createIcons();
         };
 
-        // 【修改重點 3】: 將特定照片的位置清空 (但保留欄位給後續補充)
         window.removeEditPhoto = (idx) => {
             if(confirm('確定要移除此照片嗎？（儲存後才會正式生效）')) {
                 window.tempEditPhotos[idx].url = ''; 
@@ -1965,7 +2041,6 @@
         
         window.closeEditModal = () => document.getElementById('edit-modal').classList.add('hidden');
         
-        // 【修改重點 3】: 儲存變更 (處理數量增減、照片替補與追加)
         window.handleEditSubmit = async () => { 
             const id = document.getElementById('edit-id').value; 
             const btn = document.getElementById('btn-edit-save'); 
@@ -1994,7 +2069,6 @@
                 let photosModified = false;
                 const oldOriginStudio = item.originStudio || 'JB Studio';
 
-                // 處理照片長度以匹配最新的「數量」
                 if (newQty > existingPhotos.length) {
                     const diff = newQty - existingPhotos.length;
                     for(let i=0; i<diff; i++) {
@@ -2002,11 +2076,10 @@
                     }
                     photosModified = true;
                 } else if (newQty < existingPhotos.length) {
-                    existingPhotos = existingPhotos.slice(0, newQty); // 簡單粗暴地裁切掉多餘的
+                    existingPhotos = existingPhotos.slice(0, newQty); 
                     photosModified = true;
                 }
 
-                // 更新地點
                 existingPhotos.forEach(p => {
                     if (!p.locations || p.locations.length === 0 || (p.locations.length === 1 && p.locations[0] === 'Studio')) {
                         p.locations = [newOriginStudio];
@@ -2021,7 +2094,6 @@
                 if(photoInput.files.length > 0) { 
                     let fileIdx = 0;
 
-                    // 1. 優先填補空缺的照片欄位 (被使用者手動刪除的 或 數量增加產生的空位)
                     for(let i=0; i<existingPhotos.length; i++) {
                         if (!existingPhotos[i].url && fileIdx < photoInput.files.length) {
                             const file = photoInput.files[fileIdx++];
@@ -2032,7 +2104,6 @@
                         }
                     }
 
-                    // 2. 如果還有多餘上傳的照片，就直接往後塞 (同時自動增加總數量)
                     while(fileIdx < photoInput.files.length) {
                         const file = photoInput.files[fileIdx++]; 
                         const sRef = ref(storage, 'photos/'+Date.now()+'_added_'+file.name); 
@@ -2043,7 +2114,7 @@
                     }
                 } 
                 
-                data.quantity = existingPhotos.length; // 確保與照片陣列長度吻合
+                data.quantity = existingPhotos.length; 
                 if (photosModified || existingPhotos.length > 0) {
                     data.photos = existingPhotos;
                 }
