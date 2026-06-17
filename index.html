@@ -1939,7 +1939,7 @@
         window.closeDetailModal = () => document.getElementById('detail-modal').classList.add('hidden');
         
         window.handleAddItem = async function(e) { 
-            e.preventDefault(); // 防止表單預設提交重整頁面
+            e.preventDefault(); 
             const btn = document.getElementById('btn-submit'); 
             btn.innerText = '處理中...'; 
             btn.disabled = true; 
@@ -2188,8 +2188,7 @@
         window.openModal = () => document.getElementById('add-modal').classList.remove('hidden');
         window.closeModal = () => document.getElementById('add-modal').classList.add('hidden');
 
-       // 🛠️ 整合功能：實現 Location 庫存導出成高質感 PDF 清單 (修復圖片空白問題)
-       // 🛠️ 整合功能：實現 Location 庫存導出成高質感 PDF 清單 (顯示所有庫存照片)
+        // 🛠️ 整合功能：實現 Location 庫存導出成高質感 PDF 清單 (顯示所有庫存照片)
         window.exportLocationPDF = async function() {
             const btn = document.getElementById('btn-export-pdf');
             btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> 準備資料...';
@@ -2367,3 +2366,6 @@
             btn.disabled = false;
             lucide.createIcons();
         }
+    </script>
+</body>
+</html>
