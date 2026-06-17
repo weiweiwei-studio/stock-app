@@ -8,6 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <style>
         /* BASE STYLES */
@@ -247,20 +248,18 @@
             </div>
             
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6 border-t border-stone-200 pt-6">
-                <!-- 更新區域：每月各類別銷量 (展開版) -->
                 <div class="bg-white p-5 rounded-lg shadow-sm border border-stone-200 flex flex-col">
                     <h4 class="text-sm font-bold text-stone-800 mb-1 uppercase flex items-center gap-2">
                         <i data-lucide="layers" class="w-4 h-4 text-amber-500"></i> 近半年每月各類別銷量
                     </h4>
                     <p class="text-[10px] text-stone-400 mb-4">顯示每個月售出的所有商品類別與件數 (隨日曆月份連動)</p>
                     <div id="monthly-category-sales-container" class="flex-grow flex flex-col justify-start gap-1 overflow-y-auto custom-scrollbar" style="max-height: 260px;">
-                        <!-- JS 動態生成 -->
-                    </div>
+                        </div>
                 </div>
 
                 <div class="bg-white p-5 rounded-lg shadow-sm border border-stone-200">
                     <h4 class="text-sm font-bold text-stone-800 mb-1 uppercase flex items-center gap-2"><i data-lucide="trending-up" class="w-4 h-4 text-emerald-500"></i> 通路戰力分析</h4>
-                    <p class="text-[10px] text-stone-400 mb-4">柱狀圖: 總營業額 (量) | 折線圖: 客單價 (質)</p>
+                    <p class="text-[10px] text-stone-400 mb-4">顯示通路銷售表現與數據分析</p>
                     <div class="relative w-full h-64"><canvas id="channelChart"></canvas></div>
                 </div>
             </div>
@@ -333,9 +332,15 @@
                     </div>
                 </div>
                 
-                <div id="alloc-summary-badge" class="flex items-center px-4 py-2 bg-blue-50 border border-blue-200 rounded-md shadow-inner transition-all">
-                    <div id="alloc-summary-text" class="text-sm flex items-center">
+                <div class="flex items-center gap-3">
+                    <button id="btn-export-pdf" onclick="window.exportLocationPDF()" class="flex items-center gap-1.5 bg-red-50 text-red-600 border border-red-200 px-3 py-2 rounded-md shadow-sm text-sm font-bold hover:bg-red-100 transition-colors">
+                        <i data-lucide="file-output" class="w-4 h-4"></i> 匯出此地點當下庫存 PDF
+                    </button>
+
+                    <div id="alloc-summary-badge" class="flex items-center px-4 py-2 bg-blue-50 border border-blue-200 rounded-md shadow-inner transition-all">
+                        <div id="alloc-summary-text" class="text-sm flex items-center">
                         </div>
+                    </div>
                 </div>
             </div>
             <div class="bg-white rounded-lg shadow-sm overflow-hidden border border-stone-200">
@@ -450,11 +455,11 @@
                 </div>
                 <div class="grid grid-cols-2 gap-2">
                     <div>
-                        <label class="text-xs text-stone-500 font-bold">總數量 (可修改)</label>
+                        <label class="text-xs text-stone-700 font-bold">總數量 (可修改)</label>
                         <input type="number" id="edit-quantity" min="1" class="w-full border p-2 rounded text-sm text-stone-700 bg-yellow-50 focus:bg-white transition-colors">
                     </div>
                     <div>
-                        <label class="text-xs text-stone-500 font-bold">主定價 (Price RM)</label>
+                        <label class="text-xs text-stone-700 font-bold">主定價 (Price RM)</label>
                         <input type="number" id="edit-price" class="w-full border p-2 rounded text-sm font-bold text-stone-700">
                     </div>
                 </div>
@@ -470,25 +475,22 @@
                 
                 <div class="grid grid-cols-2 gap-2 pt-2 border-t border-stone-100">
                     <div>
-                        <label class="text-xs text-stone-500 font-bold">開始製作日</label>
+                        <label class="text-xs text-stone-700 font-bold">開始製作日</label>
                         <input type="date" id="edit-startDate" class="w-full border p-2 rounded text-xs text-stone-600">
                     </div>
                     <div>
-                        <label class="text-xs text-stone-500 font-bold">完成日</label>
+                        <label class="text-xs text-stone-700 font-bold">完成日</label>
                         <input type="date" id="edit-completedDate" class="w-full border p-2 rounded text-xs text-stone-600">
                     </div>
                 </div>
                 
-                <!-- 照片編輯區塊 -->
                 <div class="pt-2 border-t border-stone-100">
                     <label class="text-xs text-stone-700 font-bold block mb-2">已上傳照片 (點擊垃圾桶可移除)</label>
                     <div id="edit-existing-photos" class="flex flex-wrap gap-2 mb-2 min-h-[40px] p-2 bg-stone-50 rounded border border-dashed border-stone-200">
-                        <!-- 動態生成舊照片 -->
                     </div>
 
                     <label class="text-xs text-stone-700 font-bold block mb-2">為此工單追加/補齊照片</label>
                     <input type="file" id="edit-addPhotos" accept="image/*" multiple class="block w-full text-xs text-stone-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-stone-200 file:text-stone-700">
-                    <p class="text-[10px] text-stone-400 mt-1">若上方有移除照片產生空缺，上傳的新照片會優先填補空缺。</p>
                 </div>
             </div>
             <div class="flex justify-between mt-6">
@@ -518,7 +520,6 @@
                 </div>
 
                 <div class="space-y-4 flex-grow overflow-y-auto pr-2 custom-scrollbar">
-                    
                     <div class="bg-stone-50 p-3 rounded border border-stone-200 shadow-sm">
                         <label class="text-[11px] font-bold text-stone-700 uppercase tracking-wider mb-2 block border-b border-stone-200 pb-1">單品專屬設定 (Piece-Level Settings)</label>
                         <div class="grid grid-cols-2 gap-3 mt-2">
@@ -539,8 +540,7 @@
                         <p class="text-[10px] text-stone-400 mt-1">* 實體地點只能單選</p>
                         
                         <div class="mt-3 pt-3 border-t border-stone-100" id="detail-online-container">
-                            <label class="text-[11px] font-bold text-stone-700 uppercase tracking-wider mb-2 block">2. 線上商店狀態</label>
-                            </div>
+                        </div>
                     </div>
 
                     <div>
@@ -932,7 +932,6 @@
             window.updateBusinessAnalytics();
         }
         
-        // --- 更新：渲染近半年每月各類別銷量 (清單標籤版) ---
         window.renderMonthlyCategorySales = function() {
             const container = document.getElementById('monthly-category-sales-container');
             if (!container) return;
@@ -1342,8 +1341,7 @@
                 options: {
                     maintainAspectRatio: false,
                     scales: {
-                        y: { beginAtZero: true, type: 'linear', display: true, position: 'left', title: { display: true, text: '總營業額 (RM)' } },
-                        y1: { beginAtZero: true, type: 'linear', display: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: '客單價 (RM)' } }
+                        y: { beginAtZero: true, type: 'linear', display: true, position: 'left', title: { display: true, text: '總營業額 (RM)' } }
                     }
                 }
             });
@@ -1382,7 +1380,6 @@
             const channelStats = {};
 
             db.forEach(item => {
-                const itemName = item.itemName || 'Unknown Item';
                 const photos = normalizePhotos(item);
                 
                 photos.forEach(p => {
@@ -1401,26 +1398,13 @@
 
             const channelNames = Object.keys(channelStats);
             const revenues = channelNames.map(c => channelStats[c].revenue);
-            const aovs = channelNames.map(c => channelStats[c].qty > 0 ? Math.round(channelStats[c].revenue / channelStats[c].qty) : 0);
 
             channelChart.data.labels = channelNames;
             channelChart.data.datasets = [
                 {
-                    type: 'bar',
                     label: '總營業額 (RM)',
                     data: revenues,
-                    backgroundColor: '#34d399',
-                    yAxisID: 'y'
-                },
-                {
-                    type: 'line',
-                    label: '客單價 AOV (RM)',
-                    data: aovs,
-                    borderColor: '#3b82f6',
-                    backgroundColor: '#3b82f6',
-                    borderWidth: 3,
-                    tension: 0.3,
-                    yAxisID: 'y1'
+                    backgroundColor: '#34d399'
                 }
             ];
             channelChart.update();
@@ -1927,7 +1911,7 @@
                 window.closeDetailModal(); 
             } catch(e) { 
                 alert("儲存失敗: " + e.message); 
-            } finally {
+            } finalRef: {
                 btn.innerText = '儲存'; btn.disabled = false;
             } 
         };
@@ -1955,8 +1939,7 @@
         window.closeDetailModal = () => document.getElementById('detail-modal').classList.add('hidden');
         
         window.handleAddItem = async function(e) { 
-            e.preventDefault(); 
-            const btn = document.getElementById('btn-submit'); btn.innerText = '處理中...'; btn.disabled = true; 
+            document.getElementById('btn-submit'); btn.innerText = '處理中...'; btn.disabled = true; 
             try { 
                 const form = new FormData(e.target); 
                 const originStudio = form.get('originStudio');
@@ -2201,6 +2184,152 @@
         window.updateRole = () => { currentRole = document.getElementById('role-select').value; const isAdmin = currentRole === 'admin'; document.getElementById('nav-settings').classList.toggle('hidden', !isAdmin); window.switchView(currentRole.startsWith('maker') ? 'production' : 'dashboard'); };
         window.openModal = () => document.getElementById('add-modal').classList.remove('hidden');
         window.closeModal = () => document.getElementById('add-modal').classList.add('hidden');
+
+        // 🛠️ 整合功能：實現 Location 庫存導出成高質感 PDF 清單 (含照片與入庫日期)
+        window.exportLocationPDF = function() {
+            const btn = document.getElementById('btn-export-pdf');
+            btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> 匯出中...';
+            btn.disabled = true;
+
+            const locFilter = document.getElementById('alloc-filter-location').value;
+            const displayLocRaw = document.getElementById('alloc-filter-location').options[document.getElementById('alloc-filter-location').selectedIndex]?.text || locFilter;
+            const displayLoc = locFilter === 'all' ? '全部地點' : displayLocRaw.replace(/[\(🌐🚚🏠\)]/g, '').trim();
+
+            let exportData = [];
+            let totalQty = 0;
+
+            // 1. 篩選與加總特定地點下的單品數據
+            db.filter(i => i.status === 'Ready' || i.status === 'In Studio' || i.status === 'Sold' || i.status === 'Partial Sold').forEach(item => {
+                const photos = normalizePhotos(item);
+                let locPhotos = [];
+
+                if (locFilter === 'all') {
+                    locPhotos = photos;
+                } else if (locFilter === 'Sold') {
+                    locPhotos = photos.filter(p => p.status === 'Sold');
+                } else if (locFilter === 'Unallocated') {
+                    locPhotos = photos.filter(p => p.status !== 'Sold' && p.locations.length === 0);
+                } else {
+                    locPhotos = photos.filter(p => p.status !== 'Sold' && p.locations.includes(locFilter));
+                }
+
+                if (locPhotos.length > 0) {
+                    // 擷取日期 (優先使用完工日期 completedAt，若無則使用建立日期 createdAt)
+                    let recordDate = '-';
+                    const rawDate = item.completedAt || item.createdAt;
+                    if (rawDate) {
+                        const d = new Date(rawDate.seconds ? rawDate.seconds * 1000 : rawDate);
+                        recordDate = d.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
+                    }
+
+                    // 擷取第一張照片作為列表縮圖
+                    const thumbUrl = locPhotos[0].url || '';
+
+                    exportData.push({
+                        imgUrl: thumbUrl,
+                        dateStr: recordDate,
+                        category: getCleanCategory(item.category),
+                        itemName: item.itemName,
+                        color: item.color || '-',
+                        size: item.size || '-',
+                        price: item.price ? `RM ${item.price}` : '-',
+                        qty: locPhotos.length
+                    });
+                    totalQty += locPhotos.length;
+                }
+            });
+
+            if (exportData.length === 0) {
+                alert('目前選擇的地點沒有可供導出的庫存物件！');
+                btn.innerHTML = '<i data-lucide="file-output" class="w-4 h-4"></i> 匯出此地點當下庫存 PDF';
+                btn.disabled = false;
+                lucide.createIcons();
+                return;
+            }
+
+            // 2. 動態生成符合品牌視覺（Studio Packing List 風格）的隱藏 DOM 物件
+            const container = document.createElement('div');
+            container.style.padding = '35px 25px';
+            container.style.fontFamily = "'Helvetica Neue', Helvetica, Arial, sans-serif";
+            container.style.color = '#44403c';
+            container.style.backgroundColor = '#ffffff';
+
+            const dateStr = new Date().toLocaleString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+            let html = `
+                <div style="text-align: center; margin-bottom: 25px; border-bottom: 2px solid #78716c; padding-bottom: 15px;">
+                    <h2 style="margin: 0; font-size: 24px; font-weight: 800; letter-spacing: 2px; color: #1c1917;">WEIWEIWEI 庫存清單</h2>
+                    <div style="margin-top: 12px; display: flex; justify-content: space-between; font-size: 12px; color: #78716c;">
+                        <span>📍 當前位置: <b style="color: #1c1917;">${displayLoc}</b></span>
+                        <span>📦 總計件數: <b style="color: #b45309; font-size: 14px;">${totalQty} 件</b></span>
+                        <span>🕒 盤點時間: ${dateStr}</span>
+                    </div>
+                </div>
+                <table style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left;">
+                    <thead>
+                        <tr style="background-color: #f5f5f4; color: #78716c;">
+                            <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 12%; text-align: center;">商品圖</th>
+                            <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 12%;">入庫日期</th>
+                            <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 12%;">類別</th>
+                            <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 34%;">品名項目 (Item Name)</th>
+                            <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 10%;">規格</th>
+                            <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 10%; text-align: right;">主定價</th>
+                            <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 10%; text-align: center;">庫存</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            exportData.forEach((row, idx) => {
+                const rowBg = idx % 2 === 0 ? '#ffffff' : '#fafaf9';
+                
+                // 處理照片縮圖 (加入 crossorigin="anonymous" 避免 PDF 套件遇到跨網域圖片變空白)
+                const imgHtml = row.imgUrl 
+                    ? `<img src="${row.imgUrl}" crossorigin="anonymous" style="width: 36px; height: 48px; object-fit: cover; border-radius: 4px; border: 1px solid #e7e5e4; display: block; margin: 0 auto;">`
+                    : `<div style="width: 36px; height: 48px; background: #f5f5f4; border: 1px solid #e7e5e4; border-radius: 4px; font-size: 8px; color: #a8a29e; display: flex; align-items: center; justify-content: center; margin: 0 auto; line-height: 48px;">無圖</div>`;
+
+                html += `
+                    <tr style="background-color: ${rowBg}; border-bottom: 1px solid #e7e5e4;">
+                        <td style="padding: 8px 5px; vertical-align: middle;">${imgHtml}</td>
+                        <td style="padding: 8px 5px; color: #78716c; vertical-align: middle; font-family: monospace; font-size: 10px;">${row.dateStr}</td>
+                        <td style="padding: 8px 5px; color: #78716c; vertical-align: middle;">${row.category}</td>
+                        <td style="padding: 8px 5px; font-weight: 700; color: #1c1917; vertical-align: middle;">${row.itemName}</td>
+                        <td style="padding: 8px 5px; color: #57534e; vertical-align: middle;">${row.color} / ${row.size}</td>
+                        <td style="padding: 8px 5px; text-align: right; color: #44403c; vertical-align: middle;">${row.price}</td>
+                        <td style="padding: 8px 5px; text-align: center; font-weight: 800; font-size: 13px; color: #1c1917; vertical-align: middle;">${row.qty}</td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                    </tbody>
+                </table>
+                <div style="margin-top: 40px; text-align: center; font-size: 9px; color: #a8a29e; border-top: 1px dashed #e7e5e4; padding-top: 10px;">
+                    © WEIWEIWEI Studio ERP Inventory System
+                </div>
+            `;
+            container.innerHTML = html;
+
+            // 3. 調用 html2pdf 套件進行客戶端高畫質渲染下載
+            const opt = {
+                margin:       12,
+                filename:     `Stock_Report_${displayLoc.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true, allowTaint: true, letterRendering: true },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            html2pdf().set(opt).from(container).save().then(() => {
+                btn.innerHTML = '<i data-lucide="file-output" class="w-4 h-4"></i> 匯出此地點當下庫存 PDF';
+                btn.disabled = false;
+                lucide.createIcons();
+            }).catch(err => {
+                alert('PDF 導出失敗: ' + err.message);
+                btn.innerHTML = '<i data-lucide="file-output" class="w-4 h-4"></i> 匯出此地點當下庫存 PDF';
+                btn.disabled = false;
+                lucide.createIcons();
+            });
+        };
     </script>
 </body>
 </html>
