@@ -2188,10 +2188,10 @@
         window.openModal = () => document.getElementById('add-modal').classList.remove('hidden');
         window.closeModal = () => document.getElementById('add-modal').classList.add('hidden');
 
-        // 🛠️ 整合功能：實現 Location 庫存導出成高質感 PDF 清單 (含照片與入庫日期)
-        window.exportLocationPDF = function() {
+       // 🛠️ 整合功能：實現 Location 庫存導出成高質感 PDF 清單 (修復圖片空白問題)
+        window.exportLocationPDF = async function() {
             const btn = document.getElementById('btn-export-pdf');
-            btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> 匯出中...';
+            btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> 準備資料...';
             btn.disabled = true;
 
             const locFilter = document.getElementById('alloc-filter-location').value;
@@ -2217,19 +2217,17 @@
                 }
 
                 if (locPhotos.length > 0) {
-                    // 擷取日期 (優先使用完工日期 completedAt，若無則使用建立日期 createdAt)
                     let recordDate = '-';
                     const rawDate = item.completedAt || item.createdAt;
                     if (rawDate) {
                         const d = new Date(rawDate.seconds ? rawDate.seconds * 1000 : rawDate);
                         recordDate = d.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
                     }
-
-                    // 擷取第一張照片作為列表縮圖
                     const thumbUrl = locPhotos[0].url || '';
 
                     exportData.push({
                         imgUrl: thumbUrl,
+                        renderUrl: '', // 準備用來存 Base64 
                         dateStr: recordDate,
                         category: getCleanCategory(item.category),
                         itemName: item.itemName,
@@ -2244,13 +2242,36 @@
 
             if (exportData.length === 0) {
                 alert('目前選擇的地點沒有可供導出的庫存物件！');
-                btn.innerHTML = '<i data-lucide="file-output" class="w-4 h-4"></i> 匯出此地點當下庫存 PDF';
-                btn.disabled = false;
-                lucide.createIcons();
+                resetExportButton(btn);
                 return;
             }
 
-            // 2. 動態生成符合品牌視覺（Studio Packing List 風格）的隱藏 DOM 物件
+            // 2. 預先下載圖片並轉換為 Base64 (解決非同步載入導致 PDF 空白的問題)
+            btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> 載入圖片中...';
+            
+            const fetchAsBase64 = async (url) => {
+                try {
+                    const res = await fetch(url, { mode: 'cors' });
+                    const blob = await res.blob();
+                    return new Promise(resolve => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result);
+                        reader.readAsDataURL(blob);
+                    });
+                } catch (e) {
+                    console.warn("圖片轉 Base64 失敗:", e);
+                    return url; // 若失敗則退回原網址
+                }
+            };
+
+            for (let row of exportData) {
+                if (row.imgUrl) {
+                    row.renderUrl = await fetchAsBase64(row.imgUrl);
+                }
+            }
+
+            // 3. 動態生成符合品牌視覺的隱藏 DOM 物件
+            btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> 排版輸出中...';
             const container = document.createElement('div');
             container.style.padding = '35px 25px';
             container.style.fontFamily = "'Helvetica Neue', Helvetica, Arial, sans-serif";
@@ -2285,10 +2306,9 @@
 
             exportData.forEach((row, idx) => {
                 const rowBg = idx % 2 === 0 ? '#ffffff' : '#fafaf9';
-                
-                // 處理照片縮圖 (加入 crossorigin="anonymous" 避免 PDF 套件遇到跨網域圖片變空白)
-                const imgHtml = row.imgUrl 
-                    ? `<img src="${row.imgUrl}" crossorigin="anonymous" style="width: 36px; height: 48px; object-fit: cover; border-radius: 4px; border: 1px solid #e7e5e4; display: block; margin: 0 auto;">`
+                // 這裡改用 renderUrl (已經轉好的 Base64 圖片)
+                const imgHtml = row.renderUrl 
+                    ? `<img src="${row.renderUrl}" style="width: 36px; height: 48px; object-fit: cover; border-radius: 4px; border: 1px solid #e7e5e4; display: block; margin: 0 auto;">`
                     : `<div style="width: 36px; height: 48px; background: #f5f5f4; border: 1px solid #e7e5e4; border-radius: 4px; font-size: 8px; color: #a8a29e; display: flex; align-items: center; justify-content: center; margin: 0 auto; line-height: 48px;">無圖</div>`;
 
                 html += `
@@ -2313,26 +2333,25 @@
             `;
             container.innerHTML = html;
 
-            // 3. 調用 html2pdf 套件進行客戶端高畫質渲染下載
+            // 4. 調用 html2pdf 套件進行客戶端高畫質渲染下載
             const opt = {
                 margin:       12,
                 filename:     `Stock_Report_${displayLoc.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.pdf`,
                 image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true, allowTaint: true, letterRendering: true },
+                html2canvas:  { scale: 2, useCORS: true },
                 jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
 
             html2pdf().set(opt).from(container).save().then(() => {
-                btn.innerHTML = '<i data-lucide="file-output" class="w-4 h-4"></i> 匯出此地點當下庫存 PDF';
-                btn.disabled = false;
-                lucide.createIcons();
+                resetExportButton(btn);
             }).catch(err => {
                 alert('PDF 導出失敗: ' + err.message);
-                btn.innerHTML = '<i data-lucide="file-output" class="w-4 h-4"></i> 匯出此地點當下庫存 PDF';
-                btn.disabled = false;
-                lucide.createIcons();
+                resetExportButton(btn);
             });
         };
-    </script>
-</body>
-</html>
+
+        function resetExportButton(btn) {
+            btn.innerHTML = '<i data-lucide="file-output" class="w-4 h-4"></i> 匯出此地點當下庫存 PDF';
+            btn.disabled = false;
+            lucide.createIcons();
+        }
