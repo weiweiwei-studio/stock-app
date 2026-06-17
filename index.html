@@ -2189,6 +2189,7 @@
         window.closeModal = () => document.getElementById('add-modal').classList.add('hidden');
 
        // 🛠️ 整合功能：實現 Location 庫存導出成高質感 PDF 清單 (修復圖片空白問題)
+       // 🛠️ 整合功能：實現 Location 庫存導出成高質感 PDF 清單 (顯示所有庫存照片)
         window.exportLocationPDF = async function() {
             const btn = document.getElementById('btn-export-pdf');
             btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> 準備資料...';
@@ -2223,11 +2224,13 @@
                         const d = new Date(rawDate.seconds ? rawDate.seconds * 1000 : rawDate);
                         recordDate = d.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
                     }
-                    const thumbUrl = locPhotos[0].url || '';
+                    
+                    // 收集該地點下此單品的所有有效照片網址
+                    const imgUrls = locPhotos.map(p => p.url).filter(url => url && url.trim() !== '');
 
                     exportData.push({
-                        imgUrl: thumbUrl,
-                        renderUrl: '', // 準備用來存 Base64 
+                        imgUrls: imgUrls,      // 存入陣列
+                        renderUrls: [],        // 準備用來存多張 Base64
                         dateStr: recordDate,
                         category: getCleanCategory(item.category),
                         itemName: item.itemName,
@@ -2246,8 +2249,8 @@
                 return;
             }
 
-            // 2. 預先下載圖片並轉換為 Base64 (解決非同步載入導致 PDF 空白的問題)
-            btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> 載入圖片中...';
+            // 2. 預先下載所有圖片並轉換為 Base64
+            btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> 載入所有圖片中...';
             
             const fetchAsBase64 = async (url) => {
                 try {
@@ -2260,13 +2263,15 @@
                     });
                 } catch (e) {
                     console.warn("圖片轉 Base64 失敗:", e);
-                    return url; // 若失敗則退回原網址
+                    return url; 
                 }
             };
 
             for (let row of exportData) {
-                if (row.imgUrl) {
-                    row.renderUrl = await fetchAsBase64(row.imgUrl);
+                // 迴圈處理這個商品的所有圖片
+                for (let url of row.imgUrls) {
+                    const base64 = await fetchAsBase64(url);
+                    row.renderUrls.push(base64);
                 }
             }
 
@@ -2292,13 +2297,13 @@
                 <table style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left;">
                     <thead>
                         <tr style="background-color: #f5f5f4; color: #78716c;">
-                            <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 12%; text-align: center;">商品圖</th>
+                            <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 18%; text-align: center;">商品圖</th>
                             <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 12%;">入庫日期</th>
                             <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 12%;">類別</th>
-                            <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 34%;">品名項目 (Item Name)</th>
+                            <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 30%;">品名項目 (Item Name)</th>
                             <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 10%;">規格</th>
                             <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 10%; text-align: right;">主定價</th>
-                            <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 10%; text-align: center;">庫存</th>
+                            <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 8%; text-align: center;">數量</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -2306,10 +2311,17 @@
 
             exportData.forEach((row, idx) => {
                 const rowBg = idx % 2 === 0 ? '#ffffff' : '#fafaf9';
-                // 這裡改用 renderUrl (已經轉好的 Base64 圖片)
-                const imgHtml = row.renderUrl 
-                    ? `<img src="${row.renderUrl}" style="width: 36px; height: 48px; object-fit: cover; border-radius: 4px; border: 1px solid #e7e5e4; display: block; margin: 0 auto;">`
-                    : `<div style="width: 36px; height: 48px; background: #f5f5f4; border: 1px solid #e7e5e4; border-radius: 4px; font-size: 8px; color: #a8a29e; display: flex; align-items: center; justify-content: center; margin: 0 auto; line-height: 48px;">無圖</div>`;
+                
+                // 多張照片的排版邏輯
+                let imgHtml = '';
+                if (row.renderUrls && row.renderUrls.length > 0) {
+                    const imgTags = row.renderUrls.map(url => 
+                        `<img src="${url}" style="width: 34px; height: 46px; object-fit: cover; border-radius: 3px; border: 1px solid #e7e5e4; flex-shrink: 0;">`
+                    ).join('');
+                    imgHtml = `<div style="display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; align-items: center;">${imgTags}</div>`;
+                } else {
+                    imgHtml = `<div style="width: 34px; height: 46px; background: #f5f5f4; border: 1px solid #e7e5e4; border-radius: 3px; font-size: 8px; color: #a8a29e; display: flex; align-items: center; justify-content: center; margin: 0 auto; line-height: 46px;">無圖</div>`;
+                }
 
                 html += `
                     <tr style="background-color: ${rowBg}; border-bottom: 1px solid #e7e5e4;">
