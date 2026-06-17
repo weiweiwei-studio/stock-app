@@ -1911,7 +1911,7 @@
                 window.closeDetailModal(); 
             } catch(e) { 
                 alert("儲存失敗: " + e.message); 
-            } finalRef: {
+            } finally {
                 btn.innerText = '儲存'; btn.disabled = false;
             } 
         };
@@ -1939,7 +1939,10 @@
         window.closeDetailModal = () => document.getElementById('detail-modal').classList.add('hidden');
         
         window.handleAddItem = async function(e) { 
-            document.getElementById('btn-submit'); btn.innerText = '處理中...'; btn.disabled = true; 
+            e.preventDefault(); // 防止表單預設提交重整頁面
+            const btn = document.getElementById('btn-submit'); 
+            btn.innerText = '處理中...'; 
+            btn.disabled = true; 
             try { 
                 const form = new FormData(e.target); 
                 const originStudio = form.get('originStudio');
