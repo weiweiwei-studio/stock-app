@@ -370,6 +370,17 @@
         </section>
 
     </main>
+    <!-- 照片放大檢視 Modal -->
+<div id="image-viewer-modal" class="fixed inset-0 bg-black bg-opacity-80 hidden z-[70] flex items-center justify-center p-4 cursor-pointer animate-fade-in" onclick="window.closeImageViewer()">
+    <div class="relative max-w-4xl w-full flex justify-center items-center">
+        <!-- 關閉按鈕 -->
+        <button onclick="window.closeImageViewer()" class="absolute -top-10 right-0 text-white hover:text-gray-300 transition flex items-center gap-1 font-bold text-sm">
+            ✕ 關閉
+        </button>
+        <!-- 圖片顯示區 -->
+        <img id="image-viewer-img" src="" class="max-h-[85vh] max-w-full rounded-lg shadow-2xl object-contain cursor-default" onclick="event.stopPropagation()">
+    </div>
+</div>
 
     <div id="add-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-lg shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
