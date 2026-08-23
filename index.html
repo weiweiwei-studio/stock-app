@@ -1440,7 +1440,7 @@
                 const photos = normalizePhotos(item);
                 let reelHTML = `<div class="photo-reel">`;
                 if(photos.length === 0 || !photos[0].url) reelHTML += `<div class="w-8 h-10 bg-stone-100 flex items-center justify-center text-[10px] text-stone-300 rounded border">No Img</div>`;
-                else { photos.forEach(p => { if(p.url) reelHTML += `<img src="${p.url}" class="reel-img" onclick="window.open('${p.url}')">`; }); }
+               else { photos.forEach(p => { if(p.url) reelHTML += `<img src="${p.url}" class="reel-img cursor-pointer hover:opacity-80 transition-opacity shadow-sm" onclick="window.openImageViewer('${p.url}')">`; }); }
                 reelHTML += `</div>`;
                 let statusColor = 'bg-gray-100 text-gray-600';
                 if(item.status === 'Making') statusColor = 'bg-amber-100 text-amber-700';
