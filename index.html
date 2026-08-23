@@ -2198,6 +2198,18 @@
         window.updateRole = () => { currentRole = document.getElementById('role-select').value; const isAdmin = currentRole === 'admin'; document.getElementById('nav-settings').classList.toggle('hidden', !isAdmin); window.switchView(currentRole.startsWith('maker') ? 'production' : 'dashboard'); };
         window.openModal = () => document.getElementById('add-modal').classList.remove('hidden');
         window.closeModal = () => document.getElementById('add-modal').classList.add('hidden');
+        // 打開照片放大視窗
+window.openImageViewer = function(url) {
+    document.getElementById('image-viewer-img').src = url;
+    document.getElementById('image-viewer-modal').classList.remove('hidden');
+};
+
+// 關閉照片放大視窗
+window.closeImageViewer = function() {
+    document.getElementById('image-viewer-modal').classList.add('hidden');
+    // 延遲清除圖片來源，避免關閉動畫時閃爍
+    setTimeout(() => { document.getElementById('image-viewer-img').src = ''; }, 300);
+};
 
         // 🛠️ 整合功能：實現 Location 庫存導出成高質感 PDF 清單 (顯示所有庫存照片)
         window.exportLocationPDF = async function() {
