@@ -740,59 +740,44 @@
             window.updateRole();
         });
 
-        function startListeners() { 
-    // 1. 監聽系統設定 (Makers, Locations, Categories) 變更 [cite: 39]
-    onSnapshot(doc(dbFirestore, "settings", "config"), (snap) => { 
-        if(snap.exists()) { 
-            const data = snap.data(); 
-            let fetchedLocations = data.locations || appSettings.locations; 
-            ['JB Studio', 'PNG Studio', 'Online'].forEach(coreLoc => { 
-                if (!fetchedLocations.includes(coreLoc)) { 
-                    fetchedLocations.unshift(coreLoc); 
-                } 
-            });
-            appSettings = { 
-                makers: data.makers || appSettings.makers, 
-                locations: fetchedLocations, 
-                categories: data.categories || appSettings.categories, 
-                weekly_goals: data.weekly_goals || {} 
-            }; 
-        } [cite: 40]
-        
-        renderSettingsView(); 
-        updateDropdowns(); 
-        renderCalendar(); 
-        
-        // 💡【安全保險】：當系統設定（例如地點、類別）被修改且下拉選單更新後，
-        // 立即同步刷新商品清單，確保畫面上的過濾狀態與設定完全一致。
-        if (typeof renderProductionList === 'function') renderProductionList();
-        if (typeof renderAllocationList === 'function') renderAllocationList();
-    });
+        function startListeners() {
+            onSnapshot(doc(dbFirestore, "settings", "config"), (snap) => {
+                if(snap.exists()) {
+                    const data = snap.data();
+                    let fetchedLocations = data.locations || appSettings.locations;
+                    ['JB Studio', 'PNG Studio', 'Online'].forEach(coreLoc => {
+                        if (!fetchedLocations.includes(coreLoc)) {
+                            fetchedLocations.unshift(coreLoc);
+                        }
+                    });
 
-    // 2. 監聽商品資料 (stock_items) 變更 [cite: 40]
-    const q = collection(dbFirestore, "stock_items"); 
-    onSnapshot(q, (snapshot) => { 
-        db = snapshot.docs.map(d => ({ id: d.id, ...d.data() })); 
-        db.sort((a, b) => { 
-            if (a.createdAt && b.createdAt) return b.createdAt.seconds - a.createdAt.seconds; 
-            if (!a.createdAt) return 1; 
-            if (!b.createdAt) return -1; 
-            return 0; 
-        }); 
-        
-        // 更新儀表板數據 [cite: 40]
-        updateDashboard(); 
-        
-        // 💡【修復關鍵】：必須「先」更新下拉選單！
-        // 這樣可以確保在渲染商品列表前，HTML 中的過濾下拉選單已被填入選項，
-        // 且預設值已正確設為 "all"，不會再因為讀取到空值而導致商品消失 [cite: 40]。
-        updateDropdowns(); 
-        
-        // 💡 下拉選單就緒後，「後」執行渲染清單，商品就能在登入後立刻正常顯示
-        renderProductionList(); 
-        renderAllocationList(); 
-    }); 
-}
+                    appSettings = {
+                        makers: data.makers || appSettings.makers,
+                        locations: fetchedLocations,
+                        categories: data.categories || appSettings.categories,
+                        weekly_goals: data.weekly_goals || {} 
+                    };
+                }
+                renderSettingsView();
+                updateDropdowns();
+                renderCalendar(); 
+            });
+
+            const q = collection(dbFirestore, "stock_items");
+            onSnapshot(q, (snapshot) => {
+                db = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                db.sort((a, b) => {
+                    if (a.createdAt && b.createdAt) return b.createdAt.seconds - a.createdAt.seconds;
+                    if (!a.createdAt) return 1;
+                    if (!b.createdAt) return -1;
+                    return 0; 
+                });
+                updateDashboard();
+                renderProductionList();
+                renderAllocationList();
+                updateDropdowns(); 
+            });
+        }
 
         function normalizePhotos(item) {
             let raw = [];
