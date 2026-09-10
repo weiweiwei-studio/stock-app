@@ -615,6 +615,7 @@
     </div>
 
     <script type="module">
+        import { DEFAULT_PAGE_SIZE, paginate, prepareAllocationPage } from "./view-utils.js";
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
@@ -641,9 +642,12 @@
         let activeView = 'dashboard';
         let renderFrame = null;
         let listenersStarted = false;
-        const PAGE_SIZE = 25;
+        const PAGE_SIZE = DEFAULT_PAGE_SIZE;
         let productionPage = 1;
         let allocationPage = 1;
+        const stockItemsById = new Map();
+        let dropdownSignature = '';
+        const dirtyViews = new Set(['dashboard', 'production', 'allocation', 'settings']);
         
         let categoryChart = null, allocChart = null;
         
@@ -777,6 +781,7 @@
                     };
                 }
                 updateDropdowns();
+                markAllViewsDirty();
                 scheduleActiveViewRender();
             }, (error) => {
                 showSyncError(error);
@@ -784,7 +789,17 @@
 
             const q = collection(dbFirestore, "stock_items");
             onSnapshot(q, (snapshot) => {
-                db = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                snapshot.docChanges().forEach(change => {
+                    if (change.type === 'removed') {
+                        stockItemsById.delete(change.doc.id);
+                    } else {
+                        stockItemsById.set(change.doc.id, {
+                            id: change.doc.id,
+                            ...change.doc.data()
+                        });
+                    }
+                });
+                db = Array.from(stockItemsById.values());
                 db.sort((a, b) => {
                     if (a.createdAt && b.createdAt) return b.createdAt.seconds - a.createdAt.seconds;
                     if (!a.createdAt) return 1;
@@ -792,6 +807,7 @@
                     return 0; 
                 });
                 updateDropdowns();
+                markAllViewsDirty();
                 scheduleActiveViewRender();
             }, (error) => {
                 showSyncError(error);
@@ -806,10 +822,16 @@
         }
 
         function renderActiveView() {
+            if (!dirtyViews.has(activeView)) return;
             if (activeView === 'dashboard') updateDashboard();
             else if (activeView === 'production') window.renderProductionList();
             else if (activeView === 'allocation') window.renderAllocationList();
             else if (activeView === 'settings') window.renderSettingsView();
+            dirtyViews.delete(activeView);
+        }
+
+        function markAllViewsDirty() {
+            ['dashboard', 'production', 'allocation', 'settings'].forEach(view => dirtyViews.add(view));
         }
 
         function scheduleActiveViewRender() {
@@ -1460,18 +1482,16 @@
             const catFilter = document.getElementById('prod-filter-category').value;
             const statusFilter = document.getElementById('prod-filter-status').value;
             
-            tbody.innerHTML = '';
+            const fragment = document.createDocumentFragment();
             let data = db;
             
             if (makerFilter !== 'all') data = data.filter(i => i.maker === makerFilter);
             if (catFilter !== 'all') data = data.filter(i => getCleanCategory(i.category) === catFilter);
             if (statusFilter !== 'all') data = data.filter(i => i.status === statusFilter);
 
-            const totalItems = data.length;
-            const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
-            productionPage = Math.max(1, Math.min(productionPage, totalPages));
-            const pageStart = (productionPage - 1) * PAGE_SIZE;
-            data = data.slice(pageStart, pageStart + PAGE_SIZE);
+            const page = paginate(data, productionPage, PAGE_SIZE);
+            productionPage = page.currentPage;
+            data = page.items;
             
             data.forEach(item => {
                 const tr = document.createElement('tr');
@@ -1479,16 +1499,17 @@
                 const photos = normalizePhotos(item);
                 let reelHTML = `<div class="photo-reel">`;
                 if(photos.length === 0 || !photos[0].url) reelHTML += `<div class="w-8 h-10 bg-stone-100 flex items-center justify-center text-[10px] text-stone-300 rounded border">No Img</div>`;
-               else { photos.forEach(p => { if(p.url) reelHTML += `<img src="${p.url}" loading="lazy" decoding="async" class="reel-img cursor-pointer hover:opacity-80 transition-opacity shadow-sm" onclick="window.openImageViewer('${p.url}')">`; }); }
+               else { photos.forEach(p => { if(p.url) reelHTML += `<img src="${p.url}" loading="lazy" decoding="async" fetchpriority="low" width="36" height="48" class="reel-img cursor-pointer hover:opacity-80 transition-opacity shadow-sm" onclick="window.openImageViewer('${p.url}')">`; }); }
                 reelHTML += `</div>`;
                 let statusColor = 'bg-gray-100 text-gray-600';
                 if(item.status === 'Making') statusColor = 'bg-amber-100 text-amber-700';
                 if(item.status === 'QC') statusColor = 'bg-purple-100 text-purple-700';
                 if(item.status === 'Ready') statusColor = 'bg-emerald-100 text-emerald-700';
                 tr.innerHTML = `<td class="px-6 py-4 font-mono text-xs text-stone-500">${item.month}</td><td class="px-6 py-4">${reelHTML}</td><td class="px-6 py-4"><div class="font-medium text-stone-800">${item.itemName}</div><div class="text-xs text-stone-400">${item.color||'-'} ${item.size||'-'}</div></td><td class="px-6 py-4">${item.quantity}</td><td class="px-6 py-4 text-xs">${item.maker}</td><td class="px-6 py-4"><span class="px-2 py-1 rounded-full text-xs font-bold ${statusColor}">${item.status}</span></td><td class="px-6 py-4 text-xs text-stone-600 font-bold">${item.price ? 'RM'+item.price : '-'}</td><td class="px-6 py-4"><button onclick="window.openEditModal('${item.id}')" class="text-stone-400 hover:text-stone-800 border p-1 rounded shadow-sm"><i data-lucide="settings-2" class="w-4 h-4"></i></button></td>`;
-                tbody.appendChild(tr);
+                fragment.appendChild(tr);
             });
-            updatePaginationControls('production', productionPage, totalPages, totalItems);
+            tbody.replaceChildren(fragment);
+            updatePaginationControls('production', productionPage, page.totalPages, page.totalItems);
             lucide.createIcons();
         };
 
@@ -1507,34 +1528,20 @@
             const tbody = document.getElementById('allocation-table-body');
             const locFilter = document.getElementById('alloc-filter-location').value;
             const catFilter = document.getElementById('alloc-filter-category').value;
-            tbody.innerHTML = '';
+            const fragment = document.createDocumentFragment();
 
-            let filteredDb = db.filter(i => i.status === 'Ready' || i.status === 'In Studio' || i.status === 'Sold' || i.status === 'Partial Sold');
-            
-            if (catFilter !== 'all') {
-                filteredDb = filteredDb.filter(i => getCleanCategory(i.category) === catFilter);
-            }
-
-            const photoMatchesFilter = (p) => {
-                if (locFilter === 'Sold') return p.status === 'Sold';
-                if (p.status === 'Sold') return false;
-                if (locFilter === 'all') return true;
-                if (locFilter === 'Unallocated') return p.locations.length === 0;
-                return p.locations.includes(locFilter);
-            };
-
-            filteredDb = filteredDb.filter(item => {
-                return locFilter === 'all' || normalizePhotos(item).some(photoMatchesFilter);
+            const page = prepareAllocationPage({
+                items: db,
+                categoryFilter: catFilter,
+                locationFilter: locFilter,
+                requestedPage: allocationPage,
+                normalizePhotos,
+                cleanCategory: getCleanCategory,
+                pageSize: PAGE_SIZE
             });
-            const totalMatchingPieces = filteredDb.reduce((sum, item) => {
-                return sum + normalizePhotos(item).filter(photoMatchesFilter).length;
-            }, 0);
-
-            const totalItems = filteredDb.length;
-            const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
-            allocationPage = Math.max(1, Math.min(allocationPage, totalPages));
-            const pageStart = (allocationPage - 1) * PAGE_SIZE;
-            const pageItems = filteredDb.slice(pageStart, pageStart + PAGE_SIZE);
+            allocationPage = page.currentPage;
+            const pageItems = page.items;
+            const totalMatchingPieces = page.totalMatchingPieces;
 
             pageItems.forEach(item => {
                 const photos = normalizePhotos(item);
@@ -1639,7 +1646,7 @@
                         gridHTML += `
                         <div class="flex flex-col items-center w-[64px] flex-shrink-0 dispatch-card">
                             <div class="relative w-full h-[84px] cursor-pointer transition-transform hover:scale-105 bg-white rounded shadow-sm border border-stone-200 group" onclick="window.openDetailModal('${item.id}', ${idx})">
-                                ${hasImg ? `<img src="${p.url}" loading="lazy" decoding="async" class="w-full h-full object-cover rounded ${isSold ? 'opacity-50 grayscale' : ''}">` : `<div class="w-full h-full bg-stone-50 flex items-center justify-center text-[8px] text-stone-400 rounded">No Img</div>`}
+                                ${hasImg ? `<img src="${p.url}" loading="lazy" decoding="async" fetchpriority="low" width="64" height="84" class="w-full h-full object-cover rounded ${isSold ? 'opacity-50 grayscale' : ''}">` : `<div class="w-full h-full bg-stone-50 flex items-center justify-center text-[8px] text-stone-400 rounded">No Img</div>`}
                                 <div class="status-badge ${badgeClass}" style="${badgeStyle}">${badgeText}</div>
                                 ${isSold ? `<div class="sold-overlay"><i data-lucide="check" class="text-white w-4 h-4"></i></div>` : ''}
                                 ${hasNote ? `<div class="has-note-dot"></div>` : ''}
@@ -1662,9 +1669,10 @@
                             <div class="text-[10px] text-stone-400 mt-1">主定價: ${item.price ? 'RM'+item.price : '-'}</div>
                         </td>
                         <td class="px-6 py-4 text-xs font-medium text-stone-500">${getCleanCategory(item.category)}</td>`;
-                    tbody.appendChild(tr);
+                    fragment.appendChild(tr);
                 }
             });
+            tbody.replaceChildren(fragment);
 
             const summaryText = document.getElementById('alloc-summary-text');
             const locSelectEl = document.getElementById('alloc-filter-location');
@@ -1684,7 +1692,7 @@
                 <span class="text-blue-500 font-bold text-xs ml-1">件</span>
             `;
 
-            updatePaginationControls('allocation', allocationPage, totalPages, totalItems);
+            updatePaginationControls('allocation', allocationPage, page.totalPages, page.totalItems);
             lucide.createIcons();
         };
 
@@ -1810,7 +1818,7 @@
 
             allMatchedPhotos.forEach(({ item, p, idx, cleanCat }) => {
                 let imgSrc = p.url ? p.url : '';
-                let imgHTML = imgSrc ? `<img src="${imgSrc}" loading="lazy" decoding="async" class="w-full h-32 object-cover rounded-t-md">` : `<div class="w-full h-32 bg-stone-200 flex items-center justify-center text-xs text-stone-400 rounded-t-md">無照片</div>`;
+                let imgHTML = imgSrc ? `<img src="${imgSrc}" loading="lazy" decoding="async" fetchpriority="low" height="128" class="w-full h-32 object-cover rounded-t-md">` : `<div class="w-full h-32 bg-stone-200 flex items-center justify-center text-xs text-stone-400 rounded-t-md">無照片</div>`;
                 
                 let cardColorClass = getStatusColorClass(p.status === 'Sold' ? 'Sold' : item.status);
                 let cardBadgeHTML = '';
@@ -2226,6 +2234,13 @@
         window.updateDropdowns = function() { 
             const distinctMakers = [...new Set([...appSettings.makers, ...db.map(i => i.maker)])].filter(Boolean).sort(); 
             const distinctCategories = [...new Set([...appSettings.categories.map(c => getCleanCategory(c)), ...db.map(i => getCleanCategory(i.category))])].filter(Boolean).sort(); 
+            const nextSignature = JSON.stringify({
+                makers: distinctMakers,
+                categories: distinctCategories,
+                locations: appSettings.locations
+            });
+            if (nextSignature === dropdownSignature) return;
+            dropdownSignature = nextSignature;
             
             const locSelect = document.getElementById('alloc-filter-location'); 
             if(locSelect) { 
@@ -2253,8 +2268,9 @@
                     html += `</optgroup>`;
                 }
 
-                locSelect.innerHTML = html; 
-                locSelect.value = currentVal || "all"; 
+                locSelect.innerHTML = html;
+                const hasCurrentLocation = [...locSelect.options].some(option => option.value === currentVal);
+                locSelect.value = hasCurrentLocation ? currentVal : "all";
             } 
             
             const fill = (cls, list) => document.querySelectorAll(cls).forEach(s => { 
