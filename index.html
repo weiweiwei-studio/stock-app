@@ -13,6 +13,7 @@
     <style>
         /* BASE STYLES */
         body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #fafaf9; color: #44403c; min-height: 100vh; display: flex; flex-direction: column; }
+        body.auth-pending > nav, body.auth-pending > main { display: none; }
         .nav-active { background-color: #e7e5e4; color: #1c1917; font-weight: 700; }
         .custom-scrollbar::-webkit-scrollbar { height: 4px; width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
@@ -64,7 +65,36 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
-<body class="flex flex-col min-h-screen">
+<body class="auth-pending flex flex-col min-h-screen">
+
+    <div id="auth-screen" class="fixed inset-0 z-[100] flex items-center justify-center bg-stone-100 p-5">
+        <div class="w-full max-w-sm rounded-2xl border border-stone-200 bg-white p-7 shadow-xl">
+            <div class="mb-6 text-center">
+                <div class="text-2xl font-black tracking-tight text-stone-800">WEIWEIWEI</div>
+                <p class="mt-1 text-xs font-bold uppercase tracking-widest text-stone-400">Stock System Admin</p>
+            </div>
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label for="login-email" class="mb-1 block text-xs font-bold text-stone-600">Email</label>
+                    <input id="login-email" name="email" type="email" autocomplete="username" required readonly
+                        class="w-full rounded-lg border border-stone-300 bg-stone-50 px-3 py-2.5 text-sm text-stone-600 outline-none"
+                        aria-describedby="login-email-help">
+                    <p id="login-email-help" class="mt-1 text-[11px] text-stone-400">此系統僅開放 Admin 帳號</p>
+                </div>
+                <div>
+                    <label for="login-password" class="mb-1 block text-xs font-bold text-stone-600">Password</label>
+                    <input id="login-password" name="password" type="password" autocomplete="current-password" required
+                        class="w-full rounded-lg border border-stone-300 px-3 py-2.5 text-sm outline-none focus:border-stone-600"
+                        placeholder="輸入密碼">
+                </div>
+                <p id="login-error" class="hidden rounded-lg bg-red-50 p-2.5 text-xs font-medium text-red-600" role="alert"></p>
+                <button id="login-button" type="submit"
+                    class="w-full rounded-lg bg-stone-800 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-stone-900 disabled:cursor-wait disabled:opacity-60">
+                    登入系統
+                </button>
+            </form>
+        </div>
+    </div>
 
     <nav class="bg-white border-b border-stone-200 shadow-sm sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -81,12 +111,11 @@
                         <button onclick="window.switchView('settings')" id="nav-settings" class="nav-item px-3 py-2 rounded-md text-sm font-medium hover:bg-stone-100 transition-colors text-stone-500 hidden flex items-center gap-1 border border-stone-200 bg-stone-50">設定</button>
                     </div>
                 </div>
-                <div class="flex items-center">
-                    <select id="role-select" onchange="window.updateRole()" class="block w-full pl-3 pr-10 py-2 text-base border-stone-300 focus:outline-none focus:ring-stone-500 sm:text-sm rounded-md bg-stone-100">
-                        <option value="admin" selected>Admin (Rie & Raina)</option>
-                        <option value="maker_kim">Maker (Kim)</option>
-                        <option value="maker_kelly">Maker (Kelly)</option>
-                    </select>
+                <div class="flex items-center gap-2">
+                    <span id="signed-in-email" class="hidden max-w-[180px] truncate text-xs font-medium text-stone-500 sm:block"></span>
+                    <button onclick="window.logout()" class="rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-xs font-bold text-stone-600 hover:bg-stone-100">
+                        登出
+                    </button>
                 </div>
             </div>
         </div>
@@ -615,9 +644,10 @@
     </div>
 
     <script type="module">
+        import { ADMIN_EMAIL, getAuthErrorMessage, isAuthorizedAdmin } from "./auth-utils.js";
         import { DEFAULT_PAGE_SIZE, paginate, prepareAllocationPage } from "./view-utils.js";
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
@@ -636,12 +666,13 @@
         const storage = getStorage(app);
 
         let db = [];
-        let currentRole = 'admin';
         let calendarMode = 'production'; 
         let currentCalDate = new Date(); 
         let activeView = 'dashboard';
         let renderFrame = null;
-        let listenersStarted = false;
+        let unsubscribeSettings = null;
+        let unsubscribeStock = null;
+        let chartsInitialized = false;
         const PAGE_SIZE = DEFAULT_PAGE_SIZE;
         let productionPage = 1;
         let allocationPage = 1;
@@ -741,29 +772,61 @@
             const statusEl = document.getElementById('connection-status');
             statusEl.innerText = "Initializing...";
             document.getElementById('form-month-input').value = new Date().toLocaleString('en-US', { month: 'short', year: 'numeric' });
+            const loginForm = document.getElementById('login-form');
+            document.getElementById('login-email').value = ADMIN_EMAIL;
 
             if (!auth) return;
 
-            signInAnonymously(auth).catch((error) => {
-                statusEl.innerText = "Login Fail";
-                statusEl.className = "ml-2 px-2 py-0.5 rounded text-[10px] bg-red-100 text-red-600";
-            });
+            loginForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const button = document.getElementById('login-button');
+                const errorEl = document.getElementById('login-error');
+                const email = document.getElementById('login-email').value.trim().toLowerCase();
+                const passwordInput = document.getElementById('login-password');
 
-            onAuthStateChanged(auth, (user) => {
-                if (user && !listenersStarted) {
-                    listenersStarted = true;
-                    statusEl.innerText = "Connected";
-                    statusEl.className = "ml-2 px-2 py-0.5 rounded text-[10px] bg-green-100 text-green-600";
-                    startListeners();
+                button.disabled = true;
+                button.innerText = '登入中...';
+                errorEl.classList.add('hidden');
+                try {
+                    await signInWithEmailAndPassword(auth, email, passwordInput.value);
+                    passwordInput.value = '';
+                } catch (error) {
+                    errorEl.innerText = getAuthErrorMessage(error.code);
+                    errorEl.classList.remove('hidden');
+                } finally {
+                    button.disabled = false;
+                    button.innerText = '登入系統';
                 }
             });
 
-            initCharts();
-            window.updateRole();
+            onAuthStateChanged(auth, async (user) => {
+                if (user && !isAuthorizedAdmin(user)) {
+                    await signOut(auth);
+                    showAuthScreen('此帳號沒有系統權限。');
+                    return;
+                }
+
+                if (user) {
+                    document.getElementById('signed-in-email').innerText = user.email || ADMIN_EMAIL;
+                    document.getElementById('auth-screen').classList.add('hidden');
+                    document.body.classList.remove('auth-pending');
+                    statusEl.innerText = "Connected";
+                    statusEl.className = "ml-2 px-2 py-0.5 rounded text-[10px] bg-green-100 text-green-600";
+                    if (!chartsInitialized) {
+                        initCharts();
+                        chartsInitialized = true;
+                    }
+                    if (!unsubscribeSettings && !unsubscribeStock) startListeners();
+                    window.updateRole();
+                } else {
+                    stopListeners();
+                    showAuthScreen();
+                }
+            });
         });
 
         function startListeners() {
-            onSnapshot(doc(dbFirestore, "settings", "config"), (snap) => {
+            unsubscribeSettings = onSnapshot(doc(dbFirestore, "settings", "config"), (snap) => {
                 if(snap.exists()) {
                     const data = snap.data();
                     let fetchedLocations = data.locations || appSettings.locations;
@@ -788,7 +851,7 @@
             });
 
             const q = collection(dbFirestore, "stock_items");
-            onSnapshot(q, (snapshot) => {
+            unsubscribeStock = onSnapshot(q, (snapshot) => {
                 snapshot.docChanges().forEach(change => {
                     if (change.type === 'removed') {
                         stockItemsById.delete(change.doc.id);
@@ -813,6 +876,30 @@
                 showSyncError(error);
             });
         }
+
+        function stopListeners() {
+            if (unsubscribeSettings) unsubscribeSettings();
+            if (unsubscribeStock) unsubscribeStock();
+            unsubscribeSettings = null;
+            unsubscribeStock = null;
+            db = [];
+            stockItemsById.clear();
+            dropdownSignature = '';
+            markAllViewsDirty();
+        }
+
+        function showAuthScreen(message = '') {
+            document.body.classList.add('auth-pending');
+            document.getElementById('auth-screen').classList.remove('hidden');
+            document.getElementById('signed-in-email').innerText = '';
+            const errorEl = document.getElementById('login-error');
+            errorEl.innerText = message;
+            errorEl.classList.toggle('hidden', !message);
+        }
+
+        window.logout = async function() {
+            await signOut(auth);
+        };
 
         function showSyncError(error) {
             const statusEl = document.getElementById('connection-status');
@@ -2298,11 +2385,9 @@
             renderActiveView();
         };
         window.updateRole = () => {
-            currentRole = document.getElementById('role-select').value;
-            const isAdmin = currentRole === 'admin';
-            document.getElementById('nav-settings').classList.toggle('hidden', !isAdmin);
-            document.getElementById('mobile-nav-settings').classList.toggle('hidden', !isAdmin);
-            window.switchView(currentRole.startsWith('maker') ? 'production' : 'dashboard');
+            document.getElementById('nav-settings').classList.remove('hidden');
+            document.getElementById('mobile-nav-settings').classList.remove('hidden');
+            window.switchView('dashboard');
         };
         window.openModal = () => document.getElementById('add-modal').classList.remove('hidden');
         window.closeModal = () => document.getElementById('add-modal').classList.add('hidden');

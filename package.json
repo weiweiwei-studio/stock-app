@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test view-utils.test.mjs"
+    "test": "node --test view-utils.test.mjs auth-utils.test.mjs"
   }
 }
