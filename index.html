@@ -645,10 +645,12 @@
 
     <script type="module">
         import { ADMIN_EMAIL, getAuthErrorMessage, isAuthorizedAdmin } from "./auth-utils.js";
+        import { assertVersion, deriveItemStatus, getVersion, nextVersion } from "./data-integrity.js";
+        import { escapeHtml, inlineString, safeImageUrl } from "./security-utils.js";
         import { DEFAULT_PAGE_SIZE, paginate, prepareAllocationPage } from "./view-utils.js";
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, updateDoc, doc, onSnapshot, runTransaction, serverTimestamp, arrayUnion } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
         const firebaseConfig = {
@@ -689,6 +691,7 @@
             weekly_goals: {} 
         };
         let currentDetailItem = null, currentDetailPhotoIdx = -1, tempLocations = []; 
+        let editBaseVersion = 0;
         window.tempEditPhotos = []; 
         const catColors = ['#f472b6', '#60a5fa', '#a78bfa', '#34d399', '#fbbf24', '#9ca3af'];
 
@@ -984,6 +987,30 @@
                 };
             });
         }
+
+        async function updatePhotoAtomic(itemId, photoIdx, createPatch, updateStatus = false) {
+            const itemRef = doc(dbFirestore, "stock_items", itemId);
+            await runTransaction(dbFirestore, async transaction => {
+                const snapshot = await transaction.get(itemRef);
+                if (!snapshot.exists()) throw new Error('找不到此商品，可能已被刪除。');
+
+                const latestItem = snapshot.data();
+                const photos = normalizePhotos(latestItem);
+                if (!Number.isInteger(photoIdx) || photoIdx < 0 || photoIdx >= photos.length) {
+                    throw new Error('照片資料已變更，請重新開啟商品後再試。');
+                }
+
+                const patch = createPatch({ ...photos[photoIdx] }, latestItem);
+                photos[photoIdx] = { ...photos[photoIdx], ...patch };
+                const updates = {
+                    photos,
+                    _version: nextVersion(latestItem),
+                    updatedAt: serverTimestamp()
+                };
+                if (updateStatus) updates.status = deriveItemStatus(photos);
+                transaction.update(itemRef, updates);
+            });
+        }
         
         function getCleanCategory(catName) {
             if (!catName) return "";
@@ -1135,7 +1162,7 @@
                     sortedCats.forEach(cat => {
                         catHtml += `
                             <div class="bg-white border border-stone-200 px-2 py-1 rounded text-[10px] flex items-center justify-between gap-1 shadow-sm whitespace-nowrap group hover:border-amber-300 transition-colors">
-                                <span class="font-bold text-stone-600">${cat}</span>
+                                <span class="font-bold text-stone-600">${escapeHtml(cat)}</span>
                                 <span class="text-stone-800 bg-stone-100 px-1.5 rounded font-black">${catSales[cat]}</span>
                             </div>
                         `;
@@ -1206,8 +1233,8 @@
                 const bgHex = loc === 'Unallocated' ? '#9ca3af' : window.getLocColorObj(loc).bg;
                 
                 html += `
-                    <div class="flex items-center justify-between text-[10px] mb-1.5 group cursor-pointer" onclick="window.openListModal('cat_loc', '${selectedCat}|${loc}')">
-                        <span class="font-bold text-stone-600 truncate w-24 text-left group-hover:text-stone-900 transition-colors">${loc}</span>
+                    <div class="flex items-center justify-between text-[10px] mb-1.5 group cursor-pointer" onclick="window.openListModal('cat_loc', ${inlineString(selectedCat + '|' + loc)})">
+                        <span class="font-bold text-stone-600 truncate w-24 text-left group-hover:text-stone-900 transition-colors">${escapeHtml(loc)}</span>
                         <div class="flex-grow mx-2 bg-stone-100 rounded-full h-1.5 overflow-hidden">
                             <div class="h-full rounded-full transition-all duration-500 opacity-80 group-hover:opacity-100" style="width: ${pct}%; background-color: ${bgHex};"></div>
                         </div>
@@ -1304,8 +1331,7 @@
             const val = prompt(`Set Target for ${year}/${month+1} Week ${week}:`, current);
             if (val !== null) {
                 const num = parseInt(val) || 0;
-                const newGoals = { ...appSettings.weekly_goals, [key]: num };
-                await updateDoc(doc(dbFirestore, "settings", "config"), { weekly_goals: newGoals });
+                await updateDoc(doc(dbFirestore, "settings", "config"), { [`weekly_goals.${key}`]: num });
             }
         };
 
@@ -1339,8 +1365,8 @@
                     unscheduled.forEach(i => {
                         let colorClass = getStatusColorClass(i.status);
                         unscheduledContainer.innerHTML += `
-                            <div onclick="window.openEditModal('${i.id}')" class="${colorClass} text-[10px] px-2 py-1 rounded cursor-pointer hover:opacity-80 transition shadow-sm border border-black/5">
-                                ${getCleanCategory(i.category)}: ${i.itemName}
+                            <div onclick="window.openEditModal(${inlineString(i.id)})" class="${colorClass} text-[10px] px-2 py-1 rounded cursor-pointer hover:opacity-80 transition shadow-sm border border-black/5">
+                                ${escapeHtml(getCleanCategory(i.category))}: ${escapeHtml(i.itemName)}
                             </div>`;
                     });
                 }
@@ -1388,7 +1414,7 @@
                     const catName = getCleanCategory(item.category);
                     const qtyDisplay = item.quantity > 1 ? ` (${item.quantity})` : '';
                     
-                    cellHTML += `<div class="cal-item ${colorClass} border border-black/5" onclick="window.openEditModal('${item.id}')" title="${item.itemName}">${catName}${qtyDisplay}</div>`;
+                    cellHTML += `<div class="cal-item ${colorClass} border border-black/5" onclick="window.openEditModal(${inlineString(item.id)})" title="${escapeHtml(item.itemName)}">${escapeHtml(catName)}${escapeHtml(qtyDisplay)}</div>`;
                 });
 
                 cellHTML += `</div></div>`;
@@ -1431,8 +1457,8 @@
                     const unsold = unsoldStats[c] || 0;
                     const unshipped = unshippedStats[c] || 0;
                     container.innerHTML += `
-                    <button onclick="window.openListModal('category', '${c}')" class="bg-white px-3 py-2 rounded shadow-sm border border-stone-200 text-left hover:shadow-md transition-all flex flex-col min-w-[110px]">
-                        <span class="font-bold text-stone-700 text-xs mb-1">${c}</span>
+                    <button onclick="window.openListModal('category', ${inlineString(c)})" class="bg-white px-3 py-2 rounded shadow-sm border border-stone-200 text-left hover:shadow-md transition-all flex flex-col min-w-[110px]">
+                        <span class="font-bold text-stone-700 text-xs mb-1">${escapeHtml(c)}</span>
                         <div class="flex items-center justify-between w-full text-[10px]">
                             <span class="text-stone-500">未售出: <b class="text-stone-800">${unsold}</b></span>
                             <span class="text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-medium">未出庫: <b>${unshipped}</b></span>
@@ -1454,7 +1480,7 @@
                     const isStudio = l.toUpperCase().includes('JB') || l.toUpperCase().includes('PNG');
                     const colors = window.getLocColorObj(l);
                     const btnStyle = `background-color: ${colors.bg}; color: ${colors.text}; border-color: rgba(0,0,0,0.1);`;
-                    const btn = `<button onclick="window.openListModal('location', '${l}')" class="px-3 py-1.5 rounded shadow-sm border text-xs transition-colors font-medium hover:opacity-80" style="${btnStyle}">${l}: <b class="font-bold">${stats[l]}</b></button>`;
+                    const btn = `<button onclick="window.openListModal('location', ${inlineString(l)})" class="px-3 py-1.5 rounded shadow-sm border text-xs transition-colors font-medium hover:opacity-80" style="${btnStyle}">${escapeHtml(l)}: <b class="font-bold">${stats[l]}</b></button>`;
                     
                     if (isStudio) studiosHTML += btn;
                     else stockistsHTML += btn;
@@ -1590,13 +1616,13 @@
                 const photos = normalizePhotos(item);
                 let reelHTML = `<div class="photo-reel">`;
                 if(photos.length === 0 || !photos[0].url) reelHTML += `<div class="w-8 h-10 bg-stone-100 flex items-center justify-center text-[10px] text-stone-300 rounded border">No Img</div>`;
-               else { photos.forEach(p => { if(p.url) reelHTML += `<img src="${p.url}" loading="lazy" decoding="async" fetchpriority="low" width="36" height="48" class="reel-img cursor-pointer hover:opacity-80 transition-opacity shadow-sm" onclick="window.openImageViewer('${p.url}')">`; }); }
+               else { photos.forEach(p => { const imageUrl = safeImageUrl(p.url); if(imageUrl) reelHTML += `<img src="${escapeHtml(imageUrl)}" loading="lazy" decoding="async" fetchpriority="low" width="36" height="48" class="reel-img cursor-pointer hover:opacity-80 transition-opacity shadow-sm" onclick="window.openImageViewer(${inlineString(imageUrl)})">`; }); }
                 reelHTML += `</div>`;
                 let statusColor = 'bg-gray-100 text-gray-600';
                 if(item.status === 'Making') statusColor = 'bg-amber-100 text-amber-700';
                 if(item.status === 'QC') statusColor = 'bg-purple-100 text-purple-700';
                 if(item.status === 'Ready') statusColor = 'bg-emerald-100 text-emerald-700';
-                tr.innerHTML = `<td class="px-6 py-4 font-mono text-xs text-stone-500">${item.month}</td><td class="px-6 py-4">${reelHTML}</td><td class="px-6 py-4"><div class="font-medium text-stone-800">${item.itemName}</div><div class="text-xs text-stone-400">${item.color||'-'} ${item.size||'-'}</div></td><td class="px-6 py-4">${item.quantity}</td><td class="px-6 py-4 text-xs">${item.maker}</td><td class="px-6 py-4"><span class="px-2 py-1 rounded-full text-xs font-bold ${statusColor}">${item.status}</span></td><td class="px-6 py-4 text-xs text-stone-600 font-bold">${item.price ? 'RM'+item.price : '-'}</td><td class="px-6 py-4"><button onclick="window.openEditModal('${item.id}')" class="text-stone-400 hover:text-stone-800 border p-1 rounded shadow-sm"><i data-lucide="settings-2" class="w-4 h-4"></i></button></td>`;
+                tr.innerHTML = `<td class="px-6 py-4 font-mono text-xs text-stone-500">${escapeHtml(item.month)}</td><td class="px-6 py-4">${reelHTML}</td><td class="px-6 py-4"><div class="font-medium text-stone-800">${escapeHtml(item.itemName)}</div><div class="text-xs text-stone-400">${escapeHtml(item.color||'-')} ${escapeHtml(item.size||'-')}</div></td><td class="px-6 py-4">${escapeHtml(item.quantity)}</td><td class="px-6 py-4 text-xs">${escapeHtml(item.maker)}</td><td class="px-6 py-4"><span class="px-2 py-1 rounded-full text-xs font-bold ${statusColor}">${escapeHtml(item.status)}</span></td><td class="px-6 py-4 text-xs text-stone-600 font-bold">${item.price ? 'RM'+escapeHtml(item.price) : '-'}</td><td class="px-6 py-4"><button onclick="window.openEditModal(${inlineString(item.id)})" class="text-stone-400 hover:text-stone-800 border p-1 rounded shadow-sm"><i data-lucide="settings-2" class="w-4 h-4"></i></button></td>`;
                 fragment.appendChild(tr);
             });
             tbody.replaceChildren(fragment);
@@ -1715,7 +1741,7 @@
                             if (physicalOptions.length > 0) {
                                 optionsHTML += `<optgroup label="實體地點轉移">`;
                                 physicalOptions.forEach(s => {
-                                    optionsHTML += `<option value="${s}">${s}</option>`;
+                                    optionsHTML += `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`;
                                 });
                                 optionsHTML += `</optgroup>`;
                             }
@@ -1723,7 +1749,7 @@
                             if (optionsHTML) {
                                 quickDispatchHTML = `
                                     <div class="mt-2 border-t border-stone-100 pt-2 dispatch-wrapper">
-                                        <select onchange="window.quickDispatch(event, '${item.id}', ${idx}, this.value)" class="w-full text-[10px] p-1.5 border rounded font-bold cursor-pointer outline-none transition shadow-sm ${bgClass}" onclick="event.stopPropagation()">
+                                        <select onchange="window.quickDispatch(event, ${inlineString(item.id)}, ${idx}, this.value)" class="w-full text-[10px] p-1.5 border rounded font-bold cursor-pointer outline-none transition shadow-sm ${bgClass}" onclick="event.stopPropagation()">
                                             <option value="" disabled selected>${labelText}</option>
                                             ${optionsHTML}
                                         </select>
@@ -1736,9 +1762,9 @@
 
                         gridHTML += `
                         <div class="flex flex-col items-center w-[64px] flex-shrink-0 dispatch-card">
-                            <div class="relative w-full h-[84px] cursor-pointer transition-transform hover:scale-105 bg-white rounded shadow-sm border border-stone-200 group" onclick="window.openDetailModal('${item.id}', ${idx})">
-                                ${hasImg ? `<img src="${p.url}" loading="lazy" decoding="async" fetchpriority="low" width="64" height="84" class="w-full h-full object-cover rounded ${isSold ? 'opacity-50 grayscale' : ''}">` : `<div class="w-full h-full bg-stone-50 flex items-center justify-center text-[8px] text-stone-400 rounded">No Img</div>`}
-                                <div class="status-badge ${badgeClass}" style="${badgeStyle}">${badgeText}</div>
+                            <div class="relative w-full h-[84px] cursor-pointer transition-transform hover:scale-105 bg-white rounded shadow-sm border border-stone-200 group" onclick="window.openDetailModal(${inlineString(item.id)}, ${idx})">
+                                ${safeImageUrl(p.url) ? `<img src="${escapeHtml(safeImageUrl(p.url))}" loading="lazy" decoding="async" fetchpriority="low" width="64" height="84" class="w-full h-full object-cover rounded ${isSold ? 'opacity-50 grayscale' : ''}">` : `<div class="w-full h-full bg-stone-50 flex items-center justify-center text-[8px] text-stone-400 rounded">No Img</div>`}
+                                <div class="status-badge ${badgeClass}" style="${badgeStyle}">${escapeHtml(badgeText)}</div>
                                 ${isSold ? `<div class="sold-overlay"><i data-lucide="check" class="text-white w-4 h-4"></i></div>` : ''}
                                 ${hasNote ? `<div class="has-note-dot"></div>` : ''}
                                 <div class="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity rounded flex items-center justify-center pointer-events-none"><i data-lucide="settings" class="text-white w-5 h-5 drop-shadow-md"></i></div>
@@ -1755,11 +1781,11 @@
                     tr.innerHTML = `
                         <td class="px-6 py-4">${gridHTML}</td>
                         <td class="px-6 py-4">
-                            <div class="font-bold text-stone-800 text-sm">${item.itemName}</div>
-                            <div class="text-xs text-stone-500">${item.color||''} ${item.size||''}</div>
-                            <div class="text-[10px] text-stone-400 mt-1">主定價: ${item.price ? 'RM'+item.price : '-'}</div>
+                            <div class="font-bold text-stone-800 text-sm">${escapeHtml(item.itemName)}</div>
+                            <div class="text-xs text-stone-500">${escapeHtml(item.color||'')} ${escapeHtml(item.size||'')}</div>
+                            <div class="text-[10px] text-stone-400 mt-1">主定價: ${item.price ? 'RM'+escapeHtml(item.price) : '-'}</div>
                         </td>
-                        <td class="px-6 py-4 text-xs font-medium text-stone-500">${getCleanCategory(item.category)}</td>`;
+                        <td class="px-6 py-4 text-xs font-medium text-stone-500">${escapeHtml(getCleanCategory(item.category))}</td>`;
                     fragment.appendChild(tr);
                 }
             });
@@ -1775,9 +1801,9 @@
 
             summaryText.innerHTML = `
                 <span class="text-stone-500 font-bold text-xs mr-2"><i data-lucide="package-check" class="w-4 h-4 inline pb-0.5"></i> ${summaryLabel}:</span> 
-                <span class="bg-white px-2 py-0.5 rounded shadow-sm border border-blue-100 text-stone-700 text-xs font-bold">${displayCat}</span> 
+                <span class="bg-white px-2 py-0.5 rounded shadow-sm border border-blue-100 text-stone-700 text-xs font-bold">${escapeHtml(displayCat)}</span>
                 <span class="text-blue-300 mx-1 font-bold">+</span> 
-                <span class="bg-white px-2 py-0.5 rounded shadow-sm border border-blue-100 text-stone-700 text-xs font-bold">${displayLoc}</span> 
+                <span class="bg-white px-2 py-0.5 rounded shadow-sm border border-blue-100 text-stone-700 text-xs font-bold">${escapeHtml(displayLoc)}</span>
                 <span class="text-blue-300 mx-1 font-bold">=</span> 
                 <span class="text-xl font-black text-blue-700 ml-1 drop-shadow-sm">${totalMatchingPieces}</span> 
                 <span class="text-blue-500 font-bold text-xs ml-1">件</span>
@@ -1821,22 +1847,16 @@
             selectEl.disabled = true;
             selectEl.options[selectEl.selectedIndex].text = '處理中...';
             try {
-                const item = db.find(i => i.id === itemId);
-                let photos = normalizePhotos(item);
-                
-                const isTargetOnline = toLocation.toUpperCase() === 'ONLINE';
-                
-                if (isTargetOnline) {
-                    if (!photos[photoIdx].locations.some(l => l.toUpperCase() === 'ONLINE')) {
-                        photos[photoIdx].locations.push('Online');
+                await updatePhotoAtomic(itemId, photoIdx, photo => {
+                    const isTargetOnline = toLocation.toUpperCase() === 'ONLINE';
+                    const locations = [...photo.locations];
+                    if (isTargetOnline) {
+                        if (!locations.some(location => location.toUpperCase() === 'ONLINE')) locations.push('Online');
+                        return { locations };
                     }
-                } else {
-                    const hasOnline = photos[photoIdx].locations.some(l => l.toUpperCase() === 'ONLINE');
-                    const onlineName = photos[photoIdx].locations.find(l => l.toUpperCase() === 'ONLINE');
-                    photos[photoIdx].locations = hasOnline ? [onlineName, toLocation] : [toLocation]; 
-                }
-                
-                await updateDoc(doc(dbFirestore, "stock_items", itemId), { photos: photos });
+                    const onlineName = locations.find(location => location.toUpperCase() === 'ONLINE');
+                    return { locations: onlineName ? [onlineName, toLocation] : [toLocation] };
+                });
             } catch (err) {
                 alert("轉移失敗：" + err.message);
                 selectEl.disabled = false;
@@ -1908,8 +1928,8 @@
             let cardsHTML = '';
 
             allMatchedPhotos.forEach(({ item, p, idx, cleanCat }) => {
-                let imgSrc = p.url ? p.url : '';
-                let imgHTML = imgSrc ? `<img src="${imgSrc}" loading="lazy" decoding="async" fetchpriority="low" height="128" class="w-full h-32 object-cover rounded-t-md">` : `<div class="w-full h-32 bg-stone-200 flex items-center justify-center text-xs text-stone-400 rounded-t-md">無照片</div>`;
+                let imgSrc = safeImageUrl(p.url);
+                let imgHTML = imgSrc ? `<img src="${escapeHtml(imgSrc)}" loading="lazy" decoding="async" fetchpriority="low" height="128" class="w-full h-32 object-cover rounded-t-md">` : `<div class="w-full h-32 bg-stone-200 flex items-center justify-center text-xs text-stone-400 rounded-t-md">無照片</div>`;
                 
                 let cardColorClass = getStatusColorClass(p.status === 'Sold' ? 'Sold' : item.status);
                 let cardBadgeHTML = '';
@@ -1925,13 +1945,13 @@
                     let loc0 = physicalLocs[0];
                     const colors = window.getLocColorObj(loc0);
                     let displayLoc = isOnline ? '🌐 ' + loc0 : loc0;
-                    cardBadgeHTML = `<div class="mt-2 text-[10px] font-bold px-1.5 py-0.5 rounded w-fit border border-black/10" style="background-color: ${colors.bg}; color: ${colors.text};">${displayLoc}</div>`;
+                    cardBadgeHTML = `<div class="mt-2 text-[10px] font-bold px-1.5 py-0.5 rounded w-fit border border-black/10" style="background-color: ${colors.bg}; color: ${colors.text};">${escapeHtml(displayLoc)}</div>`;
                 } else if (isOnline) {
                     let loc0 = 'Online';
                     const colors = window.getLocColorObj(loc0);
                     cardBadgeHTML = `<div class="mt-2 text-[10px] font-bold px-1.5 py-0.5 rounded w-fit border border-black/10" style="background-color: ${colors.bg}; color: ${colors.text};">${loc0}</div>`;
                 } else {
-                    cardBadgeHTML = `<div class="mt-2 text-[10px] font-bold px-1.5 py-0.5 rounded w-fit border border-black/5 ${cardColorClass}">${item.status}</div>`;
+                    cardBadgeHTML = `<div class="mt-2 text-[10px] font-bold px-1.5 py-0.5 rounded w-fit border border-black/5 ${cardColorClass}">${escapeHtml(item.status)}</div>`;
                 }
                 
                 let quickDispatchHTML = '';
@@ -1947,14 +1967,14 @@
                     const physicalOptions = appSettings.locations.filter(s => !p.locations.includes(s) && s.toUpperCase() !== 'ONLINE');
                     if (physicalOptions.length > 0) {
                         optionsHTML += `<optgroup label="實體地點轉移">`;
-                        physicalOptions.forEach(s => { optionsHTML += `<option value="${s}">${s}</option>`; });
+                        physicalOptions.forEach(s => { optionsHTML += `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`; });
                         optionsHTML += `</optgroup>`;
                     }
 
                     if (optionsHTML) {
                         quickDispatchHTML = `
                             <div class="mt-2 border-t border-stone-100 pt-2 dispatch-wrapper">
-                                <select onchange="window.quickDispatch(event, '${item.id}', ${idx}, this.value)" class="w-full text-[10px] p-1.5 border rounded font-bold cursor-pointer outline-none transition shadow-sm ${bgClass}" onclick="event.stopPropagation()">
+                                <select onchange="window.quickDispatch(event, ${inlineString(item.id)}, ${idx}, this.value)" class="w-full text-[10px] p-1.5 border rounded font-bold cursor-pointer outline-none transition shadow-sm ${bgClass}" onclick="event.stopPropagation()">
                                     <option value="" disabled selected>${labelText}</option>
                                     ${optionsHTML}
                                 </select>
@@ -1964,11 +1984,11 @@
                 }
 
                 cardsHTML += `
-                    <div class="bg-white rounded-md shadow-sm border border-stone-200 hover:shadow-md transition flex flex-col overflow-hidden relative group cursor-pointer dispatch-card" onclick="window.openDetailModal('${item.id}', ${idx})">
+                    <div class="bg-white rounded-md shadow-sm border border-stone-200 hover:shadow-md transition flex flex-col overflow-hidden relative group cursor-pointer dispatch-card" onclick="window.openDetailModal(${inlineString(item.id)}, ${idx})">
                         ${imgHTML}
                         <div class="p-2 flex flex-col flex-grow">
-                            <div class="font-bold text-stone-800 text-xs truncate" title="${item.itemName}">${item.itemName}</div>
-                            <div class="text-[10px] text-stone-500">${cleanCat} | ${item.color || '-'}</div>
+                            <div class="font-bold text-stone-800 text-xs truncate" title="${escapeHtml(item.itemName)}">${escapeHtml(item.itemName)}</div>
+                            <div class="text-[10px] text-stone-500">${escapeHtml(cleanCat)} | ${escapeHtml(item.color || '-')}</div>
                             <div class="flex-grow">
                                 ${cardBadgeHTML}
                             </div>
@@ -2040,7 +2060,7 @@
             physicalLocs.forEach(loc => {
                 const isSelected = tempLocations.includes(loc);
                 const btnClass = isSelected ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white text-stone-500 border-stone-200 hover:border-blue-300';
-                container.innerHTML += `<button onclick="window.toggleDetailLocation('${loc}')" class="border rounded py-2 text-xs font-bold transition-colors ${btnClass}">${loc} ${isSelected ? '✓' : ''}</button>`;
+                container.innerHTML += `<button onclick="window.toggleDetailLocation(${inlineString(loc)})" class="border rounded py-2 text-xs font-bold transition-colors ${btnClass}">${escapeHtml(loc)} ${isSelected ? '✓' : ''}</button>`;
             });
 
             const isOnlineSelected = tempLocations.some(l => l.toUpperCase() === 'ONLINE');
@@ -2077,22 +2097,21 @@
             const btn = document.getElementById('btn-save-detail');
             btn.innerText = '儲存中...'; btn.disabled = true;
             try {
-                let photos = normalizePhotos(currentDetailItem); 
-                photos[currentDetailPhotoIdx].notes = document.getElementById('detail-notes').value; 
-                photos[currentDetailPhotoIdx].locations = tempLocations; 
-                
                 const specPrice = document.getElementById('detail-specific-price').value;
-                photos[currentDetailPhotoIdx].specificPrice = specPrice !== '' ? Number(specPrice) : null;
-                
+                const patch = {
+                    notes: document.getElementById('detail-notes').value,
+                    locations: [...tempLocations],
+                    specificPrice: specPrice !== '' ? Number(specPrice) : null
+                };
                 const fileInput = document.getElementById('detail-photo-upload');
                 if (fileInput.files.length > 0) {
                     const file = fileInput.files[0];
                     const sRef = ref(storage, 'photos/'+Date.now()+'_detail_'+file.name);
                     const snap = await uploadBytes(sRef, file);
-                    photos[currentDetailPhotoIdx].url = await getDownloadURL(snap.ref);
+                    patch.url = await getDownloadURL(snap.ref);
                 }
-                
-                await updateDoc(doc(dbFirestore, "stock_items", currentDetailItem.id), { photos: photos }); 
+
+                await updatePhotoAtomic(currentDetailItem.id, currentDetailPhotoIdx, () => patch);
                 window.closeDetailModal(); 
             } catch(e) { 
                 alert("儲存失敗: " + e.message); 
@@ -2103,7 +2122,7 @@
         
         window.triggerSoldFlow = function() {
             let photos = normalizePhotos(currentDetailItem); const currentStatus = photos[currentDetailPhotoIdx].status;
-            if (currentStatus === 'Sold') { if(confirm("確認取消售出？物品將回到庫存中。")) { photos[currentDetailPhotoIdx].status = 'Available'; photos[currentDetailPhotoIdx].soldPrice = null; updateItemStatus(photos); } } 
+            if (currentStatus === 'Sold') { if(confirm("確認取消售出？物品將回到庫存中。")) updateItemStatus({ status: 'Available', soldPrice: null, soldAt: null }); }
             else { 
                 let basePrice = currentDetailItem.price || '';
                 let piecePrice = photos[currentDetailPhotoIdx].specificPrice !== undefined && photos[currentDetailPhotoIdx].specificPrice !== null ? photos[currentDetailPhotoIdx].specificPrice : basePrice;
@@ -2116,11 +2135,29 @@
         };
         window.confirmSoldAction = function() {
             const soldPrice = document.getElementById('sold-price-input').value; const note = document.getElementById('sold-note-input').value; const dateVal = document.getElementById('sold-date-input').value;
-            let photos = normalizePhotos(currentDetailItem); photos[currentDetailPhotoIdx].status = 'Sold'; photos[currentDetailPhotoIdx].soldPrice = soldPrice; photos[currentDetailPhotoIdx].soldAt = dateVal ? new Date(dateVal.replace(/-/g, '/')) : new Date(); photos[currentDetailPhotoIdx].locations = tempLocations;
-            if(note) photos[currentDetailPhotoIdx].notes = (photos[currentDetailPhotoIdx].notes ? photos[currentDetailPhotoIdx].notes + " | " : "") + note;
-            document.getElementById('sold-modal').classList.add('hidden'); updateItemStatus(photos);
+            const patch = {
+                status: 'Sold',
+                soldPrice,
+                soldAt: dateVal ? new Date(dateVal.replace(/-/g, '/')) : new Date(),
+                locations: [...tempLocations]
+            };
+            document.getElementById('sold-modal').classList.add('hidden');
+            updateItemStatus(patch, note);
         };
-        async function updateItemStatus(photos) { const allSold = photos.every(p => p.status === 'Sold'); const anySold = photos.some(p => p.status === 'Sold'); let globalStatus = allSold ? 'Sold' : (anySold ? 'Partial Sold' : 'Ready'); await updateDoc(doc(dbFirestore, "stock_items", currentDetailItem.id), { photos: photos, status: globalStatus }); window.closeDetailModal(); }
+        async function updateItemStatus(patch, noteToAppend = '') {
+            try {
+                await updatePhotoAtomic(currentDetailItem.id, currentDetailPhotoIdx, latestPhoto => {
+                    if (!noteToAppend) return patch;
+                    return {
+                        ...patch,
+                        notes: (latestPhoto.notes ? latestPhoto.notes + ' | ' : '') + noteToAppend
+                    };
+                }, true);
+                window.closeDetailModal();
+            } catch (error) {
+                alert('更新售出狀態失敗：' + error.message);
+            }
+        }
         window.closeDetailModal = () => document.getElementById('detail-modal').classList.add('hidden');
         
         window.handleAddItem = async function(e) { 
@@ -2156,6 +2193,8 @@
                     price: form.get('price'), 
                     status: 'To Make', 
                     photos: photoObjs, 
+                    _version: 1,
+                    updatedAt: serverTimestamp(),
                     createdAt: serverTimestamp() 
                 }); 
                 window.closeModal(); 
@@ -2165,6 +2204,8 @@
         
         window.openEditModal = (id) => { 
             const item = db.find(i=>i.id===id); 
+            if (!item) return;
+            editBaseVersion = getVersion(item);
             document.getElementById('edit-id').value = id; 
             document.getElementById('edit-itemName').value = item.itemName; 
             document.getElementById('edit-month').value = item.month; 
@@ -2193,7 +2234,7 @@
                     hasPhotos = true;
                     container.innerHTML += `
                         <div class="relative w-14 h-20 group rounded overflow-hidden border border-stone-200 bg-white flex-shrink-0 shadow-sm">
-                            <img src="${p.url}" class="w-full h-full object-cover">
+                            <img src="${escapeHtml(safeImageUrl(p.url))}" class="w-full h-full object-cover">
                             <button type="button" onclick="window.removeEditPhoto(${idx})" class="absolute inset-0 bg-red-600/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition duration-200">
                                 <i data-lucide="trash-2" class="w-5 h-5 drop-shadow-md"></i>
                             </button>
@@ -2294,7 +2335,18 @@
                     data.photos = existingPhotos;
                 }
 
-                await updateDoc(doc(dbFirestore, "stock_items", id), data); 
+                const itemRef = doc(dbFirestore, "stock_items", id);
+                await runTransaction(dbFirestore, async transaction => {
+                    const snapshot = await transaction.get(itemRef);
+                    if (!snapshot.exists()) throw new Error('找不到此工單，可能已被刪除。');
+                    const latestItem = snapshot.data();
+                    assertVersion(latestItem, editBaseVersion);
+                    transaction.update(itemRef, {
+                        ...data,
+                        _version: nextVersion(latestItem),
+                        updatedAt: serverTimestamp()
+                    });
+                });
                 window.closeEditModal(); 
             } catch(error) { 
                 console.error(error); alert("Error: " + error.message); 
@@ -2303,23 +2355,47 @@
             } 
         };
 
-        window.handleDelete = async () => { if(confirm('確定刪除此整個主工單嗎？')) { await deleteDoc(doc(dbFirestore, "stock_items", document.getElementById('edit-id').value)); window.closeEditModal(); } };
+        window.handleDelete = async () => {
+            if (!confirm('確定刪除此整個主工單嗎？')) return;
+            const itemRef = doc(dbFirestore, "stock_items", document.getElementById('edit-id').value);
+            try {
+                await runTransaction(dbFirestore, async transaction => {
+                    const snapshot = await transaction.get(itemRef);
+                    if (!snapshot.exists()) throw new Error('此工單已被刪除。');
+                    assertVersion(snapshot.data(), editBaseVersion);
+                    transaction.delete(itemRef);
+                });
+                window.closeEditModal();
+            } catch (error) {
+                alert('刪除失敗：' + error.message);
+            }
+        };
         
         window.renderSettingsView = function() { 
             const render = (type) => [...new Set((appSettings[type]||[]).map(x=>type==='categories'?getCleanCategory(x):x).filter(Boolean))]
-                .map(i => `<span class="bg-stone-100 px-2 py-1 rounded text-xs mr-1 mb-1 inline-block border cursor-pointer hover:bg-red-50 hover:text-red-500" onclick="window.removeSetting('${type}','${i}')">${i} &times;</span>`).join(''); 
+                .map(i => `<span class="bg-stone-100 px-2 py-1 rounded text-xs mr-1 mb-1 inline-block border cursor-pointer hover:bg-red-50 hover:text-red-500" onclick="window.removeSetting(${inlineString(type)}, ${inlineString(i)})">${escapeHtml(i)} &times;</span>`).join('');
             document.getElementById('settings-makers-list').innerHTML = render('makers'); 
             document.getElementById('settings-locations-list').innerHTML = render('locations'); 
             document.getElementById('settings-categories-list').innerHTML = render('categories'); 
         };
         
-        window.addSetting = async function(type) { const map = {'makers':'new-maker-input', 'locations':'new-location-input', 'categories':'new-category-input'}; let val = document.getElementById(map[type]).value; if (type === 'categories') val = getCleanCategory(val); else val = val.trim(); if(val) { await updateDoc(doc(dbFirestore, "settings", "config"), { [type]: [...appSettings[type], val] }); document.getElementById(map[type]).value = ''; } };
+        window.addSetting = async function(type) { const map = {'makers':'new-maker-input', 'locations':'new-location-input', 'categories':'new-category-input'}; let val = document.getElementById(map[type]).value; if (type === 'categories') val = getCleanCategory(val); else val = val.trim(); if(val) { await updateDoc(doc(dbFirestore, "settings", "config"), { [type]: arrayUnion(val) }); document.getElementById(map[type]).value = ''; } };
         window.removeSetting = async function(type, val) { 
             if (type === 'locations' && ['JB Studio', 'PNG Studio', 'Online'].includes(val)) {
                 alert("此為系統預設核心地點，為保證運作正常，無法被刪除！");
                 return;
             }
-            if(confirm(`確定要刪除 ${val}?`)) await updateDoc(doc(dbFirestore, "settings", "config"), { [type]: appSettings[type].filter(x => (type==='categories'?getCleanCategory(x):x) !== val) }); 
+            if(confirm(`確定要刪除 ${val}?`)) {
+                const settingsRef = doc(dbFirestore, "settings", "config");
+                await runTransaction(dbFirestore, async transaction => {
+                    const snapshot = await transaction.get(settingsRef);
+                    if (!snapshot.exists()) throw new Error('找不到系統設定。');
+                    const latestValues = snapshot.data()[type] || [];
+                    transaction.update(settingsRef, {
+                        [type]: latestValues.filter(x => (type==='categories'?getCleanCategory(x):x) !== val)
+                    });
+                });
+            }
         }
         
         window.updateDropdowns = function() { 
@@ -2355,7 +2431,7 @@
                 
                 if(stockists.length > 0) {
                     html += `<optgroup label="🚚 已出貨 (Stockists)">`;
-                    stockists.forEach(l => html += `<option value="${l}">${l}</option>`);
+                    stockists.forEach(l => html += `<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`);
                     html += `</optgroup>`;
                 }
 
@@ -2367,7 +2443,7 @@
             const fill = (cls, list) => document.querySelectorAll(cls).forEach(s => { 
                 const old = s.value; 
                 const isFilter = s.id.includes('filter');
-                s.innerHTML = (isFilter ? '<option value="all">全部</option>' : '') + list.map(i=>`<option value="${i}">${i}</option>`).join(''); 
+                s.innerHTML = (isFilter ? '<option value="all">全部</option>' : '') + list.map(i=>`<option value="${escapeHtml(i)}">${escapeHtml(i)}</option>`).join('');
                 if(list.includes(old)) s.value = old;
                 else if (isFilter) s.value = "all";
             }); 
@@ -2393,7 +2469,9 @@
         window.closeModal = () => document.getElementById('add-modal').classList.add('hidden');
         // 打開照片放大視窗
 window.openImageViewer = function(url) {
-    document.getElementById('image-viewer-img').src = url;
+    const imageUrl = safeImageUrl(url);
+    if (!imageUrl) return;
+    document.getElementById('image-viewer-img').src = imageUrl;
     document.getElementById('image-viewer-modal').classList.remove('hidden');
 };
 
@@ -2441,7 +2519,7 @@ window.closeImageViewer = function() {
                     }
                     
                     // 收集該地點下此單品的所有有效照片網址
-                    const imgUrls = locPhotos.map(p => p.url).filter(url => url && url.trim() !== '');
+                    const imgUrls = locPhotos.map(p => safeImageUrl(p.url)).filter(Boolean);
 
                     exportData.push({
                         imgUrls: imgUrls,      // 存入陣列
@@ -2504,7 +2582,7 @@ window.closeImageViewer = function() {
                 <div style="text-align: center; margin-bottom: 25px; border-bottom: 2px solid #78716c; padding-bottom: 15px;">
                     <h2 style="margin: 0; font-size: 24px; font-weight: 800; letter-spacing: 2px; color: #1c1917;">WEIWEIWEI 庫存清單</h2>
                     <div style="margin-top: 12px; display: flex; justify-content: space-between; font-size: 12px; color: #78716c;">
-                        <span>📍 當前位置: <b style="color: #1c1917;">${displayLoc}</b></span>
+                        <span>📍 當前位置: <b style="color: #1c1917;">${escapeHtml(displayLoc)}</b></span>
                         <span>📦 總計件數: <b style="color: #b45309; font-size: 14px;">${totalQty} 件</b></span>
                         <span>🕒 盤點時間: ${dateStr}</span>
                     </div>
@@ -2531,7 +2609,7 @@ window.closeImageViewer = function() {
                 let imgHtml = '';
                 if (row.renderUrls && row.renderUrls.length > 0) {
                     const imgTags = row.renderUrls.map(url => 
-                        `<img src="${url}" style="width: 34px; height: 46px; object-fit: cover; border-radius: 3px; border: 1px solid #e7e5e4; flex-shrink: 0;">`
+                        `<img src="${escapeHtml(safeImageUrl(url))}" style="width: 34px; height: 46px; object-fit: cover; border-radius: 3px; border: 1px solid #e7e5e4; flex-shrink: 0;">`
                     ).join('');
                     imgHtml = `<div style="display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; align-items: center;">${imgTags}</div>`;
                 } else {
@@ -2541,11 +2619,11 @@ window.closeImageViewer = function() {
                 html += `
                     <tr style="background-color: ${rowBg}; border-bottom: 1px solid #e7e5e4;">
                         <td style="padding: 8px 5px; vertical-align: middle;">${imgHtml}</td>
-                        <td style="padding: 8px 5px; color: #78716c; vertical-align: middle; font-family: monospace; font-size: 10px;">${row.dateStr}</td>
-                        <td style="padding: 8px 5px; color: #78716c; vertical-align: middle;">${row.category}</td>
-                        <td style="padding: 8px 5px; font-weight: 700; color: #1c1917; vertical-align: middle;">${row.itemName}</td>
-                        <td style="padding: 8px 5px; color: #57534e; vertical-align: middle;">${row.color} / ${row.size}</td>
-                        <td style="padding: 8px 5px; text-align: right; color: #44403c; vertical-align: middle;">${row.price}</td>
+                        <td style="padding: 8px 5px; color: #78716c; vertical-align: middle; font-family: monospace; font-size: 10px;">${escapeHtml(row.dateStr)}</td>
+                        <td style="padding: 8px 5px; color: #78716c; vertical-align: middle;">${escapeHtml(row.category)}</td>
+                        <td style="padding: 8px 5px; font-weight: 700; color: #1c1917; vertical-align: middle;">${escapeHtml(row.itemName)}</td>
+                        <td style="padding: 8px 5px; color: #57534e; vertical-align: middle;">${escapeHtml(row.color)} / ${escapeHtml(row.size)}</td>
+                        <td style="padding: 8px 5px; text-align: right; color: #44403c; vertical-align: middle;">${escapeHtml(row.price)}</td>
                         <td style="padding: 8px 5px; text-align: center; font-weight: 800; font-size: 13px; color: #1c1917; vertical-align: middle;">${row.qty}</td>
                     </tr>
                 `;

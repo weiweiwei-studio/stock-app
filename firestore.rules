@@ -7,7 +7,24 @@ service cloud.firestore {
         && request.auth.token.email == 'heyweiweiweimy@gmail.com';
     }
 
-    match /{document=**} {
+    function hasValidVersionIncrement() {
+      return request.resource.data._version is int
+        && (
+          (!('_version' in resource.data) && request.resource.data._version == 1)
+          || ('_version' in resource.data
+            && request.resource.data._version == resource.data._version + 1)
+        );
+    }
+
+    match /stock_items/{itemId} {
+      allow read, delete: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data._version == 1;
+      allow update: if isAdmin()
+        && hasValidVersionIncrement();
+    }
+
+    match /settings/{settingId} {
       allow read, write: if isAdmin();
     }
   }
