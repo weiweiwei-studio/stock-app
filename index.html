@@ -452,6 +452,7 @@
                     <div class="bg-stone-50 p-2 rounded border border-dashed border-stone-300">
                         <label class="text-xs font-bold text-stone-700 block mb-1">單品照片 (多選)</label>
                         <input type="file" name="initialPhotos" accept="image/*" multiple class="block w-full text-[10px]">
+                        <p class="mt-1 text-[9px] text-stone-400">上傳時自動壓縮並建立列表縮圖</p>
                     </div>
                 </div>
                 <div class="flex justify-end pt-2 gap-2">
@@ -535,6 +536,7 @@
 
                     <label class="text-xs text-stone-700 font-bold block mb-2">為此工單追加/補齊照片</label>
                     <input type="file" id="edit-addPhotos" accept="image/*" multiple class="block w-full text-xs text-stone-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-stone-200 file:text-stone-700">
+                    <p class="mt-1 text-[9px] text-stone-400">新照片會自動轉成 WebP 並建立縮圖</p>
                 </div>
             </div>
             <div class="flex justify-between mt-6">
@@ -574,6 +576,7 @@
                             <div>
                                 <label class="text-[10px] text-stone-500">更換單品圖 (選填)</label>
                                 <input type="file" id="detail-photo-upload" accept="image/*" class="w-full text-[10px] p-1 border border-stone-300 rounded bg-white shadow-sm file:mr-2 file:py-0.5 file:px-2 file:border-0 file:rounded file:bg-stone-100 file:text-[10px] file:font-medium">
+                                <p class="mt-1 text-[9px] text-stone-400">自動壓縮＋縮圖</p>
                             </div>
                         </div>
                     </div>
@@ -646,6 +649,7 @@
     <script type="module">
         import { ADMIN_EMAIL, getAuthErrorMessage, isAuthorizedAdmin } from "./auth-utils.js";
         import { assertVersion, deriveItemStatus, getVersion, nextVersion } from "./data-integrity.js";
+        import { optimizeImage } from "./image-utils.js";
         import { escapeHtml, inlineString, safeImageUrl } from "./security-utils.js";
         import { DEFAULT_PAGE_SIZE, paginate, prepareAllocationPage } from "./view-utils.js";
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -940,11 +944,11 @@
             const fallbackStudio = item.originStudio || 'JB Studio';
 
             if (raw.length === 0 && item.quantity > 0) {
-                 return Array.from({ length: item.quantity }, () => ({ url: '', status: 'Available', locations: [fallbackStudio], notes: '', soldPrice: null, specificPrice: null }));
+                 return Array.from({ length: item.quantity }, () => ({ url: '', thumbnailUrl: '', status: 'Available', locations: [fallbackStudio], notes: '', soldPrice: null, specificPrice: null }));
             }
 
             return raw.map(p => {
-                if (typeof p === 'string') return { url: p, status: 'Available', locations: [fallbackStudio], notes: '', soldPrice: null, specificPrice: null };
+                if (typeof p === 'string') return { url: p, thumbnailUrl: '', status: 'Available', locations: [fallbackStudio], notes: '', soldPrice: null, specificPrice: null };
                 
                 let locs = [];
                 if (Array.isArray(p.locations) && p.locations.length > 0) {
@@ -978,6 +982,7 @@
                 
                 return {
                     url: p.url || '',
+                    thumbnailUrl: p.thumbnailUrl || '',
                     status: p.status || 'Available',
                     locations: locs, 
                     notes: p.notes || '',
@@ -1010,6 +1015,29 @@
                 if (updateStatus) updates.status = deriveItemStatus(photos);
                 transaction.update(itemRef, updates);
             });
+        }
+
+        async function uploadOptimizedPhoto(file, label = 'photo') {
+            const optimized = await optimizeImage(file);
+            const uniqueId = typeof crypto.randomUUID === 'function'
+                ? crypto.randomUUID()
+                : `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+            const safeLabel = String(label).replace(/[^a-z0-9_-]/gi, '_').slice(0, 40);
+            const metadata = {
+                contentType: 'image/webp',
+                cacheControl: 'public,max-age=31536000,immutable'
+            };
+            const fullRef = ref(storage, `photos/full/${uniqueId}_${safeLabel}.webp`);
+            const thumbnailRef = ref(storage, `photos/thumbnails/${uniqueId}_${safeLabel}.webp`);
+            const [fullSnapshot, thumbnailSnapshot] = await Promise.all([
+                uploadBytes(fullRef, optimized.full.blob, metadata),
+                uploadBytes(thumbnailRef, optimized.thumbnail.blob, metadata)
+            ]);
+            const [url, thumbnailUrl] = await Promise.all([
+                getDownloadURL(fullSnapshot.ref),
+                getDownloadURL(thumbnailSnapshot.ref)
+            ]);
+            return { url, thumbnailUrl };
         }
         
         function getCleanCategory(catName) {
@@ -1615,8 +1643,15 @@
                 tr.className = 'hover:bg-stone-50 transition-colors border-b border-stone-50';
                 const photos = normalizePhotos(item);
                 let reelHTML = `<div class="photo-reel">`;
-                if(photos.length === 0 || !photos[0].url) reelHTML += `<div class="w-8 h-10 bg-stone-100 flex items-center justify-center text-[10px] text-stone-300 rounded border">No Img</div>`;
-               else { photos.forEach(p => { const imageUrl = safeImageUrl(p.url); if(imageUrl) reelHTML += `<img src="${escapeHtml(imageUrl)}" loading="lazy" decoding="async" fetchpriority="low" width="36" height="48" class="reel-img cursor-pointer hover:opacity-80 transition-opacity shadow-sm" onclick="window.openImageViewer(${inlineString(imageUrl)})">`; }); }
+                let renderedImages = 0;
+                photos.forEach(p => {
+                    const displayUrl = safeImageUrl(p.thumbnailUrl) || safeImageUrl(p.url);
+                    const fullUrl = safeImageUrl(p.url);
+                    if (!displayUrl) return;
+                    renderedImages++;
+                    reelHTML += `<img src="${escapeHtml(displayUrl)}" loading="lazy" decoding="async" fetchpriority="low" width="36" height="48" class="reel-img cursor-pointer hover:opacity-80 transition-opacity shadow-sm" onclick="window.openImageViewer(${inlineString(fullUrl || displayUrl)})">`;
+                });
+                if(renderedImages === 0) reelHTML += `<div class="w-8 h-10 bg-stone-100 flex items-center justify-center text-[10px] text-stone-300 rounded border">No Img</div>`;
                 reelHTML += `</div>`;
                 let statusColor = 'bg-gray-100 text-gray-600';
                 if(item.status === 'Making') statusColor = 'bg-amber-100 text-amber-700';
@@ -1689,7 +1724,8 @@
 
                         const isSold = p.status === 'Sold';
                         const hasNote = p.notes && p.notes.length > 0;
-                        const hasImg = p.url && p.url.length > 0;
+                        const displayImageUrl = safeImageUrl(p.thumbnailUrl) || safeImageUrl(p.url);
+                        const hasImg = Boolean(displayImageUrl);
                         let badgeText = '', badgeClass = '', badgeStyle = '';
                         
                         const physicalLocs = p.locations.filter(l => l.toUpperCase() !== 'ONLINE');
@@ -1763,7 +1799,7 @@
                         gridHTML += `
                         <div class="flex flex-col items-center w-[64px] flex-shrink-0 dispatch-card">
                             <div class="relative w-full h-[84px] cursor-pointer transition-transform hover:scale-105 bg-white rounded shadow-sm border border-stone-200 group" onclick="window.openDetailModal(${inlineString(item.id)}, ${idx})">
-                                ${safeImageUrl(p.url) ? `<img src="${escapeHtml(safeImageUrl(p.url))}" loading="lazy" decoding="async" fetchpriority="low" width="64" height="84" class="w-full h-full object-cover rounded ${isSold ? 'opacity-50 grayscale' : ''}">` : `<div class="w-full h-full bg-stone-50 flex items-center justify-center text-[8px] text-stone-400 rounded">No Img</div>`}
+                                ${hasImg ? `<img src="${escapeHtml(displayImageUrl)}" loading="lazy" decoding="async" fetchpriority="low" width="64" height="84" class="w-full h-full object-cover rounded ${isSold ? 'opacity-50 grayscale' : ''}">` : `<div class="w-full h-full bg-stone-50 flex items-center justify-center text-[8px] text-stone-400 rounded">No Img</div>`}
                                 <div class="status-badge ${badgeClass}" style="${badgeStyle}">${escapeHtml(badgeText)}</div>
                                 ${isSold ? `<div class="sold-overlay"><i data-lucide="check" class="text-white w-4 h-4"></i></div>` : ''}
                                 ${hasNote ? `<div class="has-note-dot"></div>` : ''}
@@ -1928,7 +1964,7 @@
             let cardsHTML = '';
 
             allMatchedPhotos.forEach(({ item, p, idx, cleanCat }) => {
-                let imgSrc = safeImageUrl(p.url);
+                let imgSrc = safeImageUrl(p.thumbnailUrl) || safeImageUrl(p.url);
                 let imgHTML = imgSrc ? `<img src="${escapeHtml(imgSrc)}" loading="lazy" decoding="async" fetchpriority="low" height="128" class="w-full h-32 object-cover rounded-t-md">` : `<div class="w-full h-32 bg-stone-200 flex items-center justify-center text-xs text-stone-400 rounded-t-md">無照片</div>`;
                 
                 let cardColorClass = getStatusColorClass(p.status === 'Sold' ? 'Sold' : item.status);
@@ -2014,7 +2050,8 @@
             currentDetailItem = db.find(i => i.id === id); currentDetailPhotoIdx = idx;
             const p = normalizePhotos(currentDetailItem)[idx];
             const imgEl = document.getElementById('detail-img');
-            if(p.url) { imgEl.src = p.url; imgEl.classList.remove('hidden'); } else { imgEl.classList.add('hidden'); }
+            const detailImageUrl = safeImageUrl(p.url);
+            if(detailImageUrl) { imgEl.src = detailImageUrl; imgEl.classList.remove('hidden'); } else { imgEl.classList.add('hidden'); }
             
             document.getElementById('detail-title').innerText = currentDetailItem.itemName;
             document.getElementById('detail-sku').innerText = `${getCleanCategory(currentDetailItem.category)} / ${currentDetailItem.color}`;
@@ -2106,9 +2143,10 @@
                 const fileInput = document.getElementById('detail-photo-upload');
                 if (fileInput.files.length > 0) {
                     const file = fileInput.files[0];
-                    const sRef = ref(storage, 'photos/'+Date.now()+'_detail_'+file.name);
-                    const snap = await uploadBytes(sRef, file);
-                    patch.url = await getDownloadURL(snap.ref);
+                    btn.innerText = '優化照片中...';
+                    const uploaded = await uploadOptimizedPhoto(file, 'detail');
+                    patch.url = uploaded.url;
+                    patch.thumbnailUrl = uploaded.thumbnailUrl;
                 }
 
                 await updatePhotoAtomic(currentDetailItem.id, currentDetailPhotoIdx, () => patch);
@@ -2173,10 +2211,9 @@
                 if(fileInput.files.length > 0) { 
                     for(let i=0; i<fileInput.files.length; i++) { 
                         const file = fileInput.files[i]; 
-                        const sRef = ref(storage, 'photos/'+Date.now()+'_'+file.name); 
-                        const snap = await uploadBytes(sRef, file); 
-                        const url = await getDownloadURL(snap.ref); 
-                        photoObjs.push({ url: url, status: 'Available', locations: [originStudio], notes: '', soldPrice: null, specificPrice: null }); 
+                        btn.innerText = `優化照片 ${i + 1}/${fileInput.files.length}...`;
+                        const uploaded = await uploadOptimizedPhoto(file, 'new');
+                        photoObjs.push({ url: uploaded.url, thumbnailUrl: uploaded.thumbnailUrl, status: 'Available', locations: [originStudio], notes: '', soldPrice: null, specificPrice: null });
                     } 
                 } 
                 const cleanCat = getCleanCategory(form.get('category')); 
@@ -2234,7 +2271,7 @@
                     hasPhotos = true;
                     container.innerHTML += `
                         <div class="relative w-14 h-20 group rounded overflow-hidden border border-stone-200 bg-white flex-shrink-0 shadow-sm">
-                            <img src="${escapeHtml(safeImageUrl(p.url))}" class="w-full h-full object-cover">
+                            <img src="${escapeHtml(safeImageUrl(p.thumbnailUrl) || safeImageUrl(p.url))}" class="w-full h-full object-cover">
                             <button type="button" onclick="window.removeEditPhoto(${idx})" class="absolute inset-0 bg-red-600/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition duration-200">
                                 <i data-lucide="trash-2" class="w-5 h-5 drop-shadow-md"></i>
                             </button>
@@ -2251,6 +2288,7 @@
         window.removeEditPhoto = (idx) => {
             if(confirm('確定要移除此照片嗎？（儲存後才會正式生效）')) {
                 window.tempEditPhotos[idx].url = ''; 
+                window.tempEditPhotos[idx].thumbnailUrl = '';
                 window.renderEditPhotos();
             }
         };
@@ -2288,7 +2326,7 @@
                 if (newQty > existingPhotos.length) {
                     const diff = newQty - existingPhotos.length;
                     for(let i=0; i<diff; i++) {
-                        existingPhotos.push({ url: '', status: 'Available', locations: [newOriginStudio], notes: '', soldPrice: null, specificPrice: null });
+                        existingPhotos.push({ url: '', thumbnailUrl: '', status: 'Available', locations: [newOriginStudio], notes: '', soldPrice: null, specificPrice: null });
                     }
                     photosModified = true;
                 } else if (newQty < existingPhotos.length) {
@@ -2313,19 +2351,19 @@
                     for(let i=0; i<existingPhotos.length; i++) {
                         if (!existingPhotos[i].url && fileIdx < photoInput.files.length) {
                             const file = photoInput.files[fileIdx++];
-                            const sRef = ref(storage, 'photos/'+Date.now()+'_replaced_'+file.name);
-                            const snap = await uploadBytes(sRef, file);
-                            existingPhotos[i].url = await getDownloadURL(snap.ref);
+                            btn.innerText = `優化照片 ${fileIdx}/${photoInput.files.length}...`;
+                            const uploaded = await uploadOptimizedPhoto(file, 'replaced');
+                            existingPhotos[i].url = uploaded.url;
+                            existingPhotos[i].thumbnailUrl = uploaded.thumbnailUrl;
                             photosModified = true;
                         }
                     }
 
                     while(fileIdx < photoInput.files.length) {
                         const file = photoInput.files[fileIdx++]; 
-                        const sRef = ref(storage, 'photos/'+Date.now()+'_added_'+file.name); 
-                        const snap = await uploadBytes(sRef, file); 
-                        const url = await getDownloadURL(snap.ref); 
-                        existingPhotos.push({ url: url, status: 'Available', locations: [newOriginStudio], notes: '', soldPrice: null, specificPrice: null }); 
+                        btn.innerText = `優化照片 ${fileIdx}/${photoInput.files.length}...`;
+                        const uploaded = await uploadOptimizedPhoto(file, 'added');
+                        existingPhotos.push({ url: uploaded.url, thumbnailUrl: uploaded.thumbnailUrl, status: 'Available', locations: [newOriginStudio], notes: '', soldPrice: null, specificPrice: null });
                         photosModified = true;
                     }
                 } 
@@ -2519,7 +2557,7 @@ window.closeImageViewer = function() {
                     }
                     
                     // 收集該地點下此單品的所有有效照片網址
-                    const imgUrls = locPhotos.map(p => safeImageUrl(p.url)).filter(Boolean);
+                    const imgUrls = locPhotos.map(p => safeImageUrl(p.thumbnailUrl) || safeImageUrl(p.url)).filter(Boolean);
 
                     exportData.push({
                         imgUrls: imgUrls,      // 存入陣列
