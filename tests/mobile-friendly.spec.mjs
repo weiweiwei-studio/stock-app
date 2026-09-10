@@ -1,0 +1,37 @@
+import { expect, test } from '@playwright/test';
+
+test.beforeEach(async ({ page }) => {
+    await page.route(/^https:\/\//, route => route.abort());
+    await page.goto('/index.html');
+});
+
+test('login and primary navigation fit a phone viewport', async ({ page }) => {
+    await expect(page.locator('#auth-screen')).toBeVisible();
+    await expect(page.locator('#login-email')).toBeInViewport();
+    await expect(page.locator('#login-password')).toBeInViewport();
+    await expect(page.locator('#login-button')).toBeInViewport();
+
+    const loginButton = await page.locator('#login-button').boundingBox();
+    expect(loginButton?.height ?? 0).toBeGreaterThanOrEqual(44);
+
+    await page.evaluate(() => {
+        document.getElementById('auth-screen')?.classList.add('hidden');
+        document.body.classList.remove('auth-pending');
+    });
+
+    await expect(page.locator('nav .sm\\:hidden')).toBeVisible();
+    await expect(page.locator('nav .sm\\:flex')).toBeHidden();
+
+    const mobileButtons = page.locator('nav .sm\\:hidden button:not(.hidden)');
+    await expect(mobileButtons).toHaveCount(3);
+    for (const button of await mobileButtons.all()) {
+        const box = await button.boundingBox();
+        expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+        expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
+    }
+
+    const hasViewportOverflow = await page.evaluate(
+        () => document.documentElement.scrollWidth > document.documentElement.clientWidth
+    );
+    expect(hasViewportOverflow).toBe(false);
+});
