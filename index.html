@@ -22,6 +22,7 @@
         .photo-reel { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; max-width: 180px; scrollbar-width: thin; scrollbar-color: #d6d3d1 transparent; }
         .reel-img { width: 36px; height: 48px; object-fit: cover; border-radius: 4px; border: 1px solid #e7e5e4; flex-shrink: 0; background: #fff; }
         .photo-grid { display: flex; flex-wrap: wrap; gap: 8px; max-width: 500px; }
+        .dispatch-card { content-visibility: auto; contain-intrinsic-size: 64px 132px; }
         
         /* Badges */
         .status-badge { position: absolute; bottom: 0; right: 0; left: 0; padding: 2px 0; font-size: 8px; font-weight: bold; color: white; text-align: center; border-radius: 0 0 4px 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -271,10 +272,10 @@
             </div>
             <div class="flex items-center gap-2 bg-white p-3 rounded-lg shadow-sm">
                 <span class="text-sm font-medium text-stone-600 flex-shrink-0">過濾:</span>
-                <select id="prod-filter-maker" onchange="window.renderProductionList()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5 dynamic-maker-select"><option value="all">全部製作人</option></select>
-                <select id="prod-filter-category" onchange="window.renderProductionList()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5 dynamic-category-select"><option value="all">全部類別</option></select>
+                <select id="prod-filter-maker" onchange="window.resetProductionPage()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5 dynamic-maker-select"><option value="all">全部製作人</option></select>
+                <select id="prod-filter-category" onchange="window.resetProductionPage()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5 dynamic-category-select"><option value="all">全部類別</option></select>
                 
-                <select id="prod-filter-status" onchange="window.renderProductionList()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5">
+                <select id="prod-filter-status" onchange="window.resetProductionPage()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5">
                     <option value="all">全部狀態</option>
                     <option value="Pending">Pending</option>
                     <option value="To Make">To Make</option>
@@ -301,6 +302,11 @@
                         <tbody id="production-table-body" class="divide-y divide-stone-100"></tbody>
                     </table>
                 </div>
+                <div class="flex items-center justify-between gap-3 border-t border-stone-100 px-4 py-3">
+                    <button id="production-prev-page" onclick="window.changeProductionPage(-1)" class="px-3 py-1.5 rounded border border-stone-200 text-xs font-bold text-stone-600 disabled:opacity-30 disabled:cursor-not-allowed">上一頁</button>
+                    <span id="production-page-info" class="text-xs font-bold text-stone-500">0 筆</span>
+                    <button id="production-next-page" onclick="window.changeProductionPage(1)" class="px-3 py-1.5 rounded border border-stone-200 text-xs font-bold text-stone-600 disabled:opacity-30 disabled:cursor-not-allowed">下一頁</button>
+                </div>
             </div>
         </section>
 
@@ -316,12 +322,12 @@
                 <div class="flex flex-wrap items-center gap-4">
                     <div class="flex items-center gap-2">
                         <span class="text-sm font-medium text-stone-600 flex-shrink-0">當前所在位置:</span>
-                        <select id="alloc-filter-location" onchange="window.renderAllocationList()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5 font-bold outline-none cursor-pointer hover:bg-stone-100 transition-colors">
+                        <select id="alloc-filter-location" onchange="window.resetAllocationPage()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5 font-bold outline-none cursor-pointer hover:bg-stone-100 transition-colors">
                         </select>
                     </div>
                     <div class="flex items-center gap-2">
                         <span class="text-sm font-medium text-stone-600 flex-shrink-0">過濾類別:</span>
-                        <select id="alloc-filter-category" onchange="window.renderAllocationList()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5 dynamic-category-select"><option value="all">全部類別</option></select>
+                        <select id="alloc-filter-category" onchange="window.resetAllocationPage()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5 dynamic-category-select"><option value="all">全部類別</option></select>
                     </div>
                 </div>
                 
@@ -344,6 +350,11 @@
                         </thead>
                         <tbody id="allocation-table-body" class="divide-y divide-stone-100"></tbody>
                     </table>
+                </div>
+                <div class="flex items-center justify-between gap-3 border-t border-stone-100 px-4 py-3">
+                    <button id="allocation-prev-page" onclick="window.changeAllocationPage(-1)" class="px-3 py-1.5 rounded border border-stone-200 text-xs font-bold text-stone-600 disabled:opacity-30 disabled:cursor-not-allowed">上一頁</button>
+                    <span id="allocation-page-info" class="text-xs font-bold text-stone-500">0 筆</span>
+                    <button id="allocation-next-page" onclick="window.changeAllocationPage(1)" class="px-3 py-1.5 rounded border border-stone-200 text-xs font-bold text-stone-600 disabled:opacity-30 disabled:cursor-not-allowed">下一頁</button>
                 </div>
             </div>
         </section>
@@ -627,6 +638,12 @@
         let currentRole = 'admin';
         let calendarMode = 'production'; 
         let currentCalDate = new Date(); 
+        let activeView = 'dashboard';
+        let renderFrame = null;
+        let listenersStarted = false;
+        const PAGE_SIZE = 25;
+        let productionPage = 1;
+        let allocationPage = 1;
         
         let categoryChart = null, allocChart = null;
         
@@ -729,7 +746,8 @@
             });
 
             onAuthStateChanged(auth, (user) => {
-                if (user) {
+                if (user && !listenersStarted) {
+                    listenersStarted = true;
                     statusEl.innerText = "Connected";
                     statusEl.className = "ml-2 px-2 py-0.5 rounded text-[10px] bg-green-100 text-green-600";
                     startListeners();
@@ -758,9 +776,10 @@
                         weekly_goals: data.weekly_goals || {} 
                     };
                 }
-                renderSettingsView();
                 updateDropdowns();
-                renderCalendar(); 
+                scheduleActiveViewRender();
+            }, (error) => {
+                showSyncError(error);
             });
 
             const q = collection(dbFirestore, "stock_items");
@@ -772,10 +791,32 @@
                     if (!b.createdAt) return -1;
                     return 0; 
                 });
-                updateDashboard();
-                renderProductionList();
-                renderAllocationList();
-                updateDropdowns(); 
+                updateDropdowns();
+                scheduleActiveViewRender();
+            }, (error) => {
+                showSyncError(error);
+            });
+        }
+
+        function showSyncError(error) {
+            const statusEl = document.getElementById('connection-status');
+            statusEl.innerText = "Sync Error";
+            statusEl.className = "ml-2 px-2 py-0.5 rounded text-[10px] bg-red-100 text-red-600";
+            console.error("Firebase sync failed:", error);
+        }
+
+        function renderActiveView() {
+            if (activeView === 'dashboard') updateDashboard();
+            else if (activeView === 'production') window.renderProductionList();
+            else if (activeView === 'allocation') window.renderAllocationList();
+            else if (activeView === 'settings') window.renderSettingsView();
+        }
+
+        function scheduleActiveViewRender() {
+            if (renderFrame !== null) return;
+            renderFrame = requestAnimationFrame(() => {
+                renderFrame = null;
+                renderActiveView();
             });
         }
 
@@ -1425,6 +1466,12 @@
             if (makerFilter !== 'all') data = data.filter(i => i.maker === makerFilter);
             if (catFilter !== 'all') data = data.filter(i => getCleanCategory(i.category) === catFilter);
             if (statusFilter !== 'all') data = data.filter(i => i.status === statusFilter);
+
+            const totalItems = data.length;
+            const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+            productionPage = Math.max(1, Math.min(productionPage, totalPages));
+            const pageStart = (productionPage - 1) * PAGE_SIZE;
+            data = data.slice(pageStart, pageStart + PAGE_SIZE);
             
             data.forEach(item => {
                 const tr = document.createElement('tr');
@@ -1432,7 +1479,7 @@
                 const photos = normalizePhotos(item);
                 let reelHTML = `<div class="photo-reel">`;
                 if(photos.length === 0 || !photos[0].url) reelHTML += `<div class="w-8 h-10 bg-stone-100 flex items-center justify-center text-[10px] text-stone-300 rounded border">No Img</div>`;
-               else { photos.forEach(p => { if(p.url) reelHTML += `<img src="${p.url}" class="reel-img cursor-pointer hover:opacity-80 transition-opacity shadow-sm" onclick="window.openImageViewer('${p.url}')">`; }); }
+               else { photos.forEach(p => { if(p.url) reelHTML += `<img src="${p.url}" loading="lazy" decoding="async" class="reel-img cursor-pointer hover:opacity-80 transition-opacity shadow-sm" onclick="window.openImageViewer('${p.url}')">`; }); }
                 reelHTML += `</div>`;
                 let statusColor = 'bg-gray-100 text-gray-600';
                 if(item.status === 'Making') statusColor = 'bg-amber-100 text-amber-700';
@@ -1441,7 +1488,19 @@
                 tr.innerHTML = `<td class="px-6 py-4 font-mono text-xs text-stone-500">${item.month}</td><td class="px-6 py-4">${reelHTML}</td><td class="px-6 py-4"><div class="font-medium text-stone-800">${item.itemName}</div><div class="text-xs text-stone-400">${item.color||'-'} ${item.size||'-'}</div></td><td class="px-6 py-4">${item.quantity}</td><td class="px-6 py-4 text-xs">${item.maker}</td><td class="px-6 py-4"><span class="px-2 py-1 rounded-full text-xs font-bold ${statusColor}">${item.status}</span></td><td class="px-6 py-4 text-xs text-stone-600 font-bold">${item.price ? 'RM'+item.price : '-'}</td><td class="px-6 py-4"><button onclick="window.openEditModal('${item.id}')" class="text-stone-400 hover:text-stone-800 border p-1 rounded shadow-sm"><i data-lucide="settings-2" class="w-4 h-4"></i></button></td>`;
                 tbody.appendChild(tr);
             });
+            updatePaginationControls('production', productionPage, totalPages, totalItems);
             lucide.createIcons();
+        };
+
+        window.resetProductionPage = function() {
+            productionPage = 1;
+            window.renderProductionList();
+        };
+
+        window.changeProductionPage = function(delta) {
+            productionPage += delta;
+            window.renderProductionList();
+            document.getElementById('view-production').scrollIntoView({ behavior: 'smooth', block: 'start' });
         };
 
         window.renderAllocationList = function() {
@@ -1456,26 +1515,29 @@
                 filteredDb = filteredDb.filter(i => getCleanCategory(i.category) === catFilter);
             }
 
-            let totalMatchingPieces = 0;
+            const photoMatchesFilter = (p) => {
+                if (locFilter === 'Sold') return p.status === 'Sold';
+                if (p.status === 'Sold') return false;
+                if (locFilter === 'all') return true;
+                if (locFilter === 'Unallocated') return p.locations.length === 0;
+                return p.locations.includes(locFilter);
+            };
 
-            filteredDb.forEach(item => {
+            filteredDb = filteredDb.filter(item => {
+                return locFilter === 'all' || normalizePhotos(item).some(photoMatchesFilter);
+            });
+            const totalMatchingPieces = filteredDb.reduce((sum, item) => {
+                return sum + normalizePhotos(item).filter(photoMatchesFilter).length;
+            }, 0);
+
+            const totalItems = filteredDb.length;
+            const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+            allocationPage = Math.max(1, Math.min(allocationPage, totalPages));
+            const pageStart = (allocationPage - 1) * PAGE_SIZE;
+            const pageItems = filteredDb.slice(pageStart, pageStart + PAGE_SIZE);
+
+            pageItems.forEach(item => {
                 const photos = normalizePhotos(item);
-                
-                let matchesLoc = true;
-                if (locFilter !== 'all') {
-                    if (locFilter === 'Sold') { 
-                        matchesLoc = photos.some(p => p.status === 'Sold'); 
-                    } else if (locFilter === 'Unallocated') { 
-                        matchesLoc = photos.some(p => p.status !== 'Sold' && p.locations.length === 0); 
-                    } else { 
-                        matchesLoc = photos.some(p => {
-                            if (p.status === 'Sold') return false;
-                            return p.locations.includes(locFilter); 
-                        });
-                    }
-                }
-
-                if (!matchesLoc) return;
 
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-stone-50 transition-colors border-b border-stone-50';
@@ -1499,12 +1561,6 @@
                         if (locFilter === 'Sold' && p.status !== 'Sold') return;
                         if (locFilter === 'Unallocated' && (p.status === 'Sold' || p.locations.length > 0)) return;
 
-                        if (locFilter === 'Sold') {
-                            totalMatchingPieces++; 
-                        } else if (p.status !== 'Sold') {
-                            totalMatchingPieces++; 
-                        }
-                        
                         hasRenderedAnyPhoto = true;
 
                         const isSold = p.status === 'Sold';
@@ -1583,7 +1639,7 @@
                         gridHTML += `
                         <div class="flex flex-col items-center w-[64px] flex-shrink-0 dispatch-card">
                             <div class="relative w-full h-[84px] cursor-pointer transition-transform hover:scale-105 bg-white rounded shadow-sm border border-stone-200 group" onclick="window.openDetailModal('${item.id}', ${idx})">
-                                ${hasImg ? `<img src="${p.url}" class="w-full h-full object-cover rounded ${isSold ? 'opacity-50 grayscale' : ''}">` : `<div class="w-full h-full bg-stone-50 flex items-center justify-center text-[8px] text-stone-400 rounded">No Img</div>`}
+                                ${hasImg ? `<img src="${p.url}" loading="lazy" decoding="async" class="w-full h-full object-cover rounded ${isSold ? 'opacity-50 grayscale' : ''}">` : `<div class="w-full h-full bg-stone-50 flex items-center justify-center text-[8px] text-stone-400 rounded">No Img</div>`}
                                 <div class="status-badge ${badgeClass}" style="${badgeStyle}">${badgeText}</div>
                                 ${isSold ? `<div class="sold-overlay"><i data-lucide="check" class="text-white w-4 h-4"></i></div>` : ''}
                                 ${hasNote ? `<div class="has-note-dot"></div>` : ''}
@@ -1628,8 +1684,33 @@
                 <span class="text-blue-500 font-bold text-xs ml-1">件</span>
             `;
 
+            updatePaginationControls('allocation', allocationPage, totalPages, totalItems);
             lucide.createIcons();
         };
+
+        window.resetAllocationPage = function() {
+            allocationPage = 1;
+            window.renderAllocationList();
+        };
+
+        window.changeAllocationPage = function(delta) {
+            allocationPage += delta;
+            window.renderAllocationList();
+            document.getElementById('view-allocation').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        };
+
+        function updatePaginationControls(prefix, currentPage, totalPages, totalItems) {
+            const prev = document.getElementById(`${prefix}-prev-page`);
+            const next = document.getElementById(`${prefix}-next-page`);
+            const info = document.getElementById(`${prefix}-page-info`);
+            if (!prev || !next || !info) return;
+
+            prev.disabled = currentPage <= 1;
+            next.disabled = currentPage >= totalPages;
+            info.innerText = totalItems === 0
+                ? '0 筆'
+                : `第 ${currentPage} / ${totalPages} 頁 · 共 ${totalItems} 筆`;
+        }
 
         window.quickDispatch = async function(e, itemId, photoIdx, toLocation) {
             e.stopPropagation();
@@ -1725,10 +1806,11 @@
             });
 
             allMatchedPhotos.sort((a, b) => window.getPhotoRank(a.p) - window.getPhotoRank(b.p));
-            
+            let cardsHTML = '';
+
             allMatchedPhotos.forEach(({ item, p, idx, cleanCat }) => {
                 let imgSrc = p.url ? p.url : '';
-                let imgHTML = imgSrc ? `<img src="${imgSrc}" class="w-full h-32 object-cover rounded-t-md">` : `<div class="w-full h-32 bg-stone-200 flex items-center justify-center text-xs text-stone-400 rounded-t-md">無照片</div>`;
+                let imgHTML = imgSrc ? `<img src="${imgSrc}" loading="lazy" decoding="async" class="w-full h-32 object-cover rounded-t-md">` : `<div class="w-full h-32 bg-stone-200 flex items-center justify-center text-xs text-stone-400 rounded-t-md">無照片</div>`;
                 
                 let cardColorClass = getStatusColorClass(p.status === 'Sold' ? 'Sold' : item.status);
                 let cardBadgeHTML = '';
@@ -1782,7 +1864,7 @@
                     }
                 }
 
-                gridContainer.innerHTML += `
+                cardsHTML += `
                     <div class="bg-white rounded-md shadow-sm border border-stone-200 hover:shadow-md transition flex flex-col overflow-hidden relative group cursor-pointer dispatch-card" onclick="window.openDetailModal('${item.id}', ${idx})">
                         ${imgHTML}
                         <div class="p-2 flex flex-col flex-grow">
@@ -1797,6 +1879,7 @@
                     </div>
                 `;
             });
+            gridContainer.innerHTML = cardsHTML;
             
             const count = allMatchedPhotos.length;
             titleEl.innerText += ` (${count}件)`;
@@ -2186,8 +2269,21 @@
             fill('.dynamic-category-select', distinctCategories); 
         };
         
-        window.switchView = (v) => { document.querySelectorAll('section[id^="view-"]').forEach(el => el.classList.add('hidden')); document.getElementById(`view-${v}`).classList.remove('hidden'); document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('nav-active')); document.getElementById(`nav-${v}`)?.classList.add('nav-active'); };
-        window.updateRole = () => { currentRole = document.getElementById('role-select').value; const isAdmin = currentRole === 'admin'; document.getElementById('nav-settings').classList.toggle('hidden', !isAdmin); window.switchView(currentRole.startsWith('maker') ? 'production' : 'dashboard'); };
+        window.switchView = (v) => {
+            activeView = v;
+            document.querySelectorAll('section[id^="view-"]').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`view-${v}`).classList.remove('hidden');
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('nav-active'));
+            document.getElementById(`nav-${v}`)?.classList.add('nav-active');
+            renderActiveView();
+        };
+        window.updateRole = () => {
+            currentRole = document.getElementById('role-select').value;
+            const isAdmin = currentRole === 'admin';
+            document.getElementById('nav-settings').classList.toggle('hidden', !isAdmin);
+            document.getElementById('mobile-nav-settings').classList.toggle('hidden', !isAdmin);
+            window.switchView(currentRole.startsWith('maker') ? 'production' : 'dashboard');
+        };
         window.openModal = () => document.getElementById('add-modal').classList.remove('hidden');
         window.closeModal = () => document.getElementById('add-modal').classList.add('hidden');
         // 打開照片放大視窗
