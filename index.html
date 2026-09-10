@@ -400,6 +400,31 @@
                 </div>
                  <div class="bg-white p-6 rounded-lg shadow-sm"><h3 class="font-bold text-stone-700 mb-2">類別</h3><div id="settings-categories-list" class="flex flex-wrap gap-1 mb-2"></div><div class="flex gap-2"><input id="new-category-input" placeholder="新增類別..." class="flex-1 border text-sm rounded px-2"><button onclick="window.addSetting('categories')" class="bg-stone-800 text-white px-2 rounded">+</button></div></div>
             </div>
+            <div class="bg-white p-6 rounded-lg shadow-sm border border-stone-200">
+                <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                        <h3 class="font-bold text-stone-800">既有照片安全優化</h3>
+                        <p class="mt-1 max-w-2xl text-xs leading-5 text-stone-500">先下載完整 JSON 備份，再以每批10張處理舊照片。原始圖片會保留在 Firebase，資料內也會保存原網址，可隨時分批回復。</p>
+                        <p class="mt-1 text-[10px] font-bold text-amber-600">請只在一個裝置執行，處理期間不要關閉分頁。</p>
+                    </div>
+                    <button id="image-migration-scan" onclick="window.refreshImageMigrationStatus()" class="rounded border border-stone-200 bg-stone-50 px-3 py-2 text-xs font-bold text-stone-600 hover:bg-stone-100">重新掃描</button>
+                </div>
+                <div class="mt-4 grid grid-cols-2 gap-2 md:grid-cols-4">
+                    <div class="rounded bg-stone-50 p-3"><div class="text-[10px] text-stone-400">照片總數</div><div id="migration-total" class="text-lg font-black text-stone-700">0</div></div>
+                    <div class="rounded bg-emerald-50 p-3"><div class="text-[10px] text-emerald-600">已有縮圖</div><div id="migration-optimized" class="text-lg font-black text-emerald-700">0</div></div>
+                    <div class="rounded bg-amber-50 p-3"><div class="text-[10px] text-amber-600">等待優化</div><div id="migration-pending" class="text-lg font-black text-amber-700">0</div></div>
+                    <div class="rounded bg-blue-50 p-3"><div class="text-[10px] text-blue-600">可回復</div><div id="migration-rollback" class="text-lg font-black text-blue-700">0</div></div>
+                </div>
+                <div class="mt-4 h-2 overflow-hidden rounded-full bg-stone-100"><div id="migration-progress-bar" class="h-full w-0 rounded-full bg-emerald-500 transition-all"></div></div>
+                <p id="migration-status" class="mt-2 text-xs text-stone-500">請先重新掃描。</p>
+                <div class="mt-4 flex flex-wrap gap-2">
+                    <button id="migration-backup-button" onclick="window.downloadImageMigrationBackup()" class="rounded bg-stone-800 px-3 py-2 text-xs font-bold text-white hover:bg-stone-900">1. 下載 JSON 備份</button>
+                    <button id="migration-run-button" onclick="window.runImageMigrationBatch()" disabled class="rounded bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40">2. 優化下一批10張</button>
+                    <button id="migration-stop-button" onclick="window.stopImageMigration()" disabled class="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700 disabled:opacity-40">停止</button>
+                    <button id="migration-rollback-button" onclick="window.rollbackImageMigrationBatch()" disabled class="rounded border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 disabled:opacity-40">回復上一批10張</button>
+                </div>
+                <pre id="migration-errors" class="mt-3 hidden max-h-32 overflow-auto whitespace-pre-wrap rounded bg-red-50 p-3 text-[10px] text-red-700"></pre>
+            </div>
         </section>
 
     </main>
@@ -650,6 +675,7 @@
         import { ADMIN_EMAIL, getAuthErrorMessage, isAuthorizedAdmin } from "./auth-utils.js";
         import { assertVersion, deriveItemStatus, getVersion, nextVersion } from "./data-integrity.js";
         import { optimizeImage } from "./image-utils.js";
+        import { MIGRATION_BATCH_SIZE, collectMigrationState, makeBackupPayload } from "./image-migration-utils.js";
         import { escapeHtml, inlineString, safeImageUrl } from "./security-utils.js";
         import { DEFAULT_PAGE_SIZE, paginate, prepareAllocationPage } from "./view-utils.js";
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -696,6 +722,13 @@
         };
         let currentDetailItem = null, currentDetailPhotoIdx = -1, tempLocations = []; 
         let editBaseVersion = 0;
+        let migrationBackupReady = false;
+        let migrationRunning = false;
+        let migrationStopRequested = false;
+        const migrationProcessedKeys = new Set();
+        const migrationSessionId = typeof crypto.randomUUID === 'function'
+            ? crypto.randomUUID()
+            : `${Date.now()}_${Math.random().toString(36).slice(2)}`;
         window.tempEditPhotos = []; 
         const catColors = ['#f472b6', '#60a5fa', '#a78bfa', '#34d399', '#fbbf24', '#9ca3af'];
 
@@ -983,6 +1016,8 @@
                 return {
                     url: p.url || '',
                     thumbnailUrl: p.thumbnailUrl || '',
+                    originalUrl: p.originalUrl || '',
+                    migratedAt: Number(p.migratedAt) || 0,
                     status: p.status || 'Available',
                     locations: locs, 
                     notes: p.notes || '',
@@ -2409,12 +2444,214 @@
             }
         };
         
+        function setMigrationControls(running) {
+            migrationRunning = running;
+            document.getElementById('migration-backup-button').disabled = running;
+            document.getElementById('migration-scan').disabled = running;
+            document.getElementById('migration-stop-button').disabled = !running;
+            window.refreshImageMigrationStatus();
+        }
+
+        function showMigrationErrors(errors) {
+            const errorEl = document.getElementById('migration-errors');
+            errorEl.textContent = errors.join('\n');
+            errorEl.classList.toggle('hidden', errors.length === 0);
+        }
+
+        async function acquireMigrationLock() {
+            const settingsRef = doc(dbFirestore, 'settings', 'config');
+            await runTransaction(dbFirestore, async transaction => {
+                const snapshot = await transaction.get(settingsRef);
+                if (!snapshot.exists()) throw new Error('找不到系統設定。');
+                const lock = snapshot.data().imageMigrationLock;
+                const now = Date.now();
+                if (lock && lock.sessionId !== migrationSessionId && Number(lock.expiresAtMs) > now) {
+                    throw new Error('另一個裝置正在執行照片優化，請等待該批次完成。');
+                }
+                transaction.update(settingsRef, {
+                    imageMigrationLock: {
+                        sessionId: migrationSessionId,
+                        expiresAtMs: now + (20 * 60 * 1000)
+                    }
+                });
+            });
+        }
+
+        async function releaseMigrationLock() {
+            const settingsRef = doc(dbFirestore, 'settings', 'config');
+            try {
+                await runTransaction(dbFirestore, async transaction => {
+                    const snapshot = await transaction.get(settingsRef);
+                    if (!snapshot.exists()) return;
+                    const lock = snapshot.data().imageMigrationLock;
+                    if (lock?.sessionId === migrationSessionId) {
+                        transaction.update(settingsRef, { imageMigrationLock: null });
+                    }
+                });
+            } catch (error) {
+                console.warn('Unable to release image migration lock:', error);
+            }
+        }
+
+        window.refreshImageMigrationStatus = function() {
+            const totalEl = document.getElementById('migration-total');
+            if (!totalEl) return;
+            const state = collectMigrationState(db, normalizePhotos);
+            totalEl.textContent = state.totalPhotos;
+            document.getElementById('migration-optimized').textContent = state.optimizedPhotos;
+            document.getElementById('migration-pending').textContent = state.pending.length;
+            document.getElementById('migration-rollback').textContent = state.rollback.length;
+            const progress = state.totalPhotos > 0
+                ? Math.round((state.optimizedPhotos / state.totalPhotos) * 100)
+                : 0;
+            document.getElementById('migration-progress-bar').style.width = `${progress}%`;
+            if (!migrationRunning) {
+                document.getElementById('migration-status').textContent = state.pending.length > 0
+                    ? `還有 ${state.pending.length} 張舊照片等待優化。每次安全處理最多 ${MIGRATION_BATCH_SIZE} 張。`
+                    : '所有有圖片的庫存資料都已具備縮圖。';
+            }
+            document.getElementById('migration-run-button').disabled = migrationRunning || !migrationBackupReady || state.pending.length === 0;
+            document.getElementById('migration-rollback-button').disabled = migrationRunning || state.rollback.length === 0;
+        };
+
+        window.downloadImageMigrationBackup = function() {
+            const payload = makeBackupPayload(db);
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+            const objectUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = objectUrl;
+            link.download = `weiweiwei-stock-backup-${new Date().toISOString().slice(0, 10)}.json`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+            migrationBackupReady = true;
+            migrationProcessedKeys.clear();
+            document.getElementById('migration-status').textContent = '本次備份已下載，可以開始處理第一批照片。';
+            window.refreshImageMigrationStatus();
+        };
+
+        async function fetchMigrationImage(sourceUrl) {
+            const imageUrl = safeImageUrl(sourceUrl);
+            if (!imageUrl || !imageUrl.startsWith('https:')) throw new Error('原始圖片網址無效。');
+            const response = await fetch(imageUrl, { mode: 'cors' });
+            if (!response.ok) throw new Error(`下載原圖失敗 (${response.status})`);
+            const sourceBlob = await response.blob();
+            if (sourceBlob.type.startsWith('image/')) return sourceBlob;
+            return new Blob([sourceBlob], { type: 'image/jpeg' });
+        }
+
+        window.runImageMigrationBatch = async function() {
+            if (migrationRunning) return;
+            if (!migrationBackupReady) {
+                alert('請先下載本次完整 JSON 備份。');
+                return;
+            }
+            const state = collectMigrationState(db, normalizePhotos);
+            const batch = state.pending
+                .filter(candidate => !migrationProcessedKeys.has(`${candidate.itemId}:${candidate.photoIdx}`))
+                .slice(0, MIGRATION_BATCH_SIZE);
+            if (batch.length === 0) {
+                if (state.pending.length > 0) alert('剩餘照片在本次執行中曾失敗。請查看錯誤、重新整理頁面後再重試。');
+                return;
+            }
+            if (!confirm(`即將安全優化 ${batch.length} 張舊照片。原圖會保留，確定繼續？`)) return;
+
+            migrationStopRequested = false;
+            showMigrationErrors([]);
+            setMigrationControls(true);
+            const errors = [];
+            let completed = 0;
+            try {
+                await acquireMigrationLock();
+                for (const candidate of batch) {
+                    if (migrationStopRequested) break;
+                    document.getElementById('migration-status').textContent = `正在處理 ${completed + 1}/${batch.length}；關閉分頁前請先按停止。`;
+                    try {
+                        const sourceBlob = await fetchMigrationImage(candidate.sourceUrl);
+                        const uploaded = await uploadOptimizedPhoto(sourceBlob, 'legacy');
+                        await updatePhotoAtomic(candidate.itemId, candidate.photoIdx, latestPhoto => {
+                            if (latestPhoto.thumbnailUrl) throw new Error('此照片已由其他裝置處理，已跳過。');
+                            if (latestPhoto.url !== candidate.sourceUrl) throw new Error('照片已被修改，已跳過。');
+                            return {
+                                originalUrl: latestPhoto.originalUrl || latestPhoto.url,
+                                url: uploaded.url,
+                                thumbnailUrl: uploaded.thumbnailUrl,
+                                migratedAt: Date.now()
+                            };
+                        });
+                        migrationProcessedKeys.add(`${candidate.itemId}:${candidate.photoIdx}`);
+                        completed++;
+                    } catch (error) {
+                        migrationProcessedKeys.add(`${candidate.itemId}:${candidate.photoIdx}`);
+                        errors.push(`${candidate.itemId} #${candidate.photoIdx + 1}: ${error.message}`);
+                    }
+                }
+            } catch (error) {
+                errors.push(error.message);
+            } finally {
+                await releaseMigrationLock();
+                setMigrationControls(false);
+                showMigrationErrors(errors);
+                document.getElementById('migration-status').textContent = migrationStopRequested
+                    ? `已安全停止，本批完成 ${completed} 張；稍後可重新掃描並續跑。`
+                    : `本批完成 ${completed} 張，失敗或跳過 ${errors.length} 張。`;
+                setTimeout(window.refreshImageMigrationStatus, 1200);
+            }
+        };
+
+        window.stopImageMigration = function() {
+            migrationStopRequested = true;
+            document.getElementById('migration-status').textContent = '正在完成目前這一張，完成後停止…';
+            document.getElementById('migration-stop-button').disabled = true;
+        };
+
+        window.rollbackImageMigrationBatch = async function() {
+            if (migrationRunning) return;
+            const state = collectMigrationState(db, normalizePhotos);
+            const batch = state.rollback.slice(0, MIGRATION_BATCH_SIZE);
+            if (batch.length === 0) return;
+            if (!confirm(`將 ${batch.length} 張照片回復為原始網址。新檔案不會立即刪除，確定繼續？`)) return;
+
+            migrationStopRequested = false;
+            showMigrationErrors([]);
+            setMigrationControls(true);
+            const errors = [];
+            let completed = 0;
+            try {
+                await acquireMigrationLock();
+                for (const candidate of batch) {
+                    if (migrationStopRequested) break;
+                    document.getElementById('migration-status').textContent = `正在回復 ${completed + 1}/${batch.length}…`;
+                    try {
+                        await updatePhotoAtomic(candidate.itemId, candidate.photoIdx, latestPhoto => {
+                            if (!latestPhoto.originalUrl) throw new Error('找不到原始網址，已跳過。');
+                            if (latestPhoto.originalUrl !== candidate.originalUrl) throw new Error('原始網址已改變，已跳過。');
+                            return { url: latestPhoto.originalUrl, thumbnailUrl: '', originalUrl: '', migratedAt: 0 };
+                        });
+                        completed++;
+                    } catch (error) {
+                        errors.push(`${candidate.itemId} #${candidate.photoIdx + 1}: ${error.message}`);
+                    }
+                }
+            } catch (error) {
+                errors.push(error.message);
+            } finally {
+                await releaseMigrationLock();
+                setMigrationControls(false);
+                showMigrationErrors(errors);
+                document.getElementById('migration-status').textContent = `已回復 ${completed} 張，失敗或跳過 ${errors.length} 張。`;
+                setTimeout(window.refreshImageMigrationStatus, 1200);
+            }
+        };
+
         window.renderSettingsView = function() { 
             const render = (type) => [...new Set((appSettings[type]||[]).map(x=>type==='categories'?getCleanCategory(x):x).filter(Boolean))]
                 .map(i => `<span class="bg-stone-100 px-2 py-1 rounded text-xs mr-1 mb-1 inline-block border cursor-pointer hover:bg-red-50 hover:text-red-500" onclick="window.removeSetting(${inlineString(type)}, ${inlineString(i)})">${escapeHtml(i)} &times;</span>`).join('');
             document.getElementById('settings-makers-list').innerHTML = render('makers'); 
             document.getElementById('settings-locations-list').innerHTML = render('locations'); 
             document.getElementById('settings-categories-list').innerHTML = render('categories'); 
+            window.refreshImageMigrationStatus();
         };
         
         window.addSetting = async function(type) { const map = {'makers':'new-maker-input', 'locations':'new-location-input', 'categories':'new-category-input'}; let val = document.getElementById(map[type]).value; if (type === 'categories') val = getCleanCategory(val); else val = val.trim(); if(val) { await updateDoc(doc(dbFirestore, "settings", "config"), { [type]: arrayUnion(val) }); document.getElementById(map[type]).value = ''; } };
