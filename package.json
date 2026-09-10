@@ -1,0 +1,8 @@
+{
+  "name": "weiweiwei-stock-app",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test view-utils.test.mjs"
+  }
+}
