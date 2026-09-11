@@ -2,9 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+    DEFAULT_STYLE_SKUS,
     assignMissingGarmentIds,
     formatGarmentId,
     hasGarmentIds,
+    inferStyleSkuCategory,
     normalizeStyleSku,
     normalizeStyleSkuCatalog
 } from './sku-utils.js';
@@ -70,9 +72,25 @@ test('normalizes catalog entries and keeps the latest label', () => {
         { sku: '2TOP011', name: 'Ari Top' },
         '2bag008'
     ]), [
-        { sku: '2BAG008', name: '' },
-        { sku: '2TOP011', name: 'Ari Top' }
+        { category: 'BAG', name: '', sku: '2BAG008' },
+        { category: 'TOP', name: 'Ari Top', sku: '2TOP011' }
     ]);
+});
+
+test('contains every SKU and category supplied in the 2026 COGS catalog', () => {
+    assert.equal(DEFAULT_STYLE_SKUS.length, 82);
+    assert.equal(new Set(DEFAULT_STYLE_SKUS.map(entry => entry.sku)).size, 82);
+    assert.deepEqual([...new Set(DEFAULT_STYLE_SKUS.map(entry => entry.category))], [
+        'ACCESSORY',
+        'BAG',
+        'BOTTOM',
+        'DRESS',
+        'LOUNGE-DRESS',
+        'LOUNGE-SET',
+        'TOP'
+    ]);
+    assert.equal(inferStyleSkuCategory('2DRS014'), 'LOUNGE-DRESS');
+    assert.equal(inferStyleSkuCategory('2DRS012'), 'DRESS');
 });
 
 test('detects whether a batch already has permanent IDs', () => {

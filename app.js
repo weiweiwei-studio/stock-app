@@ -210,7 +210,7 @@
                         makers: data.makers || appSettings.makers,
                         locations: fetchedLocations,
                         categories: data.categories || appSettings.categories,
-                        styleSkus: normalizeStyleSkuCatalog(data.styleSkus || appSettings.styleSkus),
+                        styleSkus: normalizeStyleSkuCatalog([...(data.styleSkus || []), ...DEFAULT_STYLE_SKUS]),
                         weekly_goals: data.weekly_goals || {} 
                     };
                 }
@@ -1595,10 +1595,11 @@
                     } 
                 } 
                 photoObjs = reconcileNewItemPhotos(photoObjs, form.get('quantity'), originStudio);
-                const cleanCat = getCleanCategory(form.get('category'));
                 const styleSku = normalizeStyleSku(form.get('styleSku'));
                 const styleEntry = normalizeStyleSkuCatalog(appSettings.styleSkus).find(entry => entry.sku === styleSku);
                 if (!styleEntry) throw new Error('找不到所選 Style SKU，請重新整理後再試。');
+                if (styleEntry.category !== form.get('category')) throw new Error('Category 與 Style SKU 不一致，請重新選擇。');
+                const cleanCat = styleEntry.category;
                 const itemRef = doc(collection(dbFirestore, "stock_items"));
                 const counterRef = doc(dbFirestore, "settings", "garment_counters");
 
@@ -2031,7 +2032,7 @@
             document.getElementById('settings-locations-list').innerHTML = render('locations'); 
             document.getElementById('settings-categories-list').innerHTML = render('categories'); 
             document.getElementById('settings-styleSkus-list').innerHTML = normalizeStyleSkuCatalog(appSettings.styleSkus)
-                .map(entry => `<span class="bg-stone-100 px-2 py-1 rounded text-[10px] mr-1 mb-1 inline-block border cursor-pointer hover:bg-red-50 hover:text-red-500" onclick="window.removeStyleSku(${inlineString(entry.sku)})"><b class="font-mono">${escapeHtml(entry.sku)}</b>${entry.name ? ` · ${escapeHtml(entry.name)}` : ''} &times;</span>`)
+                .map(entry => `<span class="bg-stone-100 px-2 py-1 rounded text-[10px] mr-1 mb-1 inline-block border cursor-pointer hover:bg-red-50 hover:text-red-500" onclick="window.removeStyleSku(${inlineString(entry.sku)})"><b>${escapeHtml(entry.category || 'OTHER')}</b> · <b class="font-mono">${escapeHtml(entry.sku)}</b>${entry.name ? ` · ${escapeHtml(entry.name)}` : ''} &times;</span>`)
                 .join('');
             window.refreshImageMigrationStatus();
         };
@@ -2040,10 +2041,11 @@
         window.addStyleSku = async function() {
             const skuInput = document.getElementById('new-style-sku-input');
             const nameInput = document.getElementById('new-style-sku-name-input');
+            const category = document.getElementById('new-style-sku-category-input').value;
             const sku = normalizeStyleSku(skuInput.value);
             const name = nameInput.value.trim();
-            if (!sku || !name) {
-                alert('請輸入 Style SKU 和商品名稱。');
+            if (!category || !sku || !name) {
+                alert('請選擇 Category，並輸入 Style SKU 和商品名稱。');
                 return;
             }
             if (normalizeStyleSkuCatalog(appSettings.styleSkus).some(entry => entry.sku === sku)) {
@@ -2056,7 +2058,7 @@
                 if (!snapshot.exists()) throw new Error('找不到系統設定。');
                 const latestValues = normalizeStyleSkuCatalog(snapshot.data().styleSkus || appSettings.styleSkus);
                 if (latestValues.some(entry => entry.sku === sku)) throw new Error(`Style SKU ${sku} 已存在。`);
-                transaction.update(settingsRef, { styleSkus: normalizeStyleSkuCatalog([...latestValues, { sku, name }]) });
+                transaction.update(settingsRef, { styleSkus: normalizeStyleSkuCatalog([...latestValues, { category, sku, name }]) });
             });
             skuInput.value = '';
             nameInput.value = '';
@@ -2064,6 +2066,10 @@
 
         window.removeStyleSku = async function(sku) {
             const normalizedSku = normalizeStyleSku(sku);
+            if (DEFAULT_STYLE_SKUS.some(entry => entry.sku === normalizedSku)) {
+                alert(`Style SKU ${normalizedSku} 來自 2026 COGS 清單，不能在網站刪除。`);
+                return;
+            }
             if (db.some(item => normalizeStyleSku(item.styleSku) === normalizedSku)) {
                 alert(`Style SKU ${normalizedSku} 已被工單使用，不能刪除。`);
                 return;
@@ -2100,9 +2106,10 @@
             const distinctMakers = [...new Set([...appSettings.makers, ...db.map(i => i.maker)])].filter(Boolean).sort(); 
             const distinctCategories = [...new Set([...appSettings.categories.map(c => getCleanCategory(c)), ...db.map(i => getCleanCategory(i.category))])].filter(Boolean).sort(); 
             const distinctStyleSkus = normalizeStyleSkuCatalog([
-                ...appSettings.styleSkus,
-                ...db.filter(item => item.styleSku).map(item => ({ sku: item.styleSku, name: item.itemName || '' }))
+                ...db.filter(item => item.styleSku).map(item => ({ sku: item.styleSku, name: item.itemName || '', category: item.category || '' })),
+                ...appSettings.styleSkus
             ]);
+            const skuCategories = [...new Set(distinctStyleSkus.map(entry => entry.category).filter(Boolean))];
             const nextSignature = JSON.stringify({
                 makers: distinctMakers,
                 categories: distinctCategories,
@@ -2153,13 +2160,37 @@
             
             fill('.dynamic-maker-select', distinctMakers); 
             fill('.dynamic-category-select', distinctCategories); 
+            fill('.dynamic-sku-category-select', skuCategories);
             document.querySelectorAll('.dynamic-style-sku-select').forEach(select => {
                 const old = normalizeStyleSku(select.value);
                 select.innerHTML = '<option value="">選擇 Style SKU</option>' + distinctStyleSkus
-                    .map(entry => `<option value="${escapeHtml(entry.sku)}">${escapeHtml(entry.sku)}${entry.name ? ` — ${escapeHtml(entry.name)}` : ''}</option>`)
+                    .map(entry => `<option value="${escapeHtml(entry.sku)}">[${escapeHtml(entry.category)}] ${escapeHtml(entry.sku)}${entry.name ? ` — ${escapeHtml(entry.name)}` : ''}</option>`)
                     .join('');
                 if (distinctStyleSkus.some(entry => entry.sku === old)) select.value = old;
             });
+
+            const newCategorySelect = document.getElementById('new-item-category');
+            if (newCategorySelect) {
+                const oldCategory = newCategorySelect.value;
+                newCategorySelect.innerHTML = '<option value="">選擇 Category</option>' + skuCategories
+                    .map(category => `<option value="${escapeHtml(category)}">${escapeHtml(category)}</option>`)
+                    .join('');
+                if (skuCategories.includes(oldCategory)) newCategorySelect.value = oldCategory;
+            }
+            window.updateNewItemSkuOptions();
+        };
+
+        window.updateNewItemSkuOptions = function() {
+            const categorySelect = document.getElementById('new-item-category');
+            const skuSelect = document.getElementById('new-item-styleSku');
+            if (!categorySelect || !skuSelect) return;
+            const category = categorySelect.value;
+            const oldSku = normalizeStyleSku(skuSelect.value);
+            const matches = normalizeStyleSkuCatalog(appSettings.styleSkus).filter(entry => entry.category === category);
+            skuSelect.innerHTML = '<option value="">選擇 Style SKU</option>' + matches
+                .map(entry => `<option value="${escapeHtml(entry.sku)}">${escapeHtml(entry.sku)}${entry.name ? ` — ${escapeHtml(entry.name)}` : ''}</option>`)
+                .join('');
+            if (matches.some(entry => entry.sku === oldSku)) skuSelect.value = oldSku;
         };
         
         window.switchView = (v) => {
@@ -2175,7 +2206,10 @@
             document.getElementById('mobile-nav-settings').classList.remove('hidden');
             window.switchView('dashboard');
         };
-        window.openModal = () => document.getElementById('add-modal').classList.remove('hidden');
+        window.openModal = () => {
+            window.updateNewItemSkuOptions();
+            document.getElementById('add-modal').classList.remove('hidden');
+        };
         window.closeModal = () => document.getElementById('add-modal').classList.add('hidden');
         // 打開照片放大視窗
 window.openImageViewer = function(url) {
