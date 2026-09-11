@@ -35,3 +35,18 @@ test('login and primary navigation fit a phone viewport', async ({ page }) => {
     );
     expect(hasViewportOverflow).toBe(false);
 });
+
+test('legacy SKU migration controls remain usable on a phone', async ({ page }) => {
+    await page.evaluate(() => {
+        document.getElementById('auth-screen')?.classList.add('hidden');
+        document.body.classList.remove('auth-pending');
+        document.getElementById('view-settings')?.classList.remove('hidden');
+    });
+
+    await expect(page.locator('#sku-migration-preview')).toBeInViewport();
+    for (const selector of ['#sku-migration-scan-button', '#sku-migration-backup-button', '#sku-migration-run-button']) {
+        const box = await page.locator(selector).boundingBox();
+        expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+});

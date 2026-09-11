@@ -3,6 +3,7 @@
         import { optimizeImage } from "./image-utils.js";
         import { reconcileNewItemPhotos, resizeItemPhotos } from "./inventory-utils.js";
         import { DEFAULT_STYLE_SKUS, assignMissingGarmentIds, hasGarmentIds, normalizeStyleSku, normalizeStyleSkuCatalog } from "./sku-utils.js";
+        import { buildLegacySkuPlan, garmentIdsMatchSku, makeSkuMigrationBackup } from "./sku-migration-utils.js";
         import { getRemainingTimeout, mapWithConcurrency } from "./pdf-export-utils.js";
         import { MIGRATION_BATCH_SIZE, collectMigrationState, makeBackupPayload } from "./image-migration-utils.js";
         import { escapeHtml, inlineString, safeImageUrl } from "./security-utils.js";
@@ -56,6 +57,9 @@
         let migrationRunning = false;
         let migrationStopRequested = false;
         const migrationProcessedKeys = new Set();
+        let legacySkuPlan = [];
+        let legacySkuBackupReady = false;
+        let legacySkuMigrationRunning = false;
         const migrationSessionId = typeof crypto.randomUUID === 'function'
             ? crypto.randomUUID()
             : `${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -2035,6 +2039,124 @@
                 .map(entry => `<span class="bg-stone-100 px-2 py-1 rounded text-[10px] mr-1 mb-1 inline-block border cursor-pointer hover:bg-red-50 hover:text-red-500" onclick="window.removeStyleSku(${inlineString(entry.sku)})"><b>${escapeHtml(entry.category || 'OTHER')}</b> · <b class="font-mono">${escapeHtml(entry.sku)}</b>${entry.name ? ` · ${escapeHtml(entry.name)}` : ''} &times;</span>`)
                 .join('');
             window.refreshImageMigrationStatus();
+            if (legacySkuPlan.length === 0 && !legacySkuMigrationRunning) window.refreshLegacySkuMigration();
+        };
+
+        function renderLegacySkuMigration() {
+            const counts = { ready: 0, manual: 0, blocked: 0, unchanged: 0 };
+            legacySkuPlan.forEach(row => { counts[row.status] = (counts[row.status] || 0) + 1; });
+            document.getElementById('sku-migration-ready').textContent = counts.ready;
+            document.getElementById('sku-migration-manual').textContent = counts.manual;
+            document.getElementById('sku-migration-blocked').textContent = counts.blocked;
+            document.getElementById('sku-migration-unchanged').textContent = counts.unchanged;
+
+            const catalog = normalizeStyleSkuCatalog(appSettings.styleSkus);
+            const rows = legacySkuPlan.filter(row => row.status !== 'unchanged');
+            document.getElementById('sku-migration-preview').innerHTML = rows.length === 0
+                ? '<div class="rounded bg-emerald-50 p-3 text-xs font-bold text-emerald-700">全部舊資料已正確配對。</div>'
+                : rows.map(row => {
+                    const optionEntries = row.candidates.length > 0 ? row.candidates : catalog;
+                    const targetHtml = row.status === 'ready'
+                        ? `<b class="font-mono">${escapeHtml(row.target.sku)}</b><br>${escapeHtml(row.target.name || row.target.sku)} · ${escapeHtml(row.target.category)}`
+                        : row.status === 'manual'
+                            ? `<select data-sku-migration-item="${escapeHtml(row.itemId)}" onchange="window.setLegacySkuSelection(${inlineString(row.itemId)}, this.value)" class="w-full rounded border border-amber-200 bg-white p-1.5 text-xs"><option value="">暫時跳過／請選擇</option>${optionEntries.map(entry => `<option value="${escapeHtml(entry.sku)}"${row.manualSku === entry.sku ? ' selected' : ''}>[${escapeHtml(entry.category)}] ${escapeHtml(entry.sku)} — ${escapeHtml(entry.name || entry.sku)}</option>`).join('')}</select>`
+                            : `<span class="font-bold text-red-600">不可自動處理</span>`;
+                    const statusClass = row.status === 'ready' ? 'text-emerald-700' : row.status === 'manual' ? 'text-amber-700' : 'text-red-700';
+                    return `<div class="grid grid-cols-1 gap-2 border-b border-stone-100 p-3 md:grid-cols-[1fr_1fr_120px]">
+                        <div class="text-xs"><b>${escapeHtml(row.currentName || '未填品名')}</b><br><span class="font-mono text-stone-400">${escapeHtml(row.currentSku || '未填 SKU')}</span> · ${escapeHtml(row.currentCategory || '未填 Category')}</div>
+                        <div class="text-xs">${targetHtml}</div>
+                        <div class="text-xs font-bold ${statusClass}">${escapeHtml(row.message)}</div>
+                    </div>`;
+                }).join('');
+
+            document.getElementById('sku-migration-backup-button').disabled = legacySkuMigrationRunning || legacySkuPlan.length === 0;
+            document.getElementById('sku-migration-run-button').disabled = legacySkuMigrationRunning || !legacySkuBackupReady || (counts.ready === 0 && counts.manual === 0);
+            document.getElementById('sku-migration-scan-button').disabled = legacySkuMigrationRunning;
+            document.getElementById('sku-migration-status').textContent = legacySkuMigrationRunning
+                ? '正在安全更新，請不要關閉頁面…'
+                : legacySkuBackupReady
+                    ? '備份已下載。確認預覽及手動選項後即可執行。'
+                    : '請先下載備份；不確定的資料可保持「暫時跳過」。';
+        }
+
+        window.refreshLegacySkuMigration = function() {
+            if (legacySkuMigrationRunning) return;
+            legacySkuPlan = buildLegacySkuPlan(db, appSettings.styleSkus, normalizePhotos);
+            legacySkuBackupReady = false;
+            renderLegacySkuMigration();
+        };
+
+        window.setLegacySkuSelection = function(itemId, styleSku) {
+            const row = legacySkuPlan.find(candidate => candidate.itemId === itemId);
+            if (row && row.status === 'manual') row.manualSku = normalizeStyleSku(styleSku);
+        };
+
+        window.downloadLegacySkuBackup = function() {
+            const payload = makeSkuMigrationBackup(db, legacySkuPlan);
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `weiweiwei-legacy-sku-backup-${new Date().toISOString().slice(0, 10)}.json`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+            legacySkuBackupReady = true;
+            renderLegacySkuMigration();
+        };
+
+        window.runLegacySkuMigration = async function() {
+            if (legacySkuMigrationRunning || !legacySkuBackupReady) return;
+            const catalog = normalizeStyleSkuCatalog(appSettings.styleSkus);
+            const updates = legacySkuPlan.flatMap(row => {
+                const selectedSku = row.status === 'ready' ? row.target.sku : row.manualSku;
+                const target = catalog.find(entry => entry.sku === selectedSku);
+                return target ? [{ ...row, target }] : [];
+            });
+            if (updates.length === 0) {
+                alert('目前沒有可更新的資料；請為需要人工確認的資料選擇 SKU。');
+                return;
+            }
+            if (!confirm(`將更新 ${updates.length} 筆舊資料的 Style SKU、品名及 Category。Sold 也包含在內；其他欄位不會改動。確定繼續？`)) return;
+
+            legacySkuMigrationRunning = true;
+            renderLegacySkuMigration();
+            const errors = [];
+            let completed = 0;
+            for (const row of updates) {
+                try {
+                    const itemRef = doc(dbFirestore, 'stock_items', row.itemId);
+                    await runTransaction(dbFirestore, async transaction => {
+                        const snapshot = await transaction.get(itemRef);
+                        if (!snapshot.exists()) throw new Error('商品已不存在');
+                        const latestItem = snapshot.data();
+                        assertVersion(latestItem, row.version);
+                        if (!garmentIdsMatchSku(normalizePhotos(latestItem), row.target.sku)) {
+                            throw new Error('Garment ID 與所選 SKU 不一致');
+                        }
+                        transaction.update(itemRef, {
+                            styleSku: row.target.sku,
+                            itemName: row.target.name || row.target.sku,
+                            category: row.target.category,
+                            _version: nextVersion(latestItem),
+                            updatedAt: serverTimestamp()
+                        });
+                    });
+                    completed++;
+                    document.getElementById('sku-migration-status').textContent = `已完成 ${completed}/${updates.length} 筆…`;
+                } catch (error) {
+                    errors.push(`${row.currentName || row.itemId}: ${error.message}`);
+                }
+            }
+            legacySkuMigrationRunning = false;
+            legacySkuPlan = buildLegacySkuPlan(db, appSettings.styleSkus, normalizePhotos);
+            legacySkuBackupReady = false;
+            renderLegacySkuMigration();
+            document.getElementById('sku-migration-status').textContent = `完成 ${completed} 筆，跳過或失敗 ${errors.length} 筆。請重新掃描確認結果。`;
+            const errorEl = document.getElementById('sku-migration-errors');
+            errorEl.textContent = errors.join('\n');
+            errorEl.classList.toggle('hidden', errors.length === 0);
         };
         
         window.addSetting = async function(type) { const map = {'makers':'new-maker-input', 'locations':'new-location-input', 'categories':'new-category-input'}; let val = document.getElementById(map[type]).value; if (type === 'categories') val = getCleanCategory(val); else val = val.trim(); if(val) { await updateDoc(doc(dbFirestore, "settings", "config"), { [type]: arrayUnion(val) }); document.getElementById(map[type]).value = ''; } };

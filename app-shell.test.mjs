@@ -40,3 +40,11 @@ test('PDF export applies the allocation category filter', () => {
     assert.match(app, /filterAllocationItemsByCategory\([\s\S]*?catFilter,[\s\S]*?getCleanCategory/);
     assert.match(html, /匯出目前篩選結果 PDF/);
 });
+
+test('legacy SKU migration requires a backup and version-protected updates', () => {
+    assert.match(html, /id=["']sku-migration-backup-button["']/);
+    assert.match(html, /id=["']sku-migration-run-button["'][^>]*disabled/);
+    assert.match(app, /makeSkuMigrationBackup\(db, legacySkuPlan\)/);
+    assert.match(app, /assertVersion\(latestItem, row\.version\)/);
+    assert.match(app, /garmentIdsMatchSku\(normalizePhotos\(latestItem\), row\.target\.sku\)/);
+});
