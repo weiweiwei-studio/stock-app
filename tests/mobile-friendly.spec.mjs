@@ -43,7 +43,9 @@ test('legacy SKU migration controls remain usable on a phone', async ({ page }) 
         document.getElementById('view-settings')?.classList.remove('hidden');
     });
 
-    await expect(page.locator('#sku-migration-preview')).toBeInViewport();
+    const preview = page.locator('#sku-migration-preview');
+    await preview.scrollIntoViewIfNeeded();
+    await expect(preview).toBeInViewport();
     for (const selector of ['#sku-migration-scan-button', '#sku-migration-backup-button', '#sku-migration-run-button']) {
         const box = await page.locator(selector).boundingBox();
         expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
