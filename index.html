@@ -454,8 +454,7 @@
             <h3 class="text-lg font-bold mb-4">新增工單 (Batch)</h3>
             <form id="add-item-form" onsubmit="window.handleAddItem(event)" class="space-y-4">
                 <div class="grid grid-cols-2 gap-4">
-                    <input type="text" name="month" id="form-month-input" class="border p-2 rounded text-sm" placeholder="月份 (例: Oct)">
-                    <input type="text" name="itemName" required class="border p-2 rounded text-sm" placeholder="品名">
+                    <input type="text" name="month" id="form-month-input" class="col-span-2 border p-2 rounded text-sm" placeholder="月份 (例: Oct)">
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <select name="category" class="border p-2 rounded text-sm dynamic-category-select"></select>

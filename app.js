@@ -3,6 +3,7 @@
         import { optimizeImage } from "./image-utils.js";
         import { reconcileNewItemPhotos, resizeItemPhotos } from "./inventory-utils.js";
         import { DEFAULT_STYLE_SKUS, assignMissingGarmentIds, hasGarmentIds, normalizeStyleSku, normalizeStyleSkuCatalog } from "./sku-utils.js";
+        import { getRemainingTimeout, mapWithConcurrency } from "./pdf-export-utils.js";
         import { MIGRATION_BATCH_SIZE, collectMigrationState, makeBackupPayload } from "./image-migration-utils.js";
         import { escapeHtml, inlineString, safeImageUrl } from "./security-utils.js";
         import { DEFAULT_PAGE_SIZE, paginate, prepareAllocationPage } from "./view-utils.js";
@@ -1596,6 +1597,8 @@
                 photoObjs = reconcileNewItemPhotos(photoObjs, form.get('quantity'), originStudio);
                 const cleanCat = getCleanCategory(form.get('category'));
                 const styleSku = normalizeStyleSku(form.get('styleSku'));
+                const styleEntry = normalizeStyleSkuCatalog(appSettings.styleSkus).find(entry => entry.sku === styleSku);
+                if (!styleEntry) throw new Error('找不到所選 Style SKU，請重新整理後再試。');
                 const itemRef = doc(collection(dbFirestore, "stock_items"));
                 const counterRef = doc(dbFirestore, "settings", "garment_counters");
 
@@ -1605,7 +1608,7 @@
                     transaction.set(counterRef, { counters: allocation.counters, updatedAt: serverTimestamp() }, { merge: true });
                     transaction.set(itemRef, {
                         month: form.get('month'),
-                        itemName: form.get('itemName'),
+                        itemName: styleEntry.name || styleSku,
                         styleSku: allocation.styleSku,
                         category: cleanCat,
                         maker: form.get('maker'),
@@ -2250,31 +2253,46 @@ window.closeImageViewer = function() {
                 return;
             }
 
-            // 2. 預先下載所有圖片並轉換為 Base64
-            btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> 載入所有圖片中...';
-            
-            const fetchAsBase64 = async (url) => {
+            // 2. 以有限並行下載縮圖。整體最多等待 30 秒，單張失敗不阻擋 PDF。
+            const uniqueImageUrls = [...new Set(exportData.flatMap(row => row.imgUrls))];
+            const imageDeadline = Date.now() + 30000;
+            btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> 載入圖片 0/${uniqueImageUrls.length}`;
+
+            const fetchAsBase64 = async url => {
+                const timeoutMs = getRemainingTimeout(imageDeadline, 8000);
+                if (timeoutMs === 0) return '';
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
                 try {
-                    const res = await fetch(url, { mode: 'cors' });
-                    const blob = await res.blob();
-                    return new Promise(resolve => {
+                    const response = await fetch(url, { mode: 'cors', signal: controller.signal });
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    const blob = await response.blob();
+                    return await new Promise((resolve, reject) => {
                         const reader = new FileReader();
-                        reader.onloadend = () => resolve(reader.result);
+                        reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+                        reader.onerror = () => reject(reader.error || new Error('圖片讀取失敗'));
                         reader.readAsDataURL(blob);
                     });
-                } catch (e) {
-                    console.warn("圖片轉 Base64 失敗:", e);
-                    return url; 
+                } catch (error) {
+                    console.warn('PDF 圖片略過:', url, error);
+                    return '';
+                } finally {
+                    clearTimeout(timeoutId);
                 }
             };
 
-            for (let row of exportData) {
-                // 迴圈處理這個商品的所有圖片
-                for (let url of row.imgUrls) {
-                    const base64 = await fetchAsBase64(url);
-                    row.renderUrls.push(base64);
+            const convertedImages = await mapWithConcurrency(
+                uniqueImageUrls,
+                fetchAsBase64,
+                6,
+                (completed, total) => {
+                    btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> 載入圖片 ${completed}/${total}`;
                 }
-            }
+            );
+            const convertedByUrl = new Map(uniqueImageUrls.map((url, index) => [url, convertedImages[index]]));
+            exportData.forEach(row => {
+                row.renderUrls = row.imgUrls.map(url => convertedByUrl.get(url)).filter(Boolean);
+            });
 
             // 3. 動態生成符合品牌視覺的隱藏 DOM 物件
             btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> 排版輸出中...';
