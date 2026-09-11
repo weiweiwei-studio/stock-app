@@ -54,3 +54,12 @@ test('legacy SKU migration requires a backup and version-protected updates', () 
     assert.match(app, /assertVersion\(latestItem, row\.version\)/);
     assert.match(app, /garmentIdsMatchSku\(normalizePhotos\(latestItem\), row\.target\.sku\)/);
 });
+
+test('legacy Garment ID migration is backup-first and transaction protected', () => {
+    assert.match(html, /id=["']garment-id-backup-button["'][^>]*disabled/);
+    assert.match(html, /id=["']garment-id-run-button["'][^>]*disabled/);
+    assert.match(app, /makeGarmentIdMigrationBackup\(db, garmentIdMigrationPlan\)/);
+    assert.match(app, /assertVersion\(latestItem, row\.version\)/);
+    assert.match(app, /normalizeStyleSku\(latestItem\.styleSku\) !== row\.sku/);
+    assert.match(app, /transaction\.update\(itemRef, \{\s*photos: allocation\.photos,\s*_version:/);
+});

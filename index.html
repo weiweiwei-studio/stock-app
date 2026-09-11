@@ -436,6 +436,28 @@
                 </div>
                 <pre id="sku-migration-errors" class="mt-3 hidden max-h-32 overflow-auto whitespace-pre-wrap rounded bg-red-50 p-3 text-[10px] text-red-700"></pre>
             </div>
+            <div class="bg-white p-6 rounded-lg shadow-sm border border-stone-200">
+                <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div>
+                        <h3 class="font-bold text-stone-800">旧商品永久编号补齐</h3>
+                        <p class="mt-1 max-w-2xl text-xs leading-5 text-stone-500">为已有 Style SKU、但仍缺少编号的旧商品（包含 Sold）补上永久 Garment ID，例如 2DRS012-018。保留所有已有编号；重复、格式错误或 SKU 冲突会被阻止。</p>
+                    </div>
+                    <button id="garment-id-scan-button" onclick="window.refreshGarmentIdMigration()" class="min-h-[44px] rounded border border-stone-200 bg-stone-50 px-3 py-2 text-xs font-bold text-stone-600 hover:bg-stone-100 disabled:opacity-40">重新扫描</button>
+                </div>
+                <div class="mt-4 grid grid-cols-2 gap-2 md:grid-cols-4">
+                    <div class="rounded bg-emerald-50 p-3"><div class="text-[10px] text-emerald-600">可处理工单</div><div id="garment-id-ready" class="text-lg font-black text-emerald-700">0</div></div>
+                    <div class="rounded bg-blue-50 p-3"><div class="text-[10px] text-blue-600">待补商品编号</div><div id="garment-id-pieces" class="text-lg font-black text-blue-700">0</div></div>
+                    <div class="rounded bg-red-50 p-3"><div class="text-[10px] text-red-600">冲突／不可处理</div><div id="garment-id-blocked" class="text-lg font-black text-red-700">0</div></div>
+                    <div class="rounded bg-stone-50 p-3"><div class="text-[10px] text-stone-500">已经完整编号</div><div id="garment-id-unchanged" class="text-lg font-black text-stone-700">0</div></div>
+                </div>
+                <div id="garment-id-preview" class="mt-4 max-h-96 overflow-auto rounded border border-stone-100"></div>
+                <p id="garment-id-status" class="mt-3 text-xs text-stone-500">正在建立预览…</p>
+                <div class="mt-3 flex flex-wrap gap-2">
+                    <button id="garment-id-backup-button" onclick="window.downloadGarmentIdBackup()" disabled class="min-h-[44px] rounded bg-stone-800 px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">1. 下载完整 JSON 备份</button>
+                    <button id="garment-id-run-button" onclick="window.runGarmentIdMigration()" disabled class="min-h-[44px] rounded bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">2. 补齐下一批编号</button>
+                </div>
+                <pre id="garment-id-errors" class="mt-3 hidden max-h-32 overflow-auto whitespace-pre-wrap rounded bg-red-50 p-3 text-[10px] text-red-700"></pre>
+            </div>
             <div class="hidden bg-white p-6 rounded-lg shadow-sm border border-stone-200" aria-hidden="true">
                 <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div>
