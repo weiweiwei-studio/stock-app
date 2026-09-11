@@ -1,6 +1,7 @@
         import { ADMIN_EMAIL, getAuthErrorMessage, isAuthorizedAdmin } from "./auth-utils.js";
         import { assertVersion, deriveItemStatus, getVersion, nextVersion } from "./data-integrity.js";
         import { optimizeImage } from "./image-utils.js";
+        import { reconcileNewItemPhotos, resizeItemPhotos } from "./inventory-utils.js";
         import { MIGRATION_BATCH_SIZE, collectMigrationState, makeBackupPayload } from "./image-migration-utils.js";
         import { escapeHtml, inlineString, safeImageUrl } from "./security-utils.js";
         import { DEFAULT_PAGE_SIZE, paginate, prepareAllocationPage } from "./view-utils.js";
@@ -1577,6 +1578,7 @@
                         photoObjs.push({ url: uploaded.url, thumbnailUrl: uploaded.thumbnailUrl, status: 'Available', locations: [originStudio], notes: '', soldPrice: null, specificPrice: null });
                     } 
                 } 
+                photoObjs = reconcileNewItemPhotos(photoObjs, form.get('quantity'), originStudio);
                 const cleanCat = getCleanCategory(form.get('category')); 
                 await addDoc(collection(dbFirestore, "stock_items"), { 
                     month: form.get('month'), 
@@ -1586,7 +1588,7 @@
                     color: form.get('color'), 
                     size: form.get('size'), 
                     originStudio: originStudio, 
-                    quantity: parseInt(form.get('quantity')) || 1, 
+                    quantity: photoObjs.length, 
                     cost: 0, 
                     price: form.get('price'), 
                     status: 'To Make', 
@@ -1684,14 +1686,8 @@
                 let photosModified = false;
                 const oldOriginStudio = item.originStudio || 'JB Studio';
 
-                if (newQty > existingPhotos.length) {
-                    const diff = newQty - existingPhotos.length;
-                    for(let i=0; i<diff; i++) {
-                        existingPhotos.push({ url: '', thumbnailUrl: '', status: 'Available', locations: [newOriginStudio], notes: '', soldPrice: null, specificPrice: null });
-                    }
-                    photosModified = true;
-                } else if (newQty < existingPhotos.length) {
-                    existingPhotos = existingPhotos.slice(0, newQty); 
+                if (newQty !== existingPhotos.length) {
+                    existingPhotos = resizeItemPhotos(existingPhotos, newQty, newOriginStudio);
                     photosModified = true;
                 }
 
