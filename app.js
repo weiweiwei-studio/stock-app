@@ -7,7 +7,7 @@
         import { getRemainingTimeout, mapWithConcurrency } from "./pdf-export-utils.js";
         import { MIGRATION_BATCH_SIZE, collectMigrationState, makeBackupPayload } from "./image-migration-utils.js";
         import { escapeHtml, inlineString, safeImageUrl } from "./security-utils.js";
-        import { DEFAULT_PAGE_SIZE, filterAllocationItemsByCategory, paginate, prepareAllocationPage } from "./view-utils.js";
+        import { DEFAULT_PAGE_SIZE, filterAllocationItemsByCategory, filterAllocationItemsByStyleSku, paginate, prepareAllocationPage } from "./view-utils.js";
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { getFirestore, collection, updateDoc, doc, onSnapshot, runTransaction, serverTimestamp, arrayUnion } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
@@ -1051,15 +1051,18 @@
             const tbody = document.getElementById('allocation-table-body');
             const locFilter = document.getElementById('alloc-filter-location').value;
             const catFilter = document.getElementById('alloc-filter-category').value;
+            const styleSkuFilter = document.getElementById('alloc-filter-style-sku').value;
             const fragment = document.createDocumentFragment();
 
             const page = prepareAllocationPage({
                 items: db,
                 categoryFilter: catFilter,
+                styleSkuFilter,
                 locationFilter: locFilter,
                 requestedPage: allocationPage,
                 normalizePhotos,
                 cleanCategory: getCleanCategory,
+                normalizeSku: normalizeStyleSku,
                 pageSize: PAGE_SIZE
             });
             allocationPage = page.currentPage;
@@ -1203,12 +1206,17 @@
             const displayLocRaw = locSelectEl.options[locSelectEl.selectedIndex]?.text || locFilter;
             const displayLoc = locFilter === 'all' ? '全部地點' : displayLocRaw.replace(/[\(🌐🚚🏠\)]/g, '').trim();
             const displayCat = catFilter === 'all' ? '全部類別' : catFilter;
+            const selectedStyleSku = normalizeStyleSku(styleSkuFilter);
+            const selectedStyleEntry = normalizeStyleSkuCatalog(appSettings.styleSkus).find(entry => entry.sku === selectedStyleSku);
+            const displayStyle = styleSkuFilter === 'all' ? '全部商品' : `${selectedStyleSku}${selectedStyleEntry?.name ? ` · ${selectedStyleEntry.name}` : ''}`;
             
             const summaryLabel = locFilter === 'Sold' ? '已售出總計' : '未售出庫存';
 
             summaryText.innerHTML = `
                 <span class="text-stone-500 font-bold text-xs mr-2"><i data-lucide="package-check" class="w-4 h-4 inline pb-0.5"></i> ${summaryLabel}:</span> 
                 <span class="bg-white px-2 py-0.5 rounded shadow-sm border border-blue-100 text-stone-700 text-xs font-bold">${escapeHtml(displayCat)}</span>
+                <span class="text-blue-300 mx-1 font-bold">+</span>
+                <span class="bg-white px-2 py-0.5 rounded shadow-sm border border-blue-100 text-stone-700 text-xs font-bold">${escapeHtml(displayStyle)}</span>
                 <span class="text-blue-300 mx-1 font-bold">+</span> 
                 <span class="bg-white px-2 py-0.5 rounded shadow-sm border border-blue-100 text-stone-700 text-xs font-bold">${escapeHtml(displayLoc)}</span>
                 <span class="text-blue-300 mx-1 font-bold">=</span> 
@@ -2283,6 +2291,14 @@
             fill('.dynamic-maker-select', distinctMakers); 
             fill('.dynamic-category-select', distinctCategories); 
             fill('.dynamic-sku-category-select', skuCategories);
+            const allocationSkuSelect = document.getElementById('alloc-filter-style-sku');
+            if (allocationSkuSelect) {
+                const oldSku = normalizeStyleSku(allocationSkuSelect.value);
+                allocationSkuSelect.innerHTML = '<option value="all">全部商品</option>' + distinctStyleSkus
+                    .map(entry => `<option value="${escapeHtml(entry.sku)}">${escapeHtml(entry.sku)}${entry.name ? ` — ${escapeHtml(entry.name)}` : ''}</option>`)
+                    .join('');
+                allocationSkuSelect.value = distinctStyleSkus.some(entry => entry.sku === oldSku) ? oldSku : 'all';
+            }
             document.querySelectorAll('.dynamic-style-sku-select').forEach(select => {
                 const old = normalizeStyleSku(select.value);
                 select.innerHTML = '<option value="">選擇 Style SKU</option>' + distinctStyleSkus
@@ -2356,19 +2372,24 @@ window.closeImageViewer = function() {
 
             const locFilter = document.getElementById('alloc-filter-location').value;
             const catFilter = document.getElementById('alloc-filter-category').value;
+            const styleSkuFilter = document.getElementById('alloc-filter-style-sku').value;
             const displayLocRaw = document.getElementById('alloc-filter-location').options[document.getElementById('alloc-filter-location').selectedIndex]?.text || locFilter;
             const displayLoc = locFilter === 'all' ? '全部地點' : displayLocRaw.replace(/[\(🌐🚚🏠\)]/g, '').trim();
             const displayCat = catFilter === 'all' ? '全部類別' : catFilter;
+            const selectedStyleSku = normalizeStyleSku(styleSkuFilter);
+            const selectedStyleEntry = normalizeStyleSkuCatalog(appSettings.styleSkus).find(entry => entry.sku === selectedStyleSku);
+            const displayStyle = styleSkuFilter === 'all' ? '全部商品' : `${selectedStyleSku}${selectedStyleEntry?.name ? ` · ${selectedStyleEntry.name}` : ''}`;
 
             let exportData = [];
             let totalQty = 0;
 
             // 1. 篩選與加總特定地點下的單品數據
-            const exportItems = filterAllocationItemsByCategory(
+            const categoryItems = filterAllocationItemsByCategory(
                 db.filter(i => i.status === 'Ready' || i.status === 'In Studio' || i.status === 'Sold' || i.status === 'Partial Sold'),
                 catFilter,
                 getCleanCategory
             );
+            const exportItems = filterAllocationItemsByStyleSku(categoryItems, styleSkuFilter, normalizeStyleSku);
             exportItems.forEach(item => {
                 const photos = normalizePhotos(item);
                 let locPhotos = [];
@@ -2471,7 +2492,7 @@ window.closeImageViewer = function() {
                 <div style="text-align: center; margin-bottom: 25px; border-bottom: 2px solid #78716c; padding-bottom: 15px;">
                     <h2 style="margin: 0; font-size: 24px; font-weight: 800; letter-spacing: 2px; color: #1c1917;">WEIWEIWEI 庫存清單</h2>
                     <div style="margin-top: 12px; display: flex; justify-content: space-between; font-size: 12px; color: #78716c;">
-                        <span>📍 篩選: <b style="color: #1c1917;">${escapeHtml(displayLoc)} · ${escapeHtml(displayCat)}</b></span>
+                        <span>📍 篩選: <b style="color: #1c1917;">${escapeHtml(displayLoc)} · ${escapeHtml(displayCat)} · ${escapeHtml(displayStyle)}</b></span>
                         <span>📦 總計件數: <b style="color: #b45309; font-size: 14px;">${totalQty} 件</b></span>
                         <span>🕒 盤點時間: ${dateStr}</span>
                     </div>
@@ -2530,7 +2551,7 @@ window.closeImageViewer = function() {
             // 4. 調用 html2pdf 套件進行客戶端高畫質渲染下載
             const opt = {
                 margin:       12,
-                filename:     `Stock_Report_${displayLoc.replace(/\s+/g, '_')}_${displayCat.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.pdf`,
+                filename:     `Stock_Report_${displayLoc.replace(/\s+/g, '_')}_${displayCat.replace(/\s+/g, '_')}_${selectedStyleSku || 'ALL'}_${new Date().toISOString().slice(0,10)}.pdf`,
                 image:        { type: 'jpeg', quality: 0.98 },
                 html2canvas:  { scale: 2, useCORS: true },
                 jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
