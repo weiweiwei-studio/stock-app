@@ -403,6 +403,7 @@
                     <h3 class="font-bold text-stone-700 mb-2">Style SKU</h3>
                     <div id="settings-styleSkus-list" class="max-h-40 overflow-y-auto flex flex-wrap gap-1 mb-2"></div>
                     <div class="grid grid-cols-1 gap-2">
+                        <select id="new-style-sku-category-input" class="border text-sm rounded px-2 py-1.5 bg-white dynamic-sku-category-select"></select>
                         <input id="new-style-sku-input" placeholder="例如 2BTM005" class="border text-sm rounded px-2 py-1.5 font-mono uppercase">
                         <input id="new-style-sku-name-input" placeholder="例如 Long Wrap Skirt - ori" class="border text-sm rounded px-2 py-1.5">
                         <button onclick="window.addStyleSku()" class="bg-stone-800 text-white px-2 py-1.5 rounded text-sm">新增 SKU</button>
@@ -454,16 +455,15 @@
             <h3 class="text-lg font-bold mb-4">新增工單 (Batch)</h3>
             <form id="add-item-form" onsubmit="window.handleAddItem(event)" class="space-y-4">
                 <div class="grid grid-cols-2 gap-4">
-                    <input type="text" name="month" id="form-month-input" class="border p-2 rounded text-sm" placeholder="月份 (例: Oct)">
-                    <input type="text" name="itemName" required class="border p-2 rounded text-sm" placeholder="品名">
+                    <input type="text" name="month" id="form-month-input" class="col-span-2 border p-2 rounded text-sm" placeholder="月份 (例: Oct)">
                 </div>
                 <div class="grid grid-cols-2 gap-4">
-                    <select name="category" class="border p-2 rounded text-sm dynamic-category-select"></select>
+                    <select name="category" id="new-item-category" onchange="window.updateNewItemSkuOptions()" required class="border p-2 rounded text-sm bg-white"></select>
                     <select name="maker" class="border p-2 rounded text-sm dynamic-maker-select"></select>
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-stone-500 mb-1">Style SKU</label>
-                    <select name="styleSku" required class="w-full border p-2 rounded text-sm bg-white font-mono dynamic-style-sku-select"></select>
+                    <select name="styleSku" id="new-item-styleSku" required class="w-full border p-2 rounded text-sm bg-white font-mono"></select>
                     <p class="mt-1 text-[9px] text-stone-400">每件會自動取得例如 2BTM005-001 的永久 Garment ID。</p>
                 </div>
                  <div class="grid grid-cols-2 gap-4">

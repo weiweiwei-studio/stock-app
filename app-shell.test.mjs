@@ -26,3 +26,11 @@ test('external module retains the application bootstrap and Firebase imports', (
 test('Tailwind scans both the HTML shell and JavaScript templates', () => {
     assert.match(tailwindConfig, /content:\s*\[[^\]]*['"]\.\/index\.html['"][^\]]*['"]\.\/app\.js['"][^\]]*\]/s);
 });
+
+test('new work orders derive the product name from category-filtered Style SKUs', () => {
+    assert.doesNotMatch(html, /name=["']itemName["']/);
+    assert.match(html, /id=["']new-item-category["'][^>]*updateNewItemSkuOptions/);
+    assert.match(html, /id=["']new-item-styleSku["']/);
+    assert.match(app, /itemName:\s*styleEntry\.name\s*\|\|\s*styleSku/);
+    assert.match(app, /styleEntry\.category\s*!==\s*form\.get\(['"]category['"]\)/);
+});
