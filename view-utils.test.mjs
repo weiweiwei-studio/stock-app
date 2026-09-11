@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
     filterAllocationItemsByCategory,
+    filterAllocationItemsByStyleSku,
     paginate,
     photoMatchesAllocationFilter,
     prepareAllocationPage
@@ -21,6 +22,17 @@ test('allocation export category filter excludes other inventory', () => {
         [items[0]]
     );
     assert.equal(filterAllocationItemsByCategory(items, 'all', cleanCategory), items);
+});
+
+test('allocation Style SKU filter keeps one product across a broad category', () => {
+    const items = [
+        { styleSku: '2DRS012', category: 'DRESS' },
+        { styleSku: '2DRS014', category: 'DRESS' }
+    ];
+    assert.deepEqual(
+        filterAllocationItemsByStyleSku(items, '2drs012', value => String(value || '').toUpperCase()),
+        [items[0]]
+    );
 });
 
 test('paginate clamps invalid and out-of-range pages', () => {

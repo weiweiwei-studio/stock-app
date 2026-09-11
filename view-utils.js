@@ -30,13 +30,21 @@ export function filterAllocationItemsByCategory(items, categoryFilter, cleanCate
     return items.filter(item => cleanCategory(item.category) === categoryFilter);
 }
 
+export function filterAllocationItemsByStyleSku(items, styleSkuFilter, normalizeSku = value => String(value || '')) {
+    if (!styleSkuFilter || styleSkuFilter === 'all') return items;
+    const target = normalizeSku(styleSkuFilter);
+    return items.filter(item => normalizeSku(item.styleSku) === target);
+}
+
 export function prepareAllocationPage({
     items,
     categoryFilter,
+    styleSkuFilter = 'all',
     locationFilter,
     requestedPage,
     normalizePhotos,
     cleanCategory,
+    normalizeSku = value => String(value || ''),
     pageSize = DEFAULT_PAGE_SIZE
 }) {
     let filteredItems = items.filter(item =>
@@ -44,6 +52,7 @@ export function prepareAllocationPage({
     );
 
     filteredItems = filterAllocationItemsByCategory(filteredItems, categoryFilter, cleanCategory);
+    filteredItems = filterAllocationItemsByStyleSku(filteredItems, styleSkuFilter, normalizeSku);
 
     const matchesPhoto = photo => photoMatchesAllocationFilter(photo, locationFilter);
     if (locationFilter !== 'all') {
