@@ -89,6 +89,25 @@ test('resizing protects empty units assigned outside the current origin studio',
     }
 });
 
+test('resizing uses the stored origin before a same-save studio relocation', () => {
+    const storedOrigin = 'JB Studio';
+    const newOrigin = 'PNG Studio';
+    const photos = [
+        createBlankPhoto(storedOrigin),
+        { ...createBlankPhoto(storedOrigin), url: 'https://example.com/item.webp' }
+    ];
+
+    const resized = resizeItemPhotos(photos, 1, storedOrigin);
+    const relocated = resized.map(photo => ({
+        ...photo,
+        locations: photo.locations.map(location => location === storedOrigin ? newOrigin : location)
+    }));
+
+    assert.equal(relocated.length, 1);
+    assert.deepEqual(relocated[0].locations, [newOrigin]);
+    assert.equal(relocated[0].url, 'https://example.com/item.webp');
+});
+
 test('resizing protects every supported history and pricing field', () => {
     const protectedPhotos = [
         { ...createBlankPhoto(), thumbnailUrl: 'https://example.com/thumb.webp' },

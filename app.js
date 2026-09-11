@@ -1687,7 +1687,7 @@
                 const oldOriginStudio = item.originStudio || 'JB Studio';
 
                 if (newQty !== existingPhotos.length) {
-                    existingPhotos = resizeItemPhotos(existingPhotos, newQty, newOriginStudio);
+                    existingPhotos = resizeItemPhotos(existingPhotos, newQty, oldOriginStudio);
                     photosModified = true;
                 }
 
