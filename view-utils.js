@@ -25,6 +25,11 @@ export function photoMatchesAllocationFilter(photo, locationFilter) {
     return photo.locations.includes(locationFilter);
 }
 
+export function filterAllocationItemsByCategory(items, categoryFilter, cleanCategory) {
+    if (categoryFilter === 'all') return items;
+    return items.filter(item => cleanCategory(item.category) === categoryFilter);
+}
+
 export function prepareAllocationPage({
     items,
     categoryFilter,
@@ -38,9 +43,7 @@ export function prepareAllocationPage({
         ['Ready', 'In Studio', 'Sold', 'Partial Sold'].includes(item.status)
     );
 
-    if (categoryFilter !== 'all') {
-        filteredItems = filteredItems.filter(item => cleanCategory(item.category) === categoryFilter);
-    }
+    filteredItems = filterAllocationItemsByCategory(filteredItems, categoryFilter, cleanCategory);
 
     const matchesPhoto = photo => photoMatchesAllocationFilter(photo, locationFilter);
     if (locationFilter !== 'all') {

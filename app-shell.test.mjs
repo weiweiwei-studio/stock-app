@@ -34,3 +34,9 @@ test('new work orders derive the product name from category-filtered Style SKUs'
     assert.match(app, /itemName:\s*styleEntry\.name\s*\|\|\s*styleSku/);
     assert.match(app, /styleEntry\.category\s*!==\s*form\.get\(['"]category['"]\)/);
 });
+
+test('PDF export applies the allocation category filter', () => {
+    assert.match(app, /const catFilter = document\.getElementById\(['"]alloc-filter-category['"]\)\.value/);
+    assert.match(app, /filterAllocationItemsByCategory\([\s\S]*?catFilter,[\s\S]*?getCleanCategory/);
+    assert.match(html, /匯出目前篩選結果 PDF/);
+});
