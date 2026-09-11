@@ -46,7 +46,7 @@ test('resizing downward removes only empty units and preserves meaningful units'
     const photos = [
         createBlankPhoto('JB Studio'),
         sold,
-        createBlankPhoto('PNG Studio'),
+        createBlankPhoto('JB Studio'),
         photographed
     ];
 
@@ -65,11 +65,54 @@ test('resizing refuses to discard photos, sales, notes, or individual prices', (
         assert.equal(isRemovableEmptyPhoto(photo), false);
         assert.throws(
             () => resizeItemPhotos([photo, { ...photo }], 1, 'JB Studio'),
-            /只能移除沒有照片/
+            /只能移除.*沒有照片/
         );
     }
 });
 
+test('resizing protects empty units assigned outside the current origin studio', () => {
+    const protectedLocations = [
+        ['Online'],
+        ['Bev C'],
+        ['PNG Studio'],
+        [],
+        ['JB Studio', 'Online']
+    ];
+
+    for (const locations of protectedLocations) {
+        const assignedUnit = { ...createBlankPhoto('JB Studio'), locations };
+        assert.equal(isRemovableEmptyPhoto(assignedUnit, 'JB Studio'), false);
+        assert.throws(
+            () => resizeItemPhotos([assignedUnit, { ...assignedUnit }], 1, 'JB Studio'),
+            /只能移除.*沒有照片/
+        );
+    }
+});
+
+test('resizing protects every supported history and pricing field', () => {
+    const protectedPhotos = [
+        { ...createBlankPhoto(), thumbnailUrl: 'https://example.com/thumb.webp' },
+        { ...createBlankPhoto(), originalUrl: 'https://example.com/original.jpg' },
+        { ...createBlankPhoto(), migratedAt: 1 },
+        { ...createBlankPhoto(), soldAt: new Date('2026-01-01') },
+        { ...createBlankPhoto(), soldPrice: 0 },
+        { ...createBlankPhoto(), specificPrice: 0 }
+    ];
+
+    for (const photo of protectedPhotos) {
+        assert.equal(isRemovableEmptyPhoto(photo, 'JB Studio'), false);
+    }
+});
+
+test('invalid quantities fall back to one without mutating source data', () => {
+    const source = [createBlankPhoto('JB Studio'), createBlankPhoto('JB Studio')];
+    const resized = resizeItemPhotos(source, 'not-a-number', 'JB Studio');
+
+    assert.equal(resized.length, 1);
+    assert.equal(source.length, 2);
+});
+
 test('empty available units remain removable', () => {
-    assert.equal(isRemovableEmptyPhoto(createBlankPhoto()), true);
+    assert.equal(isRemovableEmptyPhoto(createBlankPhoto('JB Studio'), 'JB Studio'), true);
+    assert.equal(isRemovableEmptyPhoto(createBlankPhoto('PNG Studio'), 'PNG Studio'), true);
 });

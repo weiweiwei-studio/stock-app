@@ -15,13 +15,16 @@ export function createBlankPhoto(originStudio = 'JB Studio') {
     };
 }
 
-export function isRemovableEmptyPhoto(photo = {}) {
+export function isRemovableEmptyPhoto(photo = {}, originStudio = 'JB Studio') {
     const status = photo.status || 'Available';
+    const locations = Array.isArray(photo.locations) ? photo.locations : [];
+    const isAtOriginStudio = locations.length === 1 && locations[0] === originStudio;
     return !photo.url
         && !photo.thumbnailUrl
         && !photo.originalUrl
         && !photo.migratedAt
         && status === 'Available'
+        && isAtOriginStudio
         && !String(photo.notes || '').trim()
         && (photo.soldPrice === null || photo.soldPrice === undefined || photo.soldPrice === '')
         && !photo.soldAt
@@ -52,11 +55,11 @@ export function resizeItemPhotos(photos, requestedQuantity, originStudio) {
 
     const removableIndexes = [];
     for (let index = nextPhotos.length - 1; index >= 0 && removableIndexes.length < removeCount; index--) {
-        if (isRemovableEmptyPhoto(nextPhotos[index])) removableIndexes.push(index);
+        if (isRemovableEmptyPhoto(nextPhotos[index], originStudio)) removableIndexes.push(index);
     }
 
     if (removableIndexes.length < removeCount) {
-        throw new Error('無法縮減數量：只能移除沒有照片、售出紀錄、備註或獨立定價的空白單品。');
+        throw new Error('無法縮減數量：只能移除位於目前原始工作室，且沒有照片、售出紀錄、備註或獨立定價的空白單品。');
     }
 
     const indexesToRemove = new Set(removableIndexes);
