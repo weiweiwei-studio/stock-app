@@ -407,7 +407,7 @@
                         <p class="mt-1 max-w-2xl text-xs leading-5 text-stone-500">先下載完整 JSON 備份，再以每批10張處理舊照片。原始圖片會保留在 Firebase，資料內也會保存原網址，可隨時分批回復。</p>
                         <p class="mt-1 text-[10px] font-bold text-amber-600">請只在一個裝置執行，處理期間不要關閉分頁。</p>
                     </div>
-                    <button id="image-migration-scan" onclick="window.refreshImageMigrationStatus()" class="rounded border border-stone-200 bg-stone-50 px-3 py-2 text-xs font-bold text-stone-600 hover:bg-stone-100">重新掃描</button>
+                    <button id="image-migration-scan" onclick="window.scanImageMigrationStatus()" class="rounded border border-stone-200 bg-stone-50 px-3 py-2 text-xs font-bold text-stone-600 hover:bg-stone-100 disabled:cursor-wait disabled:opacity-60">重新掃描</button>
                 </div>
                 <div class="mt-4 grid grid-cols-2 gap-2 md:grid-cols-4">
                     <div class="rounded bg-stone-50 p-3"><div class="text-[10px] text-stone-400">照片總數</div><div id="migration-total" class="text-lg font-black text-stone-700">0</div></div>
@@ -2447,7 +2447,7 @@
         function setMigrationControls(running) {
             migrationRunning = running;
             document.getElementById('migration-backup-button').disabled = running;
-            document.getElementById('migration-scan').disabled = running;
+            document.getElementById('image-migration-scan').disabled = running;
             document.getElementById('migration-stop-button').disabled = !running;
             window.refreshImageMigrationStatus();
         }
@@ -2512,6 +2512,27 @@
             }
             document.getElementById('migration-run-button').disabled = migrationRunning || !migrationBackupReady || state.pending.length === 0;
             document.getElementById('migration-rollback-button').disabled = migrationRunning || state.rollback.length === 0;
+        };
+
+        window.scanImageMigrationStatus = async function() {
+            if (migrationRunning) return;
+            const button = document.getElementById('image-migration-scan');
+            const statusEl = document.getElementById('migration-status');
+            button.disabled = true;
+            button.textContent = '掃描中…';
+            statusEl.textContent = '正在重新檢查既有照片資料…';
+
+            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            const state = collectMigrationState(db, normalizePhotos);
+            window.refreshImageMigrationStatus();
+            statusEl.textContent = `掃描完成：${state.pending.length} 張等待優化，${state.optimizedPhotos} 張已有縮圖。`;
+            button.textContent = '掃描完成 ✓';
+            setTimeout(() => {
+                if (!migrationRunning) {
+                    button.textContent = '重新掃描';
+                    button.disabled = false;
+                }
+            }, 1200);
         };
 
         window.downloadImageMigrationBackup = function() {
