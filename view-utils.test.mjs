@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+    filterAllocationItemsByCategory,
     paginate,
     photoMatchesAllocationFilter,
     prepareAllocationPage
@@ -8,6 +9,19 @@ import {
 
 const normalizePhotos = item => item.photos;
 const cleanCategory = value => value;
+
+test('allocation export category filter excludes other inventory', () => {
+    const items = [
+        { itemName: 'Clairo Dress', category: 'Clairo Dress' },
+        { itemName: 'Ari Top', category: 'Ari Top' }
+    ];
+
+    assert.deepEqual(
+        filterAllocationItemsByCategory(items, 'Clairo Dress', cleanCategory),
+        [items[0]]
+    );
+    assert.equal(filterAllocationItemsByCategory(items, 'all', cleanCategory), items);
+});
 
 test('paginate clamps invalid and out-of-range pages', () => {
     const items = Array.from({ length: 52 }, (_, index) => index);

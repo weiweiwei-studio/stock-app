@@ -6,7 +6,7 @@
         import { getRemainingTimeout, mapWithConcurrency } from "./pdf-export-utils.js";
         import { MIGRATION_BATCH_SIZE, collectMigrationState, makeBackupPayload } from "./image-migration-utils.js";
         import { escapeHtml, inlineString, safeImageUrl } from "./security-utils.js";
-        import { DEFAULT_PAGE_SIZE, paginate, prepareAllocationPage } from "./view-utils.js";
+        import { DEFAULT_PAGE_SIZE, filterAllocationItemsByCategory, paginate, prepareAllocationPage } from "./view-utils.js";
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { getFirestore, collection, updateDoc, doc, onSnapshot, runTransaction, serverTimestamp, arrayUnion } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
@@ -2233,14 +2233,21 @@ window.closeImageViewer = function() {
             btn.disabled = true;
 
             const locFilter = document.getElementById('alloc-filter-location').value;
+            const catFilter = document.getElementById('alloc-filter-category').value;
             const displayLocRaw = document.getElementById('alloc-filter-location').options[document.getElementById('alloc-filter-location').selectedIndex]?.text || locFilter;
             const displayLoc = locFilter === 'all' ? '全部地點' : displayLocRaw.replace(/[\(🌐🚚🏠\)]/g, '').trim();
+            const displayCat = catFilter === 'all' ? '全部類別' : catFilter;
 
             let exportData = [];
             let totalQty = 0;
 
             // 1. 篩選與加總特定地點下的單品數據
-            db.filter(i => i.status === 'Ready' || i.status === 'In Studio' || i.status === 'Sold' || i.status === 'Partial Sold').forEach(item => {
+            const exportItems = filterAllocationItemsByCategory(
+                db.filter(i => i.status === 'Ready' || i.status === 'In Studio' || i.status === 'Sold' || i.status === 'Partial Sold'),
+                catFilter,
+                getCleanCategory
+            );
+            exportItems.forEach(item => {
                 const photos = normalizePhotos(item);
                 let locPhotos = [];
 
@@ -2342,7 +2349,7 @@ window.closeImageViewer = function() {
                 <div style="text-align: center; margin-bottom: 25px; border-bottom: 2px solid #78716c; padding-bottom: 15px;">
                     <h2 style="margin: 0; font-size: 24px; font-weight: 800; letter-spacing: 2px; color: #1c1917;">WEIWEIWEI 庫存清單</h2>
                     <div style="margin-top: 12px; display: flex; justify-content: space-between; font-size: 12px; color: #78716c;">
-                        <span>📍 當前位置: <b style="color: #1c1917;">${escapeHtml(displayLoc)}</b></span>
+                        <span>📍 篩選: <b style="color: #1c1917;">${escapeHtml(displayLoc)} · ${escapeHtml(displayCat)}</b></span>
                         <span>📦 總計件數: <b style="color: #b45309; font-size: 14px;">${totalQty} 件</b></span>
                         <span>🕒 盤點時間: ${dateStr}</span>
                     </div>
@@ -2401,7 +2408,7 @@ window.closeImageViewer = function() {
             // 4. 調用 html2pdf 套件進行客戶端高畫質渲染下載
             const opt = {
                 margin:       12,
-                filename:     `Stock_Report_${displayLoc.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.pdf`,
+                filename:     `Stock_Report_${displayLoc.replace(/\s+/g, '_')}_${displayCat.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.pdf`,
                 image:        { type: 'jpeg', quality: 0.98 },
                 html2canvas:  { scale: 2, useCORS: true },
                 jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
