@@ -19,6 +19,8 @@ Maker (例如 Kim, Kelly)：專注於「生產排程」，只能看到與自己�
 
 完工入庫：當狀態改為 Ready 並設定好「入庫地 (JB Studio 或 PNG Studio)」後，該商品就會正式進入庫存看板，交接給理貨人員。
 
+Style SKU 與 Garment ID：新增工單時先選擇既有 Style SKU，例如 Long Wrap Skirt Original 使用 `2BTM005`。系統會為該工單中的每一件實物建立永久 ID，例如 `2BTM005-001`、`2BTM005-002`。舊工單不會被自動批次修改；在編輯舊工單並確認 Style SKU 後，系統才會為該批所有單品（包括 Sold）補上 ID。已建立 Garment ID 的 Style SKU 不能再更改。
+
 三、 庫存與調貨管理 (日常出貨/理貨必看)
 這是系統最靈活的地方，請務必了解「實體地點」與「線上商店」的雙重邏輯。
 

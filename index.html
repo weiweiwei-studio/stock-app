@@ -390,7 +390,7 @@
 
         <section id="view-settings" class="space-y-6 hidden pb-10">
              <div class="bg-white p-6 rounded-lg shadow-sm border border-stone-200"><h2 class="text-xl font-bold text-stone-800">系統設定</h2></div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                 <div class="bg-white p-6 rounded-lg shadow-sm"><h3 class="font-bold text-stone-700 mb-2">製作人</h3><div id="settings-makers-list" class="flex flex-wrap gap-1 mb-2"></div><div class="flex gap-2"><input id="new-maker-input" placeholder="新增..." class="flex-1 border text-sm rounded px-2"><button onclick="window.addSetting('makers')" class="bg-stone-800 text-white px-2 rounded">+</button></div></div>
                 <div class="bg-white p-6 rounded-lg shadow-sm">
                     <h3 class="font-bold text-stone-700 mb-2">地點與Stockists</h3>
@@ -398,7 +398,16 @@
                     <div class="flex gap-2"><input id="new-location-input" placeholder="新增地點..." class="flex-1 border text-sm rounded px-2"><button onclick="window.addSetting('locations')" class="bg-stone-800 text-white px-2 rounded">+</button></div>
                     <p class="text-[9px] text-red-500 mt-2 font-bold">* JB Studio / PNG Studio / Online 為核心系統地點，不可刪除。</p>
                 </div>
-                 <div class="bg-white p-6 rounded-lg shadow-sm"><h3 class="font-bold text-stone-700 mb-2">類別</h3><div id="settings-categories-list" class="flex flex-wrap gap-1 mb-2"></div><div class="flex gap-2"><input id="new-category-input" placeholder="新增類別..." class="flex-1 border text-sm rounded px-2"><button onclick="window.addSetting('categories')" class="bg-stone-800 text-white px-2 rounded">+</button></div></div>
+                <div class="bg-white p-6 rounded-lg shadow-sm"><h3 class="font-bold text-stone-700 mb-2">類別</h3><div id="settings-categories-list" class="flex flex-wrap gap-1 mb-2"></div><div class="flex gap-2"><input id="new-category-input" placeholder="新增類別..." class="flex-1 border text-sm rounded px-2"><button onclick="window.addSetting('categories')" class="bg-stone-800 text-white px-2 rounded">+</button></div></div>
+                <div class="bg-white p-6 rounded-lg shadow-sm">
+                    <h3 class="font-bold text-stone-700 mb-2">Style SKU</h3>
+                    <div id="settings-styleSkus-list" class="max-h-40 overflow-y-auto flex flex-wrap gap-1 mb-2"></div>
+                    <div class="grid grid-cols-1 gap-2">
+                        <input id="new-style-sku-input" placeholder="例如 2BTM005" class="border text-sm rounded px-2 py-1.5 font-mono uppercase">
+                        <input id="new-style-sku-name-input" placeholder="例如 Long Wrap Skirt - ori" class="border text-sm rounded px-2 py-1.5">
+                        <button onclick="window.addStyleSku()" class="bg-stone-800 text-white px-2 py-1.5 rounded text-sm">新增 SKU</button>
+                    </div>
+                </div>
             </div>
             <div class="hidden bg-white p-6 rounded-lg shadow-sm border border-stone-200" aria-hidden="true">
                 <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -452,6 +461,11 @@
                     <select name="category" class="border p-2 rounded text-sm dynamic-category-select"></select>
                     <select name="maker" class="border p-2 rounded text-sm dynamic-maker-select"></select>
                 </div>
+                <div>
+                    <label class="block text-xs font-medium text-stone-500 mb-1">Style SKU</label>
+                    <select name="styleSku" required class="w-full border p-2 rounded text-sm bg-white font-mono dynamic-style-sku-select"></select>
+                    <p class="mt-1 text-[9px] text-stone-400">每件會自動取得例如 2BTM005-001 的永久 Garment ID。</p>
+                </div>
                  <div class="grid grid-cols-2 gap-4">
                     <input type="text" name="color" class="border p-2 rounded text-sm" placeholder="顏色">
                     <select name="size" class="border p-2 rounded text-sm bg-white"><option value="F">F</option><option value="S">S</option><option value="M">M</option><option value="L">L</option></select>
@@ -496,6 +510,11 @@
                 <div>
                     <label class="text-xs text-stone-500">品名</label>
                     <input type="text" id="edit-itemName" class="w-full border p-2 rounded text-sm">
+                </div>
+                <div>
+                    <label class="text-xs text-stone-500">Style SKU</label>
+                    <select id="edit-styleSku" class="w-full border p-2 rounded text-sm bg-white font-mono dynamic-style-sku-select"></select>
+                    <p id="edit-styleSku-help" class="mt-1 text-[9px] text-stone-400"></p>
                 </div>
                 <div class="grid grid-cols-2 gap-2">
                     <div>

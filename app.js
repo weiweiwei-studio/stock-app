@@ -2,12 +2,13 @@
         import { assertVersion, deriveItemStatus, getVersion, nextVersion } from "./data-integrity.js";
         import { optimizeImage } from "./image-utils.js";
         import { reconcileNewItemPhotos, resizeItemPhotos } from "./inventory-utils.js";
+        import { DEFAULT_STYLE_SKUS, assignMissingGarmentIds, hasGarmentIds, normalizeStyleSku, normalizeStyleSkuCatalog } from "./sku-utils.js";
         import { MIGRATION_BATCH_SIZE, collectMigrationState, makeBackupPayload } from "./image-migration-utils.js";
         import { escapeHtml, inlineString, safeImageUrl } from "./security-utils.js";
         import { DEFAULT_PAGE_SIZE, paginate, prepareAllocationPage } from "./view-utils.js";
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, updateDoc, doc, onSnapshot, runTransaction, serverTimestamp, arrayUnion } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, updateDoc, doc, onSnapshot, runTransaction, serverTimestamp, arrayUnion } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
         const firebaseConfig = {
@@ -45,6 +46,7 @@
             makers: ['Kim', 'Kelly', 'Lijin'], 
             locations: ['JB Studio', 'PNG Studio', 'Online', 'Bev C', 'Fifth', 'Tamara Malas', 'Pop Up', 'Snub', 'Loan', 'Hahhah Store'], 
             categories: ['Top', 'Dress', 'Pants'], 
+            styleSkus: DEFAULT_STYLE_SKUS,
             weekly_goals: {} 
         };
         let currentDetailItem = null, currentDetailPhotoIdx = -1, tempLocations = []; 
@@ -207,6 +209,7 @@
                         makers: data.makers || appSettings.makers,
                         locations: fetchedLocations,
                         categories: data.categories || appSettings.categories,
+                        styleSkus: normalizeStyleSkuCatalog(data.styleSkus || appSettings.styleSkus),
                         weekly_goals: data.weekly_goals || {} 
                     };
                 }
@@ -341,6 +344,7 @@
                 locs = finalLocs;
                 
                 return {
+                    garmentId: String(p.garmentId || '').trim().toUpperCase(),
                     url: p.url || '',
                     thumbnailUrl: p.thumbnailUrl || '',
                     originalUrl: p.originalUrl || '',
@@ -1019,7 +1023,7 @@
                 if(item.status === 'Making') statusColor = 'bg-amber-100 text-amber-700';
                 if(item.status === 'QC') statusColor = 'bg-purple-100 text-purple-700';
                 if(item.status === 'Ready') statusColor = 'bg-emerald-100 text-emerald-700';
-                tr.innerHTML = `<td class="px-6 py-4 font-mono text-xs text-stone-500">${escapeHtml(item.month)}</td><td class="px-6 py-4">${reelHTML}</td><td class="px-6 py-4"><div class="font-medium text-stone-800">${escapeHtml(item.itemName)}</div><div class="text-xs text-stone-400">${escapeHtml(item.color||'-')} ${escapeHtml(item.size||'-')}</div></td><td class="px-6 py-4">${escapeHtml(item.quantity)}</td><td class="px-6 py-4 text-xs">${escapeHtml(item.maker)}</td><td class="px-6 py-4"><span class="px-2 py-1 rounded-full text-xs font-bold ${statusColor}">${escapeHtml(item.status)}</span></td><td class="px-6 py-4 text-xs text-stone-600 font-bold">${item.price ? 'RM'+escapeHtml(item.price) : '-'}</td><td class="px-6 py-4"><button onclick="window.openEditModal(${inlineString(item.id)})" class="text-stone-400 hover:text-stone-800 border p-1 rounded shadow-sm"><i data-lucide="settings-2" class="w-4 h-4"></i></button></td>`;
+                tr.innerHTML = `<td class="px-6 py-4 font-mono text-xs text-stone-500">${escapeHtml(item.month)}</td><td class="px-6 py-4">${reelHTML}</td><td class="px-6 py-4"><div class="font-medium text-stone-800">${escapeHtml(item.itemName)}</div><div class="font-mono text-[10px] text-stone-500">${escapeHtml(item.styleSku || '尚未編號')}</div><div class="text-xs text-stone-400">${escapeHtml(item.color||'-')} ${escapeHtml(item.size||'-')}</div></td><td class="px-6 py-4">${escapeHtml(item.quantity)}</td><td class="px-6 py-4 text-xs">${escapeHtml(item.maker)}</td><td class="px-6 py-4"><span class="px-2 py-1 rounded-full text-xs font-bold ${statusColor}">${escapeHtml(item.status)}</span></td><td class="px-6 py-4 text-xs text-stone-600 font-bold">${item.price ? 'RM'+escapeHtml(item.price) : '-'}</td><td class="px-6 py-4"><button onclick="window.openEditModal(${inlineString(item.id)})" class="text-stone-400 hover:text-stone-800 border p-1 rounded shadow-sm"><i data-lucide="settings-2" class="w-4 h-4"></i></button></td>`;
                 fragment.appendChild(tr);
             });
             tbody.replaceChildren(fragment);
@@ -1386,6 +1390,7 @@
                         ${imgHTML}
                         <div class="p-2 flex flex-col flex-grow">
                             <div class="font-bold text-stone-800 text-xs truncate" title="${escapeHtml(item.itemName)}">${escapeHtml(item.itemName)}</div>
+                            <div class="font-mono text-[9px] font-bold text-stone-600 truncate">${escapeHtml(p.garmentId || item.styleSku || '尚未編號')}</div>
                             <div class="text-[10px] text-stone-500">${escapeHtml(cleanCat)} | ${escapeHtml(item.color || '-')}</div>
                             <div class="flex-grow">
                                 ${cardBadgeHTML}
@@ -1416,7 +1421,9 @@
             if(detailImageUrl) { imgEl.src = detailImageUrl; imgEl.classList.remove('hidden'); } else { imgEl.classList.add('hidden'); }
             
             document.getElementById('detail-title').innerText = currentDetailItem.itemName;
-            document.getElementById('detail-sku').innerText = `${getCleanCategory(currentDetailItem.category)} / ${currentDetailItem.color}`;
+            document.getElementById('detail-sku').innerText = p.garmentId
+                ? `${p.garmentId} · ${getCleanCategory(currentDetailItem.category)} / ${currentDetailItem.color || '-'}`
+                : `${currentDetailItem.styleSku || '尚未編號'} · ${getCleanCategory(currentDetailItem.category)} / ${currentDetailItem.color || '-'}`;
             
             let basePrice = currentDetailItem.price || '';
             let displaySpecPrice = p.specificPrice !== undefined && p.specificPrice !== null ? p.specificPrice : basePrice;
@@ -1559,6 +1566,14 @@
             }
         }
         window.closeDetailModal = () => document.getElementById('detail-modal').classList.add('hidden');
+
+        function allocateGarmentIdsFromCounter(counterData, photos, styleSku) {
+            const sku = normalizeStyleSku(styleSku);
+            const counters = { ...(counterData?.counters || {}) };
+            const allocation = assignMissingGarmentIds(photos, sku, Number(counters[sku]) || 0);
+            counters[sku] = allocation.nextCounter;
+            return { ...allocation, counters, styleSku: sku };
+        }
         
         window.handleAddItem = async function(e) { 
             e.preventDefault(); 
@@ -1579,24 +1594,34 @@
                     } 
                 } 
                 photoObjs = reconcileNewItemPhotos(photoObjs, form.get('quantity'), originStudio);
-                const cleanCat = getCleanCategory(form.get('category')); 
-                await addDoc(collection(dbFirestore, "stock_items"), { 
-                    month: form.get('month'), 
-                    itemName: form.get('itemName'), 
-                    category: cleanCat, 
-                    maker: form.get('maker'), 
-                    color: form.get('color'), 
-                    size: form.get('size'), 
-                    originStudio: originStudio, 
-                    quantity: photoObjs.length, 
-                    cost: 0, 
-                    price: form.get('price'), 
-                    status: 'To Make', 
-                    photos: photoObjs, 
-                    _version: 1,
-                    updatedAt: serverTimestamp(),
-                    createdAt: serverTimestamp() 
-                }); 
+                const cleanCat = getCleanCategory(form.get('category'));
+                const styleSku = normalizeStyleSku(form.get('styleSku'));
+                const itemRef = doc(collection(dbFirestore, "stock_items"));
+                const counterRef = doc(dbFirestore, "settings", "garment_counters");
+
+                await runTransaction(dbFirestore, async transaction => {
+                    const counterSnapshot = await transaction.get(counterRef);
+                    const allocation = allocateGarmentIdsFromCounter(counterSnapshot.exists() ? counterSnapshot.data() : {}, photoObjs, styleSku);
+                    transaction.set(counterRef, { counters: allocation.counters, updatedAt: serverTimestamp() }, { merge: true });
+                    transaction.set(itemRef, {
+                        month: form.get('month'),
+                        itemName: form.get('itemName'),
+                        styleSku: allocation.styleSku,
+                        category: cleanCat,
+                        maker: form.get('maker'),
+                        color: form.get('color'),
+                        size: form.get('size'),
+                        originStudio: originStudio,
+                        quantity: allocation.photos.length,
+                        cost: 0,
+                        price: form.get('price'),
+                        status: 'To Make',
+                        photos: allocation.photos,
+                        _version: 1,
+                        updatedAt: serverTimestamp(),
+                        createdAt: serverTimestamp()
+                    });
+                });
                 window.closeModal(); 
                 e.target.reset(); 
             } catch (error) { console.error(error); alert("Error: " + error.message); } finally { btn.innerText = '確認新增'; btn.disabled = false; } 
@@ -1608,6 +1633,12 @@
             editBaseVersion = getVersion(item);
             document.getElementById('edit-id').value = id; 
             document.getElementById('edit-itemName').value = item.itemName; 
+            const editStyleSku = document.getElementById('edit-styleSku');
+            editStyleSku.value = normalizeStyleSku(item.styleSku);
+            editStyleSku.disabled = hasGarmentIds(normalizePhotos(item));
+            document.getElementById('edit-styleSku-help').innerText = editStyleSku.disabled
+                ? '已建立 Garment ID，Style SKU 已鎖定。'
+                : '舊工單可先留空；選定後會為每件（包括 Sold）建立永久 ID。';
             document.getElementById('edit-month').value = item.month; 
             document.getElementById('edit-status').value = item.status; 
             document.getElementById('edit-maker').value = item.maker || ''; 
@@ -1667,6 +1698,7 @@
                 const cDateVal = document.getElementById('edit-completedDate').value; 
                 const newOriginStudio = document.getElementById('edit-originStudio').value;
                 const newQty = parseInt(document.getElementById('edit-quantity').value) || 1;
+                const requestedStyleSku = normalizeStyleSku(document.getElementById('edit-styleSku').value);
                 
                 let data = { 
                     status: document.getElementById('edit-status').value, 
@@ -1677,6 +1709,7 @@
                     month: document.getElementById('edit-month').value, 
                     price: document.getElementById('edit-price').value 
                 }; 
+                if (requestedStyleSku) data.styleSku = requestedStyleSku;
                 
                 data.makingAt = sDateVal ? new Date(sDateVal.replace(/-/g, '/')) : null;
                 data.completedAt = cDateVal ? new Date(cDateVal.replace(/-/g, '/')) : null;
@@ -1731,11 +1764,32 @@
                 }
 
                 const itemRef = doc(dbFirestore, "stock_items", id);
+                const counterRef = doc(dbFirestore, "settings", "garment_counters");
                 await runTransaction(dbFirestore, async transaction => {
                     const snapshot = await transaction.get(itemRef);
                     if (!snapshot.exists()) throw new Error('找不到此工單，可能已被刪除。');
                     const latestItem = snapshot.data();
                     assertVersion(latestItem, editBaseVersion);
+
+                    const latestPhotos = normalizePhotos(latestItem);
+                    const lockedStyleSku = normalizeStyleSku(latestItem.styleSku);
+                    if (hasGarmentIds(latestPhotos) && requestedStyleSku !== lockedStyleSku) {
+                        throw new Error('此工單已有 Garment ID，Style SKU 不可更改。');
+                    }
+
+                    if (requestedStyleSku && existingPhotos.some(photo => !photo.garmentId)) {
+                        const counterSnapshot = await transaction.get(counterRef);
+                        const allocation = allocateGarmentIdsFromCounter(
+                            counterSnapshot.exists() ? counterSnapshot.data() : {},
+                            existingPhotos,
+                            requestedStyleSku
+                        );
+                        existingPhotos = allocation.photos;
+                        data.photos = existingPhotos;
+                        data.quantity = existingPhotos.length;
+                        transaction.set(counterRef, { counters: allocation.counters, updatedAt: serverTimestamp() }, { merge: true });
+                    }
+
                     transaction.update(itemRef, {
                         ...data,
                         _version: nextVersion(latestItem),
@@ -1973,10 +2027,54 @@
             document.getElementById('settings-makers-list').innerHTML = render('makers'); 
             document.getElementById('settings-locations-list').innerHTML = render('locations'); 
             document.getElementById('settings-categories-list').innerHTML = render('categories'); 
+            document.getElementById('settings-styleSkus-list').innerHTML = normalizeStyleSkuCatalog(appSettings.styleSkus)
+                .map(entry => `<span class="bg-stone-100 px-2 py-1 rounded text-[10px] mr-1 mb-1 inline-block border cursor-pointer hover:bg-red-50 hover:text-red-500" onclick="window.removeStyleSku(${inlineString(entry.sku)})"><b class="font-mono">${escapeHtml(entry.sku)}</b>${entry.name ? ` · ${escapeHtml(entry.name)}` : ''} &times;</span>`)
+                .join('');
             window.refreshImageMigrationStatus();
         };
         
         window.addSetting = async function(type) { const map = {'makers':'new-maker-input', 'locations':'new-location-input', 'categories':'new-category-input'}; let val = document.getElementById(map[type]).value; if (type === 'categories') val = getCleanCategory(val); else val = val.trim(); if(val) { await updateDoc(doc(dbFirestore, "settings", "config"), { [type]: arrayUnion(val) }); document.getElementById(map[type]).value = ''; } };
+        window.addStyleSku = async function() {
+            const skuInput = document.getElementById('new-style-sku-input');
+            const nameInput = document.getElementById('new-style-sku-name-input');
+            const sku = normalizeStyleSku(skuInput.value);
+            const name = nameInput.value.trim();
+            if (!sku || !name) {
+                alert('請輸入 Style SKU 和商品名稱。');
+                return;
+            }
+            if (normalizeStyleSkuCatalog(appSettings.styleSkus).some(entry => entry.sku === sku)) {
+                alert(`Style SKU ${sku} 已存在。`);
+                return;
+            }
+            const settingsRef = doc(dbFirestore, "settings", "config");
+            await runTransaction(dbFirestore, async transaction => {
+                const snapshot = await transaction.get(settingsRef);
+                if (!snapshot.exists()) throw new Error('找不到系統設定。');
+                const latestValues = normalizeStyleSkuCatalog(snapshot.data().styleSkus || appSettings.styleSkus);
+                if (latestValues.some(entry => entry.sku === sku)) throw new Error(`Style SKU ${sku} 已存在。`);
+                transaction.update(settingsRef, { styleSkus: normalizeStyleSkuCatalog([...latestValues, { sku, name }]) });
+            });
+            skuInput.value = '';
+            nameInput.value = '';
+        };
+
+        window.removeStyleSku = async function(sku) {
+            const normalizedSku = normalizeStyleSku(sku);
+            if (db.some(item => normalizeStyleSku(item.styleSku) === normalizedSku)) {
+                alert(`Style SKU ${normalizedSku} 已被工單使用，不能刪除。`);
+                return;
+            }
+            if (!confirm(`確定要刪除 ${normalizedSku}?`)) return;
+            const settingsRef = doc(dbFirestore, "settings", "config");
+            await runTransaction(dbFirestore, async transaction => {
+                const snapshot = await transaction.get(settingsRef);
+                if (!snapshot.exists()) throw new Error('找不到系統設定。');
+                const latestValues = normalizeStyleSkuCatalog(snapshot.data().styleSkus || appSettings.styleSkus);
+                transaction.update(settingsRef, { styleSkus: latestValues.filter(entry => entry.sku !== normalizedSku) });
+            });
+        };
+
         window.removeSetting = async function(type, val) { 
             if (type === 'locations' && ['JB Studio', 'PNG Studio', 'Online'].includes(val)) {
                 alert("此為系統預設核心地點，為保證運作正常，無法被刪除！");
@@ -1998,10 +2096,15 @@
         window.updateDropdowns = function() { 
             const distinctMakers = [...new Set([...appSettings.makers, ...db.map(i => i.maker)])].filter(Boolean).sort(); 
             const distinctCategories = [...new Set([...appSettings.categories.map(c => getCleanCategory(c)), ...db.map(i => getCleanCategory(i.category))])].filter(Boolean).sort(); 
+            const distinctStyleSkus = normalizeStyleSkuCatalog([
+                ...appSettings.styleSkus,
+                ...db.filter(item => item.styleSku).map(item => ({ sku: item.styleSku, name: item.itemName || '' }))
+            ]);
             const nextSignature = JSON.stringify({
                 makers: distinctMakers,
                 categories: distinctCategories,
-                locations: appSettings.locations
+                locations: appSettings.locations,
+                styleSkus: distinctStyleSkus
             });
             if (nextSignature === dropdownSignature) return;
             dropdownSignature = nextSignature;
@@ -2047,6 +2150,13 @@
             
             fill('.dynamic-maker-select', distinctMakers); 
             fill('.dynamic-category-select', distinctCategories); 
+            document.querySelectorAll('.dynamic-style-sku-select').forEach(select => {
+                const old = normalizeStyleSku(select.value);
+                select.innerHTML = '<option value="">選擇 Style SKU</option>' + distinctStyleSkus
+                    .map(entry => `<option value="${escapeHtml(entry.sku)}">${escapeHtml(entry.sku)}${entry.name ? ` — ${escapeHtml(entry.name)}` : ''}</option>`)
+                    .join('');
+                if (distinctStyleSkus.some(entry => entry.sku === old)) select.value = old;
+            });
         };
         
         window.switchView = (v) => {
@@ -2124,6 +2234,7 @@ window.closeImageViewer = function() {
                         dateStr: recordDate,
                         category: getCleanCategory(item.category),
                         itemName: item.itemName,
+                        garmentIds: locPhotos.map(photo => photo.garmentId || item.styleSku || '尚未編號'),
                         color: item.color || '-',
                         size: item.size || '-',
                         price: item.price ? `RM ${item.price}` : '-',
@@ -2218,7 +2329,7 @@ window.closeImageViewer = function() {
                         <td style="padding: 8px 5px; vertical-align: middle;">${imgHtml}</td>
                         <td style="padding: 8px 5px; color: #78716c; vertical-align: middle; font-family: monospace; font-size: 10px;">${escapeHtml(row.dateStr)}</td>
                         <td style="padding: 8px 5px; color: #78716c; vertical-align: middle;">${escapeHtml(row.category)}</td>
-                        <td style="padding: 8px 5px; font-weight: 700; color: #1c1917; vertical-align: middle;">${escapeHtml(row.itemName)}</td>
+                        <td style="padding: 8px 5px; font-weight: 700; color: #1c1917; vertical-align: middle;">${escapeHtml(row.itemName)}<div style="margin-top: 3px; font-family: monospace; font-size: 9px; font-weight: 500; color: #78716c;">${escapeHtml(row.garmentIds.join(', '))}</div></td>
                         <td style="padding: 8px 5px; color: #57534e; vertical-align: middle;">${escapeHtml(row.color)} / ${escapeHtml(row.size)}</td>
                         <td style="padding: 8px 5px; text-align: right; color: #44403c; vertical-align: middle;">${escapeHtml(row.price)}</td>
                         <td style="padding: 8px 5px; text-align: center; font-weight: 800; font-size: 13px; color: #1c1917; vertical-align: middle;">${row.qty}</td>
