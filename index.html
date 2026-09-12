@@ -676,6 +676,7 @@
                         <h3 class="text-lg font-bold text-stone-800 leading-tight" id="detail-title">Name</h3>
                         <p class="text-xs text-stone-500 mt-1" id="detail-sku">SKU</p>
                         <p class="text-sm font-bold text-stone-700 mt-1" id="detail-price-display">Price: -</p>
+                        <p class="hidden mt-1 text-[10px] text-stone-500" id="detail-sale-meta"></p>
                     </div>
                     <button onclick="window.closeDetailModal()" class="text-stone-400 hover:text-stone-800 text-2xl transition">&times;</button>
                 </div>
@@ -725,24 +726,37 @@
 
     <div id="sold-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden z-[70] flex items-center justify-center p-4">
         <div class="bg-white rounded-lg shadow-xl max-w-xs w-full p-6">
-            <h3 class="text-lg font-bold text-stone-800 mb-2">確認售出價格</h3>
-            <p class="text-xs text-stone-500 mb-4">請輸入最終成交金額與日期</p>
+            <h3 class="text-lg font-bold text-stone-800 mb-2">Singapore Popup 售出</h3>
+            <p class="text-xs text-stone-500 mb-4">记录 SGD 成交价、付款方式与售出日期</p>
             <div class="space-y-4">
                 <div>
-                    <label class="text-xs font-bold text-stone-700">成交價 (RM)</label>
-                    <input type="number" id="sold-price-input" class="w-full border p-2 rounded text-lg font-bold text-stone-800 focus:border-stone-500 outline-none transition">
+                    <label class="text-xs font-bold text-stone-700">成交价 (SGD)</label>
+                    <div class="flex items-center rounded border border-stone-300 bg-white focus-within:border-stone-500">
+                        <span class="pl-3 text-sm font-bold text-stone-500">SGD</span>
+                        <input type="number" id="sold-price-input" min="0" step="0.01" inputmode="decimal" required class="w-full p-2 text-lg font-bold text-stone-800 outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-stone-700">付款方式</label>
+                    <select id="sold-payment-method" required class="w-full border border-stone-300 p-2 rounded text-sm text-stone-700 bg-white outline-none focus:border-stone-500">
+                        <option value="">请选择</option>
+                        <option value="PayNow">PayNow</option>
+                        <option value="Card">Card</option>
+                        <option value="Cash">Cash</option>
+                        <option value="Other">Other</option>
+                    </select>
                 </div>
                 <div>
                     <label class="text-xs font-bold text-stone-700">售出日期 (Sold Date)</label>
                     <input type="date" id="sold-date-input" class="w-full border p-2 rounded text-sm text-stone-600 outline-none transition">
                 </div>
                 <div>
-                    <label class="text-xs text-stone-500">備註 (折扣原因等)</label>
-                    <input type="text" id="sold-note-input" placeholder="例: VIP 9折" class="w-full border p-2 rounded text-sm outline-none transition">
+                    <label class="text-xs text-stone-500">Sales Note（选填）</label>
+                    <input type="text" id="sold-note-input" placeholder="例：折扣、组合购买" class="w-full border p-2 rounded text-sm outline-none transition">
                 </div>
                 <div class="flex gap-2 justify-end mt-4">
                     <button onclick="document.getElementById('sold-modal').classList.add('hidden')" class="px-4 py-2 text-sm text-stone-500 hover:bg-stone-50 rounded transition-colors">取消</button>
-                    <button onclick="window.confirmSoldAction()" class="bg-stone-800 hover:bg-stone-900 text-white px-4 py-2 rounded text-sm font-bold shadow-sm transition-colors">確認售出</button>
+                    <button id="btn-confirm-sold" onclick="window.confirmSoldAction()" class="min-h-[44px] bg-stone-800 hover:bg-stone-900 text-white px-4 py-2 rounded text-sm font-bold shadow-sm transition-colors disabled:cursor-wait disabled:opacity-60">确认售出</button>
                 </div>
             </div>
         </div>
