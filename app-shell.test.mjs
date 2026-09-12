@@ -144,17 +144,20 @@ test('archived work orders expose escaped read-only details before restore', () 
 });
 
 test('popup sales capture SGD price, payment, date, location and note without changing legacy MYR', () => {
+    assert.match(html, /id=["']popup-sale-mode["']/);
     assert.match(html, /id=["']sold-payment-method["']/);
     assert.match(html, /成交价 \(SGD\)/);
-    assert.match(app, /soldCurrency:\s*['"]SGD['"]/);
+    assert.match(app, /soldCurrency:\s*isPopupSale \? ['"]SGD['"] : ['"]MYR['"]/);
     assert.match(app, /paymentMethod,/);
-    assert.match(app, /salesChannel:\s*POPUP_SALES_CHANNEL/);
-    assert.match(app, /saleEvent:\s*POPUP_SALES_EVENT/);
-    assert.match(app, /soldLocation:\s*getPopupSoldLocation\(tempLocations\)/);
-    assert.match(app, /salesNote:\s*noteInput\.value\.trim\(\)/);
-    assert.match(app, /button\.disabled = true;[\s\S]*?await updateItemStatus\(patch, '', true\)/);
+    assert.match(app, /salesChannel:\s*isPopupSale \? POPUP_SALES_CHANNEL : null/);
+    assert.match(app, /saleEvent:\s*isPopupSale \? POPUP_SALES_EVENT : null/);
+    assert.match(app, /soldLocation:\s*isPopupSale \? getPopupSoldLocation\(tempLocations\) : null/);
+    assert.match(app, /salesNote:\s*isPopupSale \? noteInput\.value\.trim\(\) : ['"]/);
+    assert.match(app, /button\.disabled = true;[\s\S]*?await updateItemStatus\(patch, isPopupSale \? '' : noteInput\.value\.trim\(\), true\)/);
     assert.match(app, /preventDuplicateSale && latestPhoto\.status === ['"]Sold['"]/);
     assert.match(app, /soldCurrency:\s*p\.soldCurrency \|\| null/);
     assert.match(app, /getSoldCurrency\(p\) !== ['"]MYR['"]\) return/);
     assert.match(html, /id=["']detail-sale-meta["']/);
+    assert.match(app, /checked = hasSingaporePopupLocation\(tempLocations\)/);
+    assert.match(app, /isPopupSale \? '' : noteInput\.value\.trim\(\)/);
 });
