@@ -2,13 +2,13 @@
         import { assertVersion, deriveItemStatus, getVersion, nextVersion } from "./data-integrity.js";
         import { optimizeImage } from "./image-utils.js";
         import { reconcileNewItemPhotos, resizeItemPhotos } from "./inventory-utils.js";
-        import { DEFAULT_STYLE_SKUS, assignMissingGarmentIds, hasGarmentIds, normalizeStyleSku, normalizeStyleSkuCatalog } from "./sku-utils.js";
+        import { DEFAULT_STYLE_SKUS, assignMissingGarmentIds, hasGarmentIds, normalizeStyleSku, normalizeStyleSkuCatalog, normalizeStyleSkuCategory } from "./sku-utils.js";
         import { buildLegacySkuPlan, garmentIdsMatchSku, makeSkuMigrationBackup } from "./sku-migration-utils.js";
         import { GARMENT_ID_MIGRATION_BATCH_SIZE, assignLegacyGarmentIds, buildGarmentIdMigrationPlan, makeGarmentIdMigrationBackup } from "./garment-id-migration-utils.js";
         import { getRemainingTimeout, mapWithConcurrency } from "./pdf-export-utils.js";
         import { MIGRATION_BATCH_SIZE, collectMigrationState, makeBackupPayload } from "./image-migration-utils.js";
         import { escapeHtml, inlineString, safeImageUrl } from "./security-utils.js";
-        import { DEFAULT_PAGE_SIZE, filterAllocationItemsByCategory, filterAllocationItemsByStyleSku, paginate, prepareAllocationPage } from "./view-utils.js";
+        import { DEFAULT_PAGE_SIZE, buildPaginationItems, filterAllocationItemsByCategory, filterAllocationItemsByStyleSku, normalizeGarmentIdSearch, paginate, photoMatchesGarmentSearch, prepareAllocationPage } from "./view-utils.js";
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { getFirestore, collection, updateDoc, doc, onSnapshot, runTransaction, serverTimestamp, arrayUnion } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
@@ -39,6 +39,7 @@
         const PAGE_SIZE = DEFAULT_PAGE_SIZE;
         let productionPage = 1;
         let allocationPage = 1;
+        let garmentSearchTimer = null;
         const stockItemsById = new Map();
         let dropdownSignature = '';
         const dirtyViews = new Set(['dashboard', 'production', 'allocation', 'settings']);
@@ -422,6 +423,22 @@
             return str.charAt(0).toUpperCase() + str.slice(1);
         }
 
+        function categoryLabel(category) {
+            return normalizeStyleSkuCategory(category)
+                .split('-')
+                .filter(Boolean)
+                .map(word => word.charAt(0) + word.slice(1).toLowerCase())
+                .join(' ');
+        }
+
+        function getCatalogContext() {
+            const catalog = normalizeStyleSkuCatalog(appSettings.styleSkus);
+            const bySku = new Map(catalog.map(entry => [entry.sku, entry]));
+            const categories = [...new Set(catalog.map(entry => entry.category).filter(Boolean))].sort();
+            const resolveCategory = item => bySku.get(normalizeStyleSku(item.styleSku))?.category || 'legacy';
+            return { catalog, bySku, categories, resolveCategory };
+        }
+
         function getStatusColorClass(status) {
             switch(status) {
                 case 'Pending': return 'status-pending';
@@ -599,10 +616,11 @@
             let locStats = {};
             appSettings.locations.forEach(l => locStats[l] = 0);
             locStats['Unallocated'] = 0;
+            const { resolveCategory } = getCatalogContext();
             
             db.forEach(item => {
-                const cleanCat = getCleanCategory(item.category);
-                if (selectedCat !== 'all' && cleanCat !== selectedCat) return;
+                const itemCategory = resolveCategory(item);
+                if (selectedCat !== 'all' && itemCategory !== selectedCat) return;
                 
                 const photos = normalizePhotos(item);
                 photos.forEach(p => {
@@ -1000,13 +1018,16 @@
             const tbody = document.getElementById('production-table-body');
             const makerFilter = document.getElementById('prod-filter-maker').value;
             const catFilter = document.getElementById('prod-filter-category').value;
+            const styleSkuFilter = document.getElementById('prod-filter-style-sku').value;
             const statusFilter = document.getElementById('prod-filter-status').value;
             
             const fragment = document.createDocumentFragment();
             let data = db;
+            const { resolveCategory } = getCatalogContext();
             
             if (makerFilter !== 'all') data = data.filter(i => i.maker === makerFilter);
-            if (catFilter !== 'all') data = data.filter(i => getCleanCategory(i.category) === catFilter);
+            if (catFilter !== 'all') data = data.filter(i => resolveCategory(i) === catFilter);
+            if (styleSkuFilter !== 'all') data = data.filter(i => normalizeStyleSku(i.styleSku) === normalizeStyleSku(styleSkuFilter));
             if (statusFilter !== 'all') data = data.filter(i => i.status === statusFilter);
 
             const page = paginate(data, productionPage, PAGE_SIZE);
@@ -1056,22 +1077,28 @@
             const locFilter = document.getElementById('alloc-filter-location').value;
             const catFilter = document.getElementById('alloc-filter-category').value;
             const styleSkuFilter = document.getElementById('alloc-filter-style-sku').value;
+            const garmentIdSearch = normalizeGarmentIdSearch(document.getElementById('allocation-garment-search').value);
             const fragment = document.createDocumentFragment();
+            const { resolveCategory } = getCatalogContext();
 
             const page = prepareAllocationPage({
                 items: db,
                 categoryFilter: catFilter,
                 styleSkuFilter,
+                garmentIdSearch,
                 locationFilter: locFilter,
                 requestedPage: allocationPage,
                 normalizePhotos,
-                cleanCategory: getCleanCategory,
+                resolveCategory,
                 normalizeSku: normalizeStyleSku,
                 pageSize: PAGE_SIZE
             });
             allocationPage = page.currentPage;
             const pageItems = page.items;
             const totalMatchingPieces = page.totalMatchingPieces;
+            document.getElementById('allocation-search-status').textContent = garmentIdSearch
+                ? `找到 ${totalMatchingPieces} 件符合「${garmentIdSearch}」的商品；编号搜索会暂时忽略其他筛选。`
+                : '';
 
             pageItems.forEach(item => {
                 const photos = normalizePhotos(item);
@@ -1089,14 +1116,15 @@
                     mappedPhotos.sort((a, b) => window.getPhotoRank(a.p) - window.getPhotoRank(b.p));
 
                     mappedPhotos.forEach(({p, idx}) => {
+                        if (garmentIdSearch && !photoMatchesGarmentSearch(p, garmentIdSearch)) return;
                         const isOnline = p.locations.some(l => l.toUpperCase() === 'ONLINE');
                         
-                        if (locFilter !== 'all' && locFilter !== 'Sold' && locFilter !== 'Unallocated') {
+                        if (!garmentIdSearch && locFilter !== 'all' && locFilter !== 'Sold' && locFilter !== 'Unallocated') {
                             if (!p.locations.includes(locFilter)) return; 
                         }
                         
-                        if (locFilter === 'Sold' && p.status !== 'Sold') return;
-                        if (locFilter === 'Unallocated' && (p.status === 'Sold' || p.locations.length > 0)) return;
+                        if (!garmentIdSearch && locFilter === 'Sold' && p.status !== 'Sold') return;
+                        if (!garmentIdSearch && locFilter === 'Unallocated' && (p.status === 'Sold' || p.locations.length > 0)) return;
 
                         hasRenderedAnyPhoto = true;
 
@@ -1107,6 +1135,9 @@
                         let badgeText = '', badgeClass = '', badgeStyle = '';
                         
                         const physicalLocs = p.locations.filter(l => l.toUpperCase() !== 'ONLINE');
+                        const locationText = isSold
+                            ? `Sold${p.locations.length ? ` · ${p.locations.join(' + ')}` : ''}`
+                            : (p.locations.length ? p.locations.join(' + ') : '无地点');
 
                         if (isSold) { 
                             badgeText = p.soldPrice ? `SOLD` : 'SOLD'; 
@@ -1183,6 +1214,8 @@
                                 ${hasNote ? `<div class="has-note-dot"></div>` : ''}
                                 <div class="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity rounded flex items-center justify-center pointer-events-none"><i data-lucide="settings" class="text-white w-5 h-5 drop-shadow-md"></i></div>
                             </div>
+                            <div class="mt-1 w-full truncate text-center font-mono text-[9px] font-bold text-stone-600">${escapeHtml(p.garmentId || item.styleSku || '尚未编号')}</div>
+                            <div class="w-full truncate text-center text-[8px] text-stone-400">${escapeHtml(locationText)}</div>
                             <div class="w-full dispatch-wrapper">
                                 ${quickDispatchHTML}
                             </div>
@@ -1209,14 +1242,20 @@
             const locSelectEl = document.getElementById('alloc-filter-location');
             const displayLocRaw = locSelectEl.options[locSelectEl.selectedIndex]?.text || locFilter;
             const displayLoc = locFilter === 'all' ? '全部地點' : displayLocRaw.replace(/[\(🌐🚚🏠\)]/g, '').trim();
-            const displayCat = catFilter === 'all' ? '全部類別' : catFilter;
+            const displayCat = catFilter === 'all' ? '全部類別' : (catFilter === 'legacy' ? '未配對舊資料' : categoryLabel(catFilter));
             const selectedStyleSku = normalizeStyleSku(styleSkuFilter);
             const selectedStyleEntry = normalizeStyleSkuCatalog(appSettings.styleSkus).find(entry => entry.sku === selectedStyleSku);
             const displayStyle = styleSkuFilter === 'all' ? '全部商品' : `${selectedStyleSku}${selectedStyleEntry?.name ? ` · ${selectedStyleEntry.name}` : ''}`;
             
-            const summaryLabel = locFilter === 'Sold' ? '已售出總計' : '未售出庫存';
+            const summaryLabel = garmentIdSearch ? '编号搜索结果' : (locFilter === 'Sold' ? '已售出總計' : '未售出庫存');
 
-            summaryText.innerHTML = `
+            summaryText.innerHTML = garmentIdSearch ? `
+                <span class="text-stone-500 font-bold text-xs mr-2"><i data-lucide="search" class="w-4 h-4 inline pb-0.5"></i> ${summaryLabel}:</span>
+                <span class="bg-white px-2 py-0.5 rounded shadow-sm border border-blue-100 font-mono text-xs font-bold text-stone-700">${escapeHtml(garmentIdSearch)}</span>
+                <span class="text-blue-300 mx-1 font-bold">=</span>
+                <span class="text-xl font-black text-blue-700 ml-1 drop-shadow-sm">${totalMatchingPieces}</span>
+                <span class="text-blue-500 font-bold text-xs ml-1">件</span>
+            ` : `
                 <span class="text-stone-500 font-bold text-xs mr-2"><i data-lucide="package-check" class="w-4 h-4 inline pb-0.5"></i> ${summaryLabel}:</span> 
                 <span class="bg-white px-2 py-0.5 rounded shadow-sm border border-blue-100 text-stone-700 text-xs font-bold">${escapeHtml(displayCat)}</span>
                 <span class="text-blue-300 mx-1 font-bold">+</span>
@@ -1237,10 +1276,39 @@
             window.renderAllocationList();
         };
 
+        window.handleGarmentSearchInput = function() {
+            if (garmentSearchTimer) clearTimeout(garmentSearchTimer);
+            garmentSearchTimer = setTimeout(() => {
+                allocationPage = 1;
+                window.renderAllocationList();
+            }, 200);
+        };
+
+        window.clearGarmentSearch = function() {
+            if (garmentSearchTimer) clearTimeout(garmentSearchTimer);
+            document.getElementById('allocation-garment-search').value = '';
+            allocationPage = 1;
+            window.renderAllocationList();
+            document.getElementById('allocation-garment-search').focus();
+        };
+
         window.changeAllocationPage = function(delta) {
             allocationPage += delta;
             window.renderAllocationList();
             document.getElementById('view-allocation').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        };
+
+        window.goToPage = function(prefix, pageNumber) {
+            const target = Math.max(1, Number.parseInt(pageNumber, 10) || 1);
+            if (prefix === 'production') {
+                productionPage = target;
+                window.renderProductionList();
+                document.getElementById('view-production').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else if (prefix === 'allocation') {
+                allocationPage = target;
+                window.renderAllocationList();
+                document.getElementById('view-allocation').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
         };
 
         function updatePaginationControls(prefix, currentPage, totalPages, totalItems) {
@@ -1254,6 +1322,21 @@
             info.innerText = totalItems === 0
                 ? '0 筆'
                 : `第 ${currentPage} / ${totalPages} 頁 · 共 ${totalItems} 筆`;
+
+            const renderNumbers = (container, maxItems) => {
+                if (!container) return;
+                if (totalItems === 0) {
+                    container.innerHTML = '';
+                    return;
+                }
+                container.innerHTML = buildPaginationItems(currentPage, totalPages, maxItems).map(item => {
+                    if (item === 'ellipsis') return '<span class="flex min-h-[44px] min-w-[20px] items-center justify-center text-xs text-stone-400">…</span>';
+                    const active = item === currentPage;
+                    return `<button type="button" onclick="window.goToPage(${inlineString(prefix)}, ${item})" ${active ? 'aria-current="page"' : ''} class="flex min-h-[44px] min-w-[44px] items-center justify-center rounded border text-xs font-bold ${active ? 'border-stone-800 bg-stone-800 text-white' : 'border-stone-200 bg-white text-stone-600 hover:bg-stone-50'}">${item}</button>`;
+                }).join('');
+            };
+            renderNumbers(document.getElementById(`${prefix}-page-numbers-mobile`), 5);
+            renderNumbers(document.getElementById(`${prefix}-page-numbers-desktop`), 7);
         }
 
         window.quickDispatch = async function(e, itemId, photoIdx, toLocation) {
@@ -1662,7 +1745,8 @@
             document.getElementById('edit-month').value = item.month; 
             document.getElementById('edit-status').value = item.status; 
             document.getElementById('edit-maker').value = item.maker || ''; 
-            document.getElementById('edit-category').value = getCleanCategory(item.category); 
+            const resolvedCategory = getCatalogContext().resolveCategory(item);
+            document.getElementById('edit-category').value = resolvedCategory === 'legacy' ? '' : resolvedCategory;
             document.getElementById('edit-quantity').value = item.quantity || normalizePhotos(item).length; 
             document.getElementById('edit-price').value = item.price !== undefined ? item.price : ''; 
             document.getElementById('edit-originStudio').value = item.originStudio || 'JB Studio'; 
@@ -1719,11 +1803,15 @@
                 const newOriginStudio = document.getElementById('edit-originStudio').value;
                 const newQty = parseInt(document.getElementById('edit-quantity').value) || 1;
                 const requestedStyleSku = normalizeStyleSku(document.getElementById('edit-styleSku').value);
+                const requestedStyleEntry = normalizeStyleSkuCatalog(appSettings.styleSkus).find(entry => entry.sku === requestedStyleSku);
+                const item = db.find(i => i.id === id);
+                if (!item) throw new Error('找不到此工单，可能已被删除。');
+                const selectedCategory = normalizeStyleSkuCategory(document.getElementById('edit-category').value);
                 
                 let data = { 
                     status: document.getElementById('edit-status').value, 
                     maker: document.getElementById('edit-maker').value, 
-                    category: getCleanCategory(document.getElementById('edit-category').value), 
+                    category: requestedStyleEntry?.category || selectedCategory || item.category || '',
                     originStudio: newOriginStudio,
                     itemName: document.getElementById('edit-itemName').value, 
                     month: document.getElementById('edit-month').value, 
@@ -1734,7 +1822,6 @@
                 data.makingAt = sDateVal ? new Date(sDateVal.replace(/-/g, '/')) : null;
                 data.completedAt = cDateVal ? new Date(cDateVal.replace(/-/g, '/')) : null;
                 
-                const item = db.find(i=>i.id===id); 
                 let existingPhotos = [...window.tempEditPhotos]; 
                 let photosModified = false;
                 const oldOriginStudio = item.originStudio || 'JB Studio';
@@ -2346,18 +2433,54 @@
                 });
             }
         }
+
+        function populateLinkedStyleSkuFilter(scope, preferredSku = '') {
+            const categorySelect = document.getElementById(`${scope}-filter-category`);
+            const skuSelect = document.getElementById(`${scope}-filter-style-sku`);
+            if (!categorySelect || !skuSelect) return;
+            const category = categorySelect.value;
+            const catalog = normalizeStyleSkuCatalog(appSettings.styleSkus);
+            const entries = category === 'all'
+                ? catalog
+                : catalog.filter(entry => entry.category === category);
+            const requestedSku = normalizeStyleSku(preferredSku || skuSelect.value);
+            skuSelect.innerHTML = '<option value="all">全部商品</option>' + entries
+                .map(entry => `<option value="${escapeHtml(entry.sku)}">${escapeHtml(entry.sku)}${entry.name ? ` — ${escapeHtml(entry.name)}` : ''}</option>`)
+                .join('');
+            skuSelect.value = entries.some(entry => entry.sku === requestedSku) ? requestedSku : 'all';
+        }
+
+        window.handleCategoryFilterChange = function(scope) {
+            populateLinkedStyleSkuFilter(scope);
+            if (scope === 'prod') window.resetProductionPage();
+            else if (scope === 'alloc') window.resetAllocationPage();
+        };
+
+        window.handleStyleSkuFilterChange = function(scope) {
+            const skuSelect = document.getElementById(`${scope}-filter-style-sku`);
+            const categorySelect = document.getElementById(`${scope}-filter-category`);
+            const selectedSku = normalizeStyleSku(skuSelect?.value);
+            const entry = normalizeStyleSkuCatalog(appSettings.styleSkus).find(candidate => candidate.sku === selectedSku);
+            if (entry && categorySelect) categorySelect.value = entry.category;
+            populateLinkedStyleSkuFilter(scope, selectedSku);
+            if (scope === 'prod') window.resetProductionPage();
+            else if (scope === 'alloc') window.resetAllocationPage();
+        };
         
         window.updateDropdowns = function() { 
             const distinctMakers = [...new Set([...appSettings.makers, ...db.map(i => i.maker)])].filter(Boolean).sort(); 
-            const distinctCategories = [...new Set([...appSettings.categories.map(c => getCleanCategory(c)), ...db.map(i => getCleanCategory(i.category))])].filter(Boolean).sort(); 
             const distinctStyleSkus = normalizeStyleSkuCatalog([
                 ...db.filter(item => item.styleSku).map(item => ({ sku: item.styleSku, name: item.itemName || '', category: item.category || '' })),
                 ...appSettings.styleSkus
             ]);
-            const skuCategories = [...new Set(distinctStyleSkus.map(entry => entry.category).filter(Boolean))];
+            const canonicalCatalog = normalizeStyleSkuCatalog(appSettings.styleSkus);
+            const skuCategories = [...new Set(canonicalCatalog.map(entry => entry.category).filter(Boolean))];
+            const catalogSkuSet = new Set(canonicalCatalog.map(entry => entry.sku));
+            const hasLegacyItems = db.some(item => !catalogSkuSet.has(normalizeStyleSku(item.styleSku)));
             const nextSignature = JSON.stringify({
                 makers: distinctMakers,
-                categories: distinctCategories,
+                categories: skuCategories,
+                hasLegacyItems,
                 locations: appSettings.locations,
                 styleSkus: distinctStyleSkus
             });
@@ -2404,16 +2527,18 @@
             }); 
             
             fill('.dynamic-maker-select', distinctMakers); 
-            fill('.dynamic-category-select', distinctCategories); 
             fill('.dynamic-sku-category-select', skuCategories);
-            const allocationSkuSelect = document.getElementById('alloc-filter-style-sku');
-            if (allocationSkuSelect) {
-                const oldSku = normalizeStyleSku(allocationSkuSelect.value);
-                allocationSkuSelect.innerHTML = '<option value="all">全部商品</option>' + distinctStyleSkus
-                    .map(entry => `<option value="${escapeHtml(entry.sku)}">${escapeHtml(entry.sku)}${entry.name ? ` — ${escapeHtml(entry.name)}` : ''}</option>`)
-                    .join('');
-                allocationSkuSelect.value = distinctStyleSkus.some(entry => entry.sku === oldSku) ? oldSku : 'all';
-            }
+            document.querySelectorAll('.dynamic-category-select').forEach(select => {
+                const oldCategory = select.value;
+                const isFilter = select.id.includes('filter');
+                select.innerHTML = (isFilter ? '<option value="all">全部类别</option>' : '<option value="">选择 Category</option>')
+                    + skuCategories.map(category => `<option value="${escapeHtml(category)}">${escapeHtml(categoryLabel(category))}</option>`).join('')
+                    + (isFilter && hasLegacyItems ? '<option value="legacy">未配对旧资料</option>' : '');
+                const allowed = skuCategories.includes(oldCategory) || (isFilter && oldCategory === 'legacy' && hasLegacyItems);
+                select.value = allowed ? oldCategory : (isFilter ? 'all' : '');
+            });
+            populateLinkedStyleSkuFilter('prod');
+            populateLinkedStyleSkuFilter('alloc');
             document.querySelectorAll('.dynamic-style-sku-select').forEach(select => {
                 const old = normalizeStyleSku(select.value);
                 select.innerHTML = '<option value="">選擇 Style SKU</option>' + distinctStyleSkus
@@ -2488,28 +2613,36 @@ window.closeImageViewer = function() {
             const locFilter = document.getElementById('alloc-filter-location').value;
             const catFilter = document.getElementById('alloc-filter-category').value;
             const styleSkuFilter = document.getElementById('alloc-filter-style-sku').value;
+            const garmentIdSearch = normalizeGarmentIdSearch(document.getElementById('allocation-garment-search').value);
             const displayLocRaw = document.getElementById('alloc-filter-location').options[document.getElementById('alloc-filter-location').selectedIndex]?.text || locFilter;
             const displayLoc = locFilter === 'all' ? '全部地點' : displayLocRaw.replace(/[\(🌐🚚🏠\)]/g, '').trim();
-            const displayCat = catFilter === 'all' ? '全部類別' : catFilter;
+            const displayCat = catFilter === 'all' ? '全部類別' : (catFilter === 'legacy' ? '未配對舊資料' : categoryLabel(catFilter));
             const selectedStyleSku = normalizeStyleSku(styleSkuFilter);
             const selectedStyleEntry = normalizeStyleSkuCatalog(appSettings.styleSkus).find(entry => entry.sku === selectedStyleSku);
             const displayStyle = styleSkuFilter === 'all' ? '全部商品' : `${selectedStyleSku}${selectedStyleEntry?.name ? ` · ${selectedStyleEntry.name}` : ''}`;
 
             let exportData = [];
             let totalQty = 0;
+            const { resolveCategory } = getCatalogContext();
 
             // 1. 篩選與加總特定地點下的單品數據
-            const categoryItems = filterAllocationItemsByCategory(
-                db.filter(i => i.status === 'Ready' || i.status === 'In Studio' || i.status === 'Sold' || i.status === 'Partial Sold'),
-                catFilter,
-                getCleanCategory
-            );
-            const exportItems = filterAllocationItemsByStyleSku(categoryItems, styleSkuFilter, normalizeStyleSku);
+            const categoryItems = garmentIdSearch
+                ? db.filter(item => normalizePhotos(item).some(photo => photoMatchesGarmentSearch(photo, garmentIdSearch)))
+                : filterAllocationItemsByCategory(
+                    db.filter(i => i.status === 'Ready' || i.status === 'In Studio' || i.status === 'Sold' || i.status === 'Partial Sold'),
+                    catFilter,
+                    resolveCategory
+                );
+            const exportItems = garmentIdSearch
+                ? categoryItems
+                : filterAllocationItemsByStyleSku(categoryItems, styleSkuFilter, normalizeStyleSku);
             exportItems.forEach(item => {
                 const photos = normalizePhotos(item);
                 let locPhotos = [];
 
-                if (locFilter === 'all') {
+                if (garmentIdSearch) {
+                    locPhotos = photos.filter(photo => photoMatchesGarmentSearch(photo, garmentIdSearch));
+                } else if (locFilter === 'all') {
                     locPhotos = photos;
                 } else if (locFilter === 'Sold') {
                     locPhotos = photos.filter(p => p.status === 'Sold');
@@ -2607,7 +2740,7 @@ window.closeImageViewer = function() {
                 <div style="text-align: center; margin-bottom: 25px; border-bottom: 2px solid #78716c; padding-bottom: 15px;">
                     <h2 style="margin: 0; font-size: 24px; font-weight: 800; letter-spacing: 2px; color: #1c1917;">WEIWEIWEI 庫存清單</h2>
                     <div style="margin-top: 12px; display: flex; justify-content: space-between; font-size: 12px; color: #78716c;">
-                        <span>📍 篩選: <b style="color: #1c1917;">${escapeHtml(displayLoc)} · ${escapeHtml(displayCat)} · ${escapeHtml(displayStyle)}</b></span>
+                        <span>📍 篩選: <b style="color: #1c1917;">${escapeHtml(garmentIdSearch ? `Garment ID · ${garmentIdSearch}` : `${displayLoc} · ${displayCat} · ${displayStyle}`)}</b></span>
                         <span>📦 總計件數: <b style="color: #b45309; font-size: 14px;">${totalQty} 件</b></span>
                         <span>🕒 盤點時間: ${dateStr}</span>
                     </div>
@@ -2666,7 +2799,7 @@ window.closeImageViewer = function() {
             // 4. 調用 html2pdf 套件進行客戶端高畫質渲染下載
             const opt = {
                 margin:       12,
-                filename:     `Stock_Report_${displayLoc.replace(/\s+/g, '_')}_${displayCat.replace(/\s+/g, '_')}_${selectedStyleSku || 'ALL'}_${new Date().toISOString().slice(0,10)}.pdf`,
+                filename:     `Stock_Report_${garmentIdSearch || `${displayLoc.replace(/\s+/g, '_')}_${displayCat.replace(/\s+/g, '_')}_${selectedStyleSku || 'ALL'}`}_${new Date().toISOString().slice(0,10)}.pdf`,
                 image:        { type: 'jpeg', quality: 0.98 },
                 html2canvas:  { scale: 2, useCORS: true },
                 jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }

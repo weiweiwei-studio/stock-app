@@ -37,7 +37,7 @@ test('new work orders derive the product name from category-filtered Style SKUs'
 
 test('PDF export applies the allocation category filter', () => {
     assert.match(app, /const catFilter = document\.getElementById\(['"]alloc-filter-category['"]\)\.value/);
-    assert.match(app, /filterAllocationItemsByCategory\([\s\S]*?catFilter,[\s\S]*?getCleanCategory/);
+    assert.match(app, /filterAllocationItemsByCategory\([\s\S]*?catFilter,[\s\S]*?resolveCategory/);
     assert.match(html, /匯出目前篩選結果 PDF/);
 });
 
@@ -45,6 +45,35 @@ test('allocation and PDF export preserve product filtering after category migrat
     assert.match(html, /id=["']alloc-filter-style-sku["']/);
     assert.match(app, /prepareAllocationPage\(\{[\s\S]*?styleSkuFilter,/);
     assert.match(app, /filterAllocationItemsByStyleSku\(categoryItems, styleSkuFilter, normalizeStyleSku\)/);
+});
+
+test('inventory provides direct Garment ID search and exact-piece rendering', () => {
+    assert.match(html, /id=["']allocation-garment-search["']/);
+    assert.match(app, /photoMatchesGarmentSearch\(p, garmentIdSearch\)/);
+    assert.match(app, /编号搜索会暂时忽略其他筛选/);
+    assert.match(app, /locPhotos = photos\.filter\(photo => photoMatchesGarmentSearch/);
+});
+
+test('production and inventory use linked canonical Category and Style SKU filters', () => {
+    assert.match(html, /id=["']prod-filter-category["'][^>]*handleCategoryFilterChange\('prod'\)/);
+    assert.match(html, /id=["']prod-filter-style-sku["'][^>]*handleStyleSkuFilterChange\('prod'\)/);
+    assert.match(html, /id=["']alloc-filter-category["'][^>]*handleCategoryFilterChange\('alloc'\)/);
+    assert.match(app, /const canonicalCatalog = normalizeStyleSkuCatalog\(appSettings\.styleSkus\)/);
+    assert.doesNotMatch(html, /onclick=["']window\.addSetting\('categories'\)/);
+});
+
+test('editing an unmatched legacy item preserves its original category', () => {
+    assert.match(app, /const selectedCategory = normalizeStyleSkuCategory\(document\.getElementById\(['"]edit-category['"]\)\.value\)/);
+    assert.match(app, /category: requestedStyleEntry\?\.category \|\| selectedCategory \|\| item\.category \|\| ['"]/);
+});
+
+test('production and inventory expose numbered pagination containers', () => {
+    for (const prefix of ['production', 'allocation']) {
+        assert.match(html, new RegExp(`id=["']${prefix}-page-numbers-mobile["']`));
+        assert.match(html, new RegExp(`id=["']${prefix}-page-numbers-desktop["']`));
+    }
+    assert.match(app, /buildPaginationItems\(currentPage, totalPages, maxItems\)/);
+    assert.match(app, /window\.goToPage\s*=/);
 });
 
 test('legacy SKU migration requires a backup and version-protected updates', () => {
