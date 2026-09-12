@@ -1,6 +1,6 @@
         import { ADMIN_EMAIL, getAuthErrorMessage, isAuthorizedAdmin } from "./auth-utils.js";
         import { isLocationReferenced, isStyleSkuReferenced, partitionStockItems } from "./archive-utils.js";
-        import { POPUP_SALES_CHANNEL, POPUP_SALES_EVENT, formatSoldMoney, getPopupSoldLocation, getSoldCurrency } from "./sales-utils.js";
+        import { POPUP_SALES_CHANNEL, POPUP_SALES_EVENT, formatSoldMoney, getPopupSoldLocation, getSoldCurrency, hasSingaporePopupLocation } from "./sales-utils.js";
         import { assertVersion, deriveItemStatus, getVersion, nextVersion } from "./data-integrity.js";
         import { optimizeImage } from "./image-utils.js";
         import { reconcileNewItemPhotos, resizeItemPhotos } from "./inventory-utils.js";
@@ -1653,11 +1653,31 @@
             let photos = normalizePhotos(currentDetailItem); const currentStatus = photos[currentDetailPhotoIdx].status;
             if (currentStatus === 'Sold') { if(confirm("確認取消售出？物品將回到庫存中。")) updateItemStatus({ status: 'Available', soldPrice: null, soldAt: null, soldCurrency: null, paymentMethod: null, salesChannel: null, saleEvent: null, soldLocation: null, salesNote: '' }); }
             else { 
-                document.getElementById('sold-price-input').value = '';
+                document.getElementById('popup-sale-mode').checked = hasSingaporePopupLocation(tempLocations);
                 document.getElementById('sold-payment-method').value = '';
                 document.getElementById('sold-note-input').value = ''; 
                 document.getElementById('sold-date-input').valueAsDate = new Date(); 
+                window.updateSaleModeUI(true);
                 document.getElementById('sold-modal').classList.remove('hidden'); 
+            }
+        };
+        window.updateSaleModeUI = function(resetPrice = false) {
+            const isPopupSale = document.getElementById('popup-sale-mode').checked;
+            const priceInput = document.getElementById('sold-price-input');
+            const paymentContainer = document.getElementById('sold-payment-container');
+            const paymentInput = document.getElementById('sold-payment-method');
+            document.getElementById('sold-modal-title').textContent = isPopupSale ? 'Singapore Popup 售出' : '确认售出价格';
+            document.getElementById('sold-modal-subtitle').textContent = isPopupSale ? '记录 SGD 成交价、付款方式与售出日期' : '记录 MYR 成交价与售出日期';
+            document.getElementById('sold-price-label').textContent = `成交价 (${isPopupSale ? 'SGD' : 'MYR'})`;
+            document.getElementById('sold-currency-prefix').textContent = isPopupSale ? 'SGD' : 'RM';
+            paymentContainer.classList.toggle('hidden', !isPopupSale);
+            paymentInput.required = isPopupSale;
+            if (resetPrice) {
+                const photo = normalizePhotos(currentDetailItem)[currentDetailPhotoIdx];
+                const myrPrice = photo?.specificPrice !== undefined && photo?.specificPrice !== null
+                    ? photo.specificPrice
+                    : currentDetailItem?.price || '';
+                priceInput.value = isPopupSale ? '' : myrPrice;
             }
         };
         window.confirmSoldAction = async function() {
@@ -1666,15 +1686,16 @@
             const dateInput = document.getElementById('sold-date-input');
             const noteInput = document.getElementById('sold-note-input');
             const button = document.getElementById('btn-confirm-sold');
+            const isPopupSale = document.getElementById('popup-sale-mode').checked;
             const soldPrice = Number(soldPriceInput.value);
             const paymentMethod = paymentInput.value;
             const dateVal = dateInput.value;
             if (soldPriceInput.value === '' || !Number.isFinite(soldPrice) || soldPrice < 0) {
-                alert('请输入正确的 SGD 售出价格。');
+                alert(`请输入正确的 ${isPopupSale ? 'SGD' : 'MYR'} 售出价格。`);
                 soldPriceInput.focus();
                 return;
             }
-            if (!paymentMethod) {
+            if (isPopupSale && !paymentMethod) {
                 alert('请选择付款方式。');
                 paymentInput.focus();
                 return;
@@ -1687,18 +1708,18 @@
             const patch = {
                 status: 'Sold',
                 soldPrice,
-                soldCurrency: 'SGD',
-                paymentMethod,
+                soldCurrency: isPopupSale ? 'SGD' : 'MYR',
+                paymentMethod: isPopupSale ? paymentMethod : null,
                 soldAt: new Date(dateVal.replace(/-/g, '/')),
-                salesChannel: POPUP_SALES_CHANNEL,
-                saleEvent: POPUP_SALES_EVENT,
-                soldLocation: getPopupSoldLocation(tempLocations),
-                salesNote: noteInput.value.trim(),
+                salesChannel: isPopupSale ? POPUP_SALES_CHANNEL : null,
+                saleEvent: isPopupSale ? POPUP_SALES_EVENT : null,
+                soldLocation: isPopupSale ? getPopupSoldLocation(tempLocations) : null,
+                salesNote: isPopupSale ? noteInput.value.trim() : '',
                 locations: [...tempLocations]
             };
             button.disabled = true;
             button.textContent = '记录中...';
-            const succeeded = await updateItemStatus(patch, '', true);
+            const succeeded = await updateItemStatus(patch, isPopupSale ? '' : noteInput.value.trim(), true);
             if (succeeded) document.getElementById('sold-modal').classList.add('hidden');
             button.disabled = false;
             button.textContent = '确认售出';
