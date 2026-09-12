@@ -104,3 +104,17 @@ test('archive recovery panel remains usable on a phone', async ({ page }) => {
     expect((await summary.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
     expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
 });
+
+test('archived item detail modal remains usable on a phone', async ({ page }) => {
+    await page.evaluate(() => {
+        document.getElementById('auth-screen')?.classList.add('hidden');
+        document.body.classList.remove('auth-pending');
+        document.getElementById('archived-detail-modal')?.classList.remove('hidden');
+    });
+
+    const modal = page.locator('#archived-detail-modal');
+    await expect(modal).toBeInViewport();
+    const closeButton = modal.getByRole('button', { name: '关闭封存工单详情' });
+    expect((await closeButton.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+});
