@@ -133,3 +133,12 @@ test('work orders use recoverable archive instead of permanent deletion', () => 
     assert.match(app, /isStyleSkuReferenced\(allItems, normalizedSku, normalizeStyleSku\)/);
     assert.match(app, /isLocationReferenced\(Array\.from\(stockItemsById\.values\(\)\), val\)/);
 });
+
+test('archived work orders expose escaped read-only details before restore', () => {
+    assert.match(html, /id=["']archived-detail-modal["']/);
+    assert.match(app, /window\.openArchivedItemDetails\s*=\s*function/);
+    assert.match(app, /archivedItems\.find\(candidate => candidate\.id === itemId\)/);
+    assert.match(app, /getElementById\(['"]archived-detail-pieces['"]\)\.innerHTML/);
+    assert.match(app, /escapeHtml\(photo\.garmentId/);
+    assert.doesNotMatch(html, /archived-detail-modal[\s\S]*?window\.saveItemDetails\(\)/);
+});
