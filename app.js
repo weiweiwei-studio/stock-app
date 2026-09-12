@@ -1804,11 +1804,14 @@
                 const newQty = parseInt(document.getElementById('edit-quantity').value) || 1;
                 const requestedStyleSku = normalizeStyleSku(document.getElementById('edit-styleSku').value);
                 const requestedStyleEntry = normalizeStyleSkuCatalog(appSettings.styleSkus).find(entry => entry.sku === requestedStyleSku);
+                const item = db.find(i => i.id === id);
+                if (!item) throw new Error('找不到此工单，可能已被删除。');
+                const selectedCategory = normalizeStyleSkuCategory(document.getElementById('edit-category').value);
                 
                 let data = { 
                     status: document.getElementById('edit-status').value, 
                     maker: document.getElementById('edit-maker').value, 
-                    category: requestedStyleEntry?.category || normalizeStyleSkuCategory(document.getElementById('edit-category').value),
+                    category: requestedStyleEntry?.category || selectedCategory || item.category || '',
                     originStudio: newOriginStudio,
                     itemName: document.getElementById('edit-itemName').value, 
                     month: document.getElementById('edit-month').value, 
@@ -1819,7 +1822,6 @@
                 data.makingAt = sDateVal ? new Date(sDateVal.replace(/-/g, '/')) : null;
                 data.completedAt = cDateVal ? new Date(cDateVal.replace(/-/g, '/')) : null;
                 
-                const item = db.find(i=>i.id===id); 
                 let existingPhotos = [...window.tempEditPhotos]; 
                 let photosModified = false;
                 const oldOriginStudio = item.originStudio || 'JB Studio';

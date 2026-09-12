@@ -62,6 +62,11 @@ test('production and inventory use linked canonical Category and Style SKU filte
     assert.doesNotMatch(html, /onclick=["']window\.addSetting\('categories'\)/);
 });
 
+test('editing an unmatched legacy item preserves its original category', () => {
+    assert.match(app, /const selectedCategory = normalizeStyleSkuCategory\(document\.getElementById\(['"]edit-category['"]\)\.value\)/);
+    assert.match(app, /category: requestedStyleEntry\?\.category \|\| selectedCategory \|\| item\.category \|\| ['"]/);
+});
+
 test('production and inventory expose numbered pagination containers', () => {
     for (const prefix of ['production', 'allocation']) {
         assert.match(html, new RegExp(`id=["']${prefix}-page-numbers-mobile["']`));
