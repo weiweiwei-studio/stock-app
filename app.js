@@ -2737,7 +2737,7 @@ window.closeImageViewer = function() {
             const dateStr = new Date().toLocaleString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
 
             let html = `
-                <div style="text-align: center; margin-bottom: 25px; border-bottom: 2px solid #78716c; padding-bottom: 15px;">
+                <div class="pdf-report-header" style="text-align: center; margin-bottom: 25px; border-bottom: 2px solid #78716c; padding-bottom: 15px; page-break-inside: avoid; break-inside: avoid;">
                     <h2 style="margin: 0; font-size: 24px; font-weight: 800; letter-spacing: 2px; color: #1c1917;">WEIWEIWEI 庫存清單</h2>
                     <div style="margin-top: 12px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 8px 16px; font-size: 12px; line-height: 1.45; color: #78716c; text-align: left;">
                         <span style="flex: 1 1 360px; min-width: 0; overflow-wrap: anywhere; word-break: break-word;">📍 篩選: <b style="color: #1c1917;">${escapeHtml(garmentIdSearch ? `Garment ID · ${garmentIdSearch}` : `${displayLoc} · ${displayCat} · ${displayStyle}`)}</b></span>
@@ -2746,7 +2746,7 @@ window.closeImageViewer = function() {
                     </div>
                 </div>
                 <table style="width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 11px; line-height: 1.45; text-align: left;">
-                    <thead>
+                    <thead style="display: table-header-group;">
                         <tr style="background-color: #f5f5f4; color: #78716c;">
                             <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 18%; line-height: 1.35; vertical-align: middle; text-align: center;">商品圖</th>
                             <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 12%; line-height: 1.35; vertical-align: middle;">入庫日期</th>
@@ -2775,7 +2775,7 @@ window.closeImageViewer = function() {
                 }
 
                 html += `
-                    <tr style="background-color: ${rowBg}; border-bottom: 1px solid #e7e5e4;">
+                    <tr style="background-color: ${rowBg}; border-bottom: 1px solid #e7e5e4; page-break-inside: avoid; break-inside: avoid;">
                         <td style="padding: 8px 5px; vertical-align: middle;">${imgHtml}</td>
                         <td style="padding: 8px 5px; color: #78716c; vertical-align: middle; font-family: monospace; font-size: 10px; line-height: 1.45; white-space: nowrap;">${escapeHtml(row.dateStr)}</td>
                         <td style="padding: 8px 5px; color: #78716c; vertical-align: middle; line-height: 1.45; overflow-wrap: anywhere; word-break: break-word;">${escapeHtml(row.category)}</td>
@@ -2793,7 +2793,7 @@ window.closeImageViewer = function() {
             html += `
                     </tbody>
                 </table>
-                <div style="margin-top: 40px; text-align: center; font-size: 9px; color: #a8a29e; border-top: 1px dashed #e7e5e4; padding-top: 10px;">
+                <div class="pdf-footer" style="margin-top: 40px; text-align: center; font-size: 9px; color: #a8a29e; border-top: 1px dashed #e7e5e4; padding-top: 10px; page-break-inside: avoid; break-inside: avoid;">
                     © WEIWEIWEI Studio ERP Inventory System
                 </div>
             `;
@@ -2805,6 +2805,7 @@ window.closeImageViewer = function() {
                 filename:     `Stock_Report_${garmentIdSearch || `${displayLoc.replace(/\s+/g, '_')}_${displayCat.replace(/\s+/g, '_')}_${selectedStyleSku || 'ALL'}`}_${new Date().toISOString().slice(0,10)}.pdf`,
                 image:        { type: 'jpeg', quality: 0.98 },
                 html2canvas:  { scale: 2, useCORS: true },
+                pagebreak:    { mode: ['css', 'legacy'], avoid: ['tr', '.pdf-report-header', '.pdf-footer'] },
                 jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
 
