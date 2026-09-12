@@ -142,3 +142,19 @@ test('archived work orders expose escaped read-only details before restore', () 
     assert.match(app, /escapeHtml\(photo\.garmentId/);
     assert.doesNotMatch(html, /archived-detail-modal[\s\S]*?window\.saveItemDetails\(\)/);
 });
+
+test('popup sales capture SGD price, payment, date, location and note without changing legacy MYR', () => {
+    assert.match(html, /id=["']sold-payment-method["']/);
+    assert.match(html, /成交价 \(SGD\)/);
+    assert.match(app, /soldCurrency:\s*['"]SGD['"]/);
+    assert.match(app, /paymentMethod,/);
+    assert.match(app, /salesChannel:\s*POPUP_SALES_CHANNEL/);
+    assert.match(app, /saleEvent:\s*POPUP_SALES_EVENT/);
+    assert.match(app, /soldLocation:\s*getPopupSoldLocation\(tempLocations\)/);
+    assert.match(app, /salesNote:\s*noteInput\.value\.trim\(\)/);
+    assert.match(app, /button\.disabled = true;[\s\S]*?await updateItemStatus\(patch, '', true\)/);
+    assert.match(app, /preventDuplicateSale && latestPhoto\.status === ['"]Sold['"]/);
+    assert.match(app, /soldCurrency:\s*p\.soldCurrency \|\| null/);
+    assert.match(app, /getSoldCurrency\(p\) !== ['"]MYR['"]\) return/);
+    assert.match(html, /id=["']detail-sale-meta["']/);
+});
