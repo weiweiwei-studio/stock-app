@@ -2751,8 +2751,8 @@ window.closeImageViewer = function() {
                             <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 18%; text-align: center;">商品圖</th>
                             <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 12%;">入庫日期</th>
                             <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 12%;">類別</th>
-                            <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 30%;">品名項目 (Item Name)</th>
-                            <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 10%;">規格</th>
+                            <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 28%;">品名項目 (Item Name)</th>
+                            <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 12%;">規格</th>
                             <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 10%; text-align: right;">主定價</th>
                             <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 8%; text-align: center;">數量</th>
                         </tr>
@@ -2780,7 +2780,10 @@ window.closeImageViewer = function() {
                         <td style="padding: 8px 5px; color: #78716c; vertical-align: middle; font-family: monospace; font-size: 10px;">${escapeHtml(row.dateStr)}</td>
                         <td style="padding: 8px 5px; color: #78716c; vertical-align: middle;">${escapeHtml(row.category)}</td>
                         <td style="padding: 8px 5px; font-weight: 700; color: #1c1917; vertical-align: middle;">${escapeHtml(row.itemName)}<div style="margin-top: 3px; font-family: monospace; font-size: 9px; font-weight: 500; color: #78716c;">${escapeHtml(row.garmentIds.join(', '))}</div></td>
-                        <td style="padding: 8px 5px; color: #57534e; vertical-align: middle;">${escapeHtml(row.color)} / ${escapeHtml(row.size)}</td>
+                        <td style="padding: 8px 5px; color: #57534e; vertical-align: middle; line-height: 1.45; overflow-wrap: anywhere; word-break: break-word;">
+                            <div style="line-height: 1.45;">${escapeHtml(row.color)}</div>
+                            <div style="margin-top: 2px; line-height: 1.45; font-size: 10px; color: #78716c;">Size: ${escapeHtml(row.size)}</div>
+                        </td>
                         <td style="padding: 8px 5px; text-align: right; color: #44403c; vertical-align: middle;">${escapeHtml(row.price)}</td>
                         <td style="padding: 8px 5px; text-align: center; font-weight: 800; font-size: 13px; color: #1c1917; vertical-align: middle;">${row.qty}</td>
                     </tr>

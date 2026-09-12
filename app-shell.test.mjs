@@ -41,6 +41,11 @@ test('PDF export applies the allocation category filter', () => {
     assert.match(html, /匯出目前篩選結果 PDF/);
 });
 
+test('PDF specification cells separate color and size with stable line spacing', () => {
+    assert.match(app, /overflow-wrap: anywhere; word-break: break-word/);
+    assert.match(app, /line-height: 1\.45; font-size: 10px; color: #78716c;["']>Size:/);
+});
+
 test('allocation and PDF export preserve product filtering after category migration', () => {
     assert.match(html, /id=["']alloc-filter-style-sku["']/);
     assert.match(app, /prepareAllocationPage\(\{[\s\S]*?styleSkuFilter,/);
