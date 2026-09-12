@@ -302,7 +302,8 @@
             <div class="flex items-center gap-2 bg-white p-3 rounded-lg shadow-sm">
                 <span class="text-sm font-medium text-stone-600 flex-shrink-0">過濾:</span>
                 <select id="prod-filter-maker" onchange="window.resetProductionPage()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5 dynamic-maker-select"><option value="all">全部製作人</option></select>
-                <select id="prod-filter-category" onchange="window.resetProductionPage()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5 dynamic-category-select"><option value="all">全部類別</option></select>
+                <select id="prod-filter-category" onchange="window.handleCategoryFilterChange('prod')" class="min-h-[44px] bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5 dynamic-category-select"><option value="all">全部类别</option></select>
+                <select id="prod-filter-style-sku" onchange="window.handleStyleSkuFilterChange('prod')" class="min-h-[44px] max-w-[210px] bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5"><option value="all">全部商品</option></select>
                 
                 <select id="prod-filter-status" onchange="window.resetProductionPage()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5">
                     <option value="all">全部狀態</option>
@@ -331,10 +332,12 @@
                         <tbody id="production-table-body" class="divide-y divide-stone-100"></tbody>
                     </table>
                 </div>
-                <div class="flex items-center justify-between gap-3 border-t border-stone-100 px-4 py-3">
-                    <button id="production-prev-page" onclick="window.changeProductionPage(-1)" class="px-3 py-1.5 rounded border border-stone-200 text-xs font-bold text-stone-600 disabled:opacity-30 disabled:cursor-not-allowed">上一頁</button>
-                    <span id="production-page-info" class="text-xs font-bold text-stone-500">0 筆</span>
-                    <button id="production-next-page" onclick="window.changeProductionPage(1)" class="px-3 py-1.5 rounded border border-stone-200 text-xs font-bold text-stone-600 disabled:opacity-30 disabled:cursor-not-allowed">下一頁</button>
+                <div class="flex flex-wrap items-center justify-center gap-2 border-t border-stone-100 px-3 py-3">
+                    <button id="production-prev-page" onclick="window.changeProductionPage(-1)" aria-label="上一页" class="min-h-[44px] min-w-[44px] px-3 rounded border border-stone-200 text-xs font-bold text-stone-600 disabled:opacity-30 disabled:cursor-not-allowed"><span class="sm:hidden">‹</span><span class="hidden sm:inline">上一页</span></button>
+                    <div id="production-page-numbers-mobile" class="flex items-center gap-1 sm:hidden"></div>
+                    <div id="production-page-numbers-desktop" class="hidden items-center gap-1 sm:flex"></div>
+                    <button id="production-next-page" onclick="window.changeProductionPage(1)" aria-label="下一页" class="min-h-[44px] min-w-[44px] px-3 rounded border border-stone-200 text-xs font-bold text-stone-600 disabled:opacity-30 disabled:cursor-not-allowed"><span class="sm:hidden">›</span><span class="hidden sm:inline">下一页</span></button>
+                    <span id="production-page-info" class="w-full text-center text-xs font-bold text-stone-500">0 笔</span>
                 </div>
             </div>
         </section>
@@ -348,6 +351,14 @@
                 </p>
             </div>
             <div class="flex flex-wrap items-center justify-between gap-4 bg-white p-3 rounded-lg shadow-sm">
+                <div class="w-full">
+                    <label for="allocation-garment-search" class="mb-1 block text-xs font-bold text-stone-600">直接搜索 Garment ID</label>
+                    <div class="flex max-w-xl gap-2">
+                        <input id="allocation-garment-search" type="search" autocomplete="off" placeholder="例如 2DRS012-018" oninput="window.handleGarmentSearchInput()" class="min-h-[44px] min-w-0 flex-1 rounded-md border border-stone-300 bg-white px-3 font-mono text-sm uppercase outline-none focus:border-stone-600">
+                        <button type="button" onclick="window.clearGarmentSearch()" class="min-h-[44px] rounded-md border border-stone-200 bg-stone-50 px-3 text-xs font-bold text-stone-600">清除</button>
+                    </div>
+                    <p id="allocation-search-status" class="mt-1 min-h-[16px] text-[10px] font-medium text-blue-700" aria-live="polite"></p>
+                </div>
                 <div class="flex flex-wrap items-center gap-4">
                     <div class="flex items-center gap-2">
                         <span class="text-sm font-medium text-stone-600 flex-shrink-0">當前所在位置:</span>
@@ -356,11 +367,11 @@
                     </div>
                     <div class="flex items-center gap-2">
                         <span class="text-sm font-medium text-stone-600 flex-shrink-0">過濾類別:</span>
-                        <select id="alloc-filter-category" onchange="window.resetAllocationPage()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5 dynamic-category-select"><option value="all">全部類別</option></select>
+                        <select id="alloc-filter-category" onchange="window.handleCategoryFilterChange('alloc')" class="min-h-[44px] bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5 dynamic-category-select"><option value="all">全部类别</option></select>
                     </div>
                     <div class="flex items-center gap-2">
                         <span class="text-sm font-medium text-stone-600 flex-shrink-0">Style SKU／商品:</span>
-                        <select id="alloc-filter-style-sku" onchange="window.resetAllocationPage()" class="min-h-[44px] max-w-[180px] bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5"><option value="all">全部商品</option></select>
+                        <select id="alloc-filter-style-sku" onchange="window.handleStyleSkuFilterChange('alloc')" class="min-h-[44px] max-w-[210px] bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5"><option value="all">全部商品</option></select>
                     </div>
                 </div>
                 
@@ -384,10 +395,12 @@
                         <tbody id="allocation-table-body" class="divide-y divide-stone-100"></tbody>
                     </table>
                 </div>
-                <div class="flex items-center justify-between gap-3 border-t border-stone-100 px-4 py-3">
-                    <button id="allocation-prev-page" onclick="window.changeAllocationPage(-1)" class="px-3 py-1.5 rounded border border-stone-200 text-xs font-bold text-stone-600 disabled:opacity-30 disabled:cursor-not-allowed">上一頁</button>
-                    <span id="allocation-page-info" class="text-xs font-bold text-stone-500">0 筆</span>
-                    <button id="allocation-next-page" onclick="window.changeAllocationPage(1)" class="px-3 py-1.5 rounded border border-stone-200 text-xs font-bold text-stone-600 disabled:opacity-30 disabled:cursor-not-allowed">下一頁</button>
+                <div class="flex flex-wrap items-center justify-center gap-2 border-t border-stone-100 px-3 py-3">
+                    <button id="allocation-prev-page" onclick="window.changeAllocationPage(-1)" aria-label="上一页" class="min-h-[44px] min-w-[44px] px-3 rounded border border-stone-200 text-xs font-bold text-stone-600 disabled:opacity-30 disabled:cursor-not-allowed"><span class="sm:hidden">‹</span><span class="hidden sm:inline">上一页</span></button>
+                    <div id="allocation-page-numbers-mobile" class="flex items-center gap-1 sm:hidden"></div>
+                    <div id="allocation-page-numbers-desktop" class="hidden items-center gap-1 sm:flex"></div>
+                    <button id="allocation-next-page" onclick="window.changeAllocationPage(1)" aria-label="下一页" class="min-h-[44px] min-w-[44px] px-3 rounded border border-stone-200 text-xs font-bold text-stone-600 disabled:opacity-30 disabled:cursor-not-allowed"><span class="sm:hidden">›</span><span class="hidden sm:inline">下一页</span></button>
+                    <span id="allocation-page-info" class="w-full text-center text-xs font-bold text-stone-500">0 笔</span>
                 </div>
             </div>
         </section>
@@ -402,9 +415,9 @@
                     <div class="flex gap-2"><input id="new-location-input" placeholder="新增地點..." class="flex-1 border text-sm rounded px-2"><button onclick="window.addSetting('locations')" class="bg-stone-800 text-white px-2 rounded">+</button></div>
                     <p class="text-[9px] text-red-500 mt-2 font-bold">* JB Studio / PNG Studio / Online 為核心系統地點，不可刪除。</p>
                 </div>
-                <div class="bg-white p-6 rounded-lg shadow-sm"><h3 class="font-bold text-stone-700 mb-2">類別</h3><div id="settings-categories-list" class="flex flex-wrap gap-1 mb-2"></div><div class="flex gap-2"><input id="new-category-input" placeholder="新增類別..." class="flex-1 border text-sm rounded px-2"><button onclick="window.addSetting('categories')" class="bg-stone-800 text-white px-2 rounded">+</button></div></div>
+                <div class="hidden" aria-hidden="true"><h3>旧类别资料（由 Style SKU catalog 取代）</h3><div id="settings-categories-list"></div><input id="new-category-input"></div>
                 <div class="bg-white p-6 rounded-lg shadow-sm">
-                    <h3 class="font-bold text-stone-700 mb-2">Style SKU</h3>
+                    <h3 class="font-bold text-stone-700 mb-2">Category → Style SKU／商品</h3>
                     <div id="settings-styleSkus-list" class="max-h-40 overflow-y-auto flex flex-wrap gap-1 mb-2"></div>
                     <div class="grid grid-cols-1 gap-2">
                         <select id="new-style-sku-category-input" class="border text-sm rounded px-2 py-1.5 bg-white dynamic-sku-category-select"></select>

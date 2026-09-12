@@ -1,10 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+    buildPaginationItems,
     filterAllocationItemsByCategory,
     filterAllocationItemsByStyleSku,
+    normalizeGarmentIdSearch,
     paginate,
     photoMatchesAllocationFilter,
+    photoMatchesGarmentSearch,
     prepareAllocationPage
 } from './view-utils.js';
 
@@ -18,10 +21,25 @@ test('allocation export category filter excludes other inventory', () => {
     ];
 
     assert.deepEqual(
-        filterAllocationItemsByCategory(items, 'Clairo Dress', cleanCategory),
+        filterAllocationItemsByCategory(items, 'Clairo Dress', item => cleanCategory(item.category)),
         [items[0]]
     );
-    assert.equal(filterAllocationItemsByCategory(items, 'all', cleanCategory), items);
+    assert.equal(filterAllocationItemsByCategory(items, 'all', item => cleanCategory(item.category)), items);
+});
+
+test('builds compact numbered pagination for start, middle and end pages', () => {
+    assert.deepEqual(buildPaginationItems(1, 3), [1, 2, 3]);
+    assert.deepEqual(buildPaginationItems(2, 20, 7), [1, 2, 3, 4, 5, 'ellipsis', 20]);
+    assert.deepEqual(buildPaginationItems(10, 20, 7), [1, 'ellipsis', 9, 10, 11, 'ellipsis', 20]);
+    assert.deepEqual(buildPaginationItems(20, 20, 7), [1, 'ellipsis', 16, 17, 18, 19, 20]);
+    assert.deepEqual(buildPaginationItems(10, 20, 5), [1, 'ellipsis', 10, 'ellipsis', 20]);
+});
+
+test('normalizes and prefix-matches permanent Garment IDs', () => {
+    assert.equal(normalizeGarmentIdSearch(' 2drs012 -018 '), '2DRS012-018');
+    assert.equal(normalizeGarmentIdSearch('../2drs012-018'), '2DRS012-018');
+    assert.equal(photoMatchesGarmentSearch({ garmentId: '2DRS012-018' }, '2drs012-01'), true);
+    assert.equal(photoMatchesGarmentSearch({ garmentId: '2DRS012-018' }, '2TOP011'), false);
 });
 
 test('allocation Style SKU filter keeps one product across a broad category', () => {
@@ -91,7 +109,7 @@ test('allocation pagination preserves the full matching piece count', () => {
         locationFilter: 'JB Studio',
         requestedPage: 1,
         normalizePhotos,
-        cleanCategory,
+        resolveCategory: item => cleanCategory(item.category),
         pageSize: 1
     });
 
@@ -124,9 +142,33 @@ test('all inventory keeps sold batches but counts only unsold pieces', () => {
         locationFilter: 'all',
         requestedPage: 1,
         normalizePhotos,
-        cleanCategory
+        resolveCategory: item => cleanCategory(item.category)
     });
 
     assert.equal(result.totalItems, 2);
     assert.equal(result.totalMatchingPieces, 1);
+});
+
+test('Garment ID search bypasses browsing filters and counts only matching pieces', () => {
+    const items = [{
+        status: 'Sold', styleSku: '2DRS012', category: 'Dress',
+        photos: [
+            { garmentId: '2DRS012-018', status: 'Sold', locations: ['Singapore Popup'] },
+            { garmentId: '2DRS012-019', status: 'Available', locations: ['PNG Studio'] }
+        ]
+    }];
+    const result = prepareAllocationPage({
+        items,
+        categoryFilter: 'TOP',
+        styleSkuFilter: '2TOP011',
+        garmentIdSearch: '2drs012-018',
+        locationFilter: 'JB Studio',
+        requestedPage: 9,
+        normalizePhotos,
+        resolveCategory: item => item.category
+    });
+    assert.equal(result.totalItems, 1);
+    assert.equal(result.totalMatchingPieces, 1);
+    assert.equal(result.currentPage, 1);
+    assert.equal(result.searchQuery, '2DRS012-018');
 });

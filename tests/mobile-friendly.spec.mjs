@@ -65,6 +65,11 @@ test('inventory product filter remains usable on a phone', async ({ page }) => {
     await expect(styleSkuFilter).toBeVisible();
     const box = await styleSkuFilter.boundingBox();
     expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+    const search = page.locator('#allocation-garment-search');
+    await expect(search).toBeVisible();
+    expect((await search.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+    await expect(page.locator('#allocation-page-numbers-mobile')).toBeVisible();
+    await expect(page.locator('#allocation-page-numbers-desktop')).toBeHidden();
     expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
 });
 
