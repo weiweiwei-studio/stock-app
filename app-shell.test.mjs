@@ -41,6 +41,15 @@ test('PDF export applies the allocation category filter', () => {
     assert.match(html, /匯出目前篩選結果 PDF/);
 });
 
+test('PDF cells use stable spacing and safe wrapping for long content', () => {
+    assert.match(app, /display: flex; flex-wrap: wrap;[^"']*gap: 8px 16px/);
+    assert.match(app, /table-layout: fixed; border-collapse: collapse;[^"']*line-height: 1\.45/);
+    assert.match(app, /overflow-wrap: anywhere; word-break: break-word/);
+    assert.match(app, /line-height: 1\.45; font-size: 10px; color: #78716c;["']>Size:/);
+    assert.match(app, /font-family: monospace; font-size: 10px; line-height: 1\.45; white-space: nowrap/);
+    assert.match(app, /font-size: 9px; line-height: 1\.45;[^"']*overflow-wrap: anywhere/);
+});
+
 test('allocation and PDF export preserve product filtering after category migration', () => {
     assert.match(html, /id=["']alloc-filter-style-sku["']/);
     assert.match(app, /prepareAllocationPage\(\{[\s\S]*?styleSkuFilter,/);
