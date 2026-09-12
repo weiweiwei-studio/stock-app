@@ -50,6 +50,12 @@ test('PDF cells use stable spacing and safe wrapping for long content', () => {
     assert.match(app, /font-size: 9px; line-height: 1\.45;[^"']*overflow-wrap: anywhere/);
 });
 
+test('PDF export keeps complete inventory rows together across pages', () => {
+    assert.match(app, /<thead style=["']display: table-header-group;/);
+    assert.match(app, /<tr style=["'][^"']*page-break-inside: avoid; break-inside: avoid;/);
+    assert.match(app, /pagebreak:\s*\{ mode: \[['"]css['"], ['"]legacy['"]\], avoid: \[['"]tr['"], ['"]\.pdf-report-header['"], ['"]\.pdf-footer['"]\] \}/);
+});
+
 test('allocation and PDF export preserve product filtering after category migration', () => {
     assert.match(html, /id=["']alloc-filter-style-sku["']/);
     assert.match(app, /prepareAllocationPage\(\{[\s\S]*?styleSkuFilter,/);
