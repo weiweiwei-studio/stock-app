@@ -161,3 +161,14 @@ test('popup sales capture SGD price, payment, date, location and note without ch
     assert.match(app, /checked = hasSingaporePopupLocation\(tempLocations\)/);
     assert.match(app, /isPopupSale \? '' : noteInput\.value\.trim\(\)/);
 });
+
+test('Singapore popup report summarizes the event and exports only the filtered rows', () => {
+    assert.match(html, /id=["']popup-sales-report-modal["']/);
+    assert.match(html, /id=["']popup-sales-dashboard-total["']/);
+    assert.match(html, /id=["']popup-report-start-date["']/);
+    assert.match(html, /id=["']popup-report-payment["']/);
+    assert.match(app, /collectPopupSales\(\[\.\.\.db, \.\.\.archivedItems\], normalizePhotos\)/);
+    assert.match(app, /filterPopupSales\(getPopupSalesRecords\(\)/);
+    assert.match(app, /buildPopupSalesCsv\(records\)/);
+    assert.match(app, /URL\.revokeObjectURL\(url\)/);
+});
