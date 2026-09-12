@@ -1246,8 +1246,6 @@
             const selectedStyleSku = normalizeStyleSku(styleSkuFilter);
             const selectedStyleEntry = normalizeStyleSkuCatalog(appSettings.styleSkus).find(entry => entry.sku === selectedStyleSku);
             const displayStyle = styleSkuFilter === 'all' ? '全部商品' : `${selectedStyleSku}${selectedStyleEntry?.name ? ` · ${selectedStyleEntry.name}` : ''}`;
-            const includeLocationColumn = locFilter === 'all' || Boolean(garmentIdSearch);
-            
             const summaryLabel = garmentIdSearch ? '编号搜索结果' : (locFilter === 'Sold' ? '已售出總計' : '未售出庫存');
 
             summaryText.innerHTML = garmentIdSearch ? `
@@ -2621,6 +2619,7 @@ window.closeImageViewer = function() {
             const selectedStyleSku = normalizeStyleSku(styleSkuFilter);
             const selectedStyleEntry = normalizeStyleSkuCatalog(appSettings.styleSkus).find(entry => entry.sku === selectedStyleSku);
             const displayStyle = styleSkuFilter === 'all' ? '全部商品' : `${selectedStyleSku}${selectedStyleEntry?.name ? ` · ${selectedStyleEntry.name}` : ''}`;
+            const includeLocationColumn = locFilter === 'all' || Boolean(garmentIdSearch);
 
             let exportData = [];
             let totalQty = 0;

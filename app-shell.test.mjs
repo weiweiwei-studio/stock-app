@@ -57,10 +57,16 @@ test('PDF export keeps complete inventory rows together across pages', () => {
 });
 
 test('all-location PDF identifies current locations without crowding specific-location reports', () => {
-    assert.match(app, /const includeLocationColumn = locFilter === ['"]all['"] \|\| Boolean\(garmentIdSearch\)/);
-    assert.match(app, /summarizeCurrentLocations\(locPhotos\)/);
-    assert.match(app, /includeLocationColumn[\s\S]*目前位置/);
-    assert.match(app, /orientation: includeLocationColumn \? ['"]landscape['"] : ['"]portrait['"]/);
+    const exportStart = app.indexOf('window.exportLocationPDF = async function()');
+    const exportEnd = app.indexOf('function resetExportButton', exportStart);
+    const exportFunction = app.slice(exportStart, exportEnd);
+
+    assert.notEqual(exportStart, -1);
+    assert.notEqual(exportEnd, -1);
+    assert.match(exportFunction, /const includeLocationColumn = locFilter === ['"]all['"] \|\| Boolean\(garmentIdSearch\)/);
+    assert.match(exportFunction, /summarizeCurrentLocations\(locPhotos\)/);
+    assert.match(exportFunction, /includeLocationColumn[\s\S]*目前位置/);
+    assert.match(exportFunction, /orientation: includeLocationColumn \? ['"]landscape['"] : ['"]portrait['"]/);
 });
 
 test('allocation and PDF export preserve product filtering after category migration', () => {
