@@ -67,3 +67,20 @@ test('inventory product filter remains usable on a phone', async ({ page }) => {
     expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
     expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
 });
+
+test('legacy Garment ID migration controls remain usable on a phone', async ({ page }) => {
+    await page.evaluate(() => {
+        document.getElementById('auth-screen')?.classList.add('hidden');
+        document.body.classList.remove('auth-pending');
+        document.getElementById('view-settings')?.classList.remove('hidden');
+    });
+
+    const preview = page.locator('#garment-id-preview');
+    await preview.scrollIntoViewIfNeeded();
+    await expect(preview).toBeInViewport();
+    for (const selector of ['#garment-id-scan-button', '#garment-id-backup-button', '#garment-id-run-button']) {
+        const box = await page.locator(selector).boundingBox();
+        expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+});

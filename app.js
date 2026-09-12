@@ -4,6 +4,7 @@
         import { reconcileNewItemPhotos, resizeItemPhotos } from "./inventory-utils.js";
         import { DEFAULT_STYLE_SKUS, assignMissingGarmentIds, hasGarmentIds, normalizeStyleSku, normalizeStyleSkuCatalog } from "./sku-utils.js";
         import { buildLegacySkuPlan, garmentIdsMatchSku, makeSkuMigrationBackup } from "./sku-migration-utils.js";
+        import { GARMENT_ID_MIGRATION_BATCH_SIZE, assignLegacyGarmentIds, buildGarmentIdMigrationPlan, makeGarmentIdMigrationBackup } from "./garment-id-migration-utils.js";
         import { getRemainingTimeout, mapWithConcurrency } from "./pdf-export-utils.js";
         import { MIGRATION_BATCH_SIZE, collectMigrationState, makeBackupPayload } from "./image-migration-utils.js";
         import { escapeHtml, inlineString, safeImageUrl } from "./security-utils.js";
@@ -60,6 +61,9 @@
         let legacySkuPlan = [];
         let legacySkuBackupReady = false;
         let legacySkuMigrationRunning = false;
+        let garmentIdMigrationPlan = [];
+        let garmentIdBackupReady = false;
+        let garmentIdMigrationRunning = false;
         const migrationSessionId = typeof crypto.randomUUID === 'function'
             ? crypto.randomUUID()
             : `${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -2048,6 +2052,7 @@
                 .join('');
             window.refreshImageMigrationStatus();
             if (legacySkuPlan.length === 0 && !legacySkuMigrationRunning) window.refreshLegacySkuMigration();
+            if (garmentIdMigrationPlan.length === 0 && !garmentIdMigrationRunning) window.refreshGarmentIdMigration();
         };
 
         function renderLegacySkuMigration() {
@@ -2163,6 +2168,116 @@
             renderLegacySkuMigration();
             document.getElementById('sku-migration-status').textContent = `完成 ${completed} 筆，跳過或失敗 ${errors.length} 筆。請重新掃描確認結果。`;
             const errorEl = document.getElementById('sku-migration-errors');
+            errorEl.textContent = errors.join('\n');
+            errorEl.classList.toggle('hidden', errors.length === 0);
+        };
+
+        function renderGarmentIdMigration() {
+            const counts = { ready: 0, blocked: 0, unchanged: 0 };
+            garmentIdMigrationPlan.forEach(row => { counts[row.status] = (counts[row.status] || 0) + 1; });
+            const missingPieces = garmentIdMigrationPlan
+                .filter(row => row.status === 'ready')
+                .reduce((sum, row) => sum + row.missingCount, 0);
+            document.getElementById('garment-id-ready').textContent = counts.ready;
+            document.getElementById('garment-id-pieces').textContent = missingPieces;
+            document.getElementById('garment-id-blocked').textContent = counts.blocked;
+            document.getElementById('garment-id-unchanged').textContent = counts.unchanged;
+
+            const rows = garmentIdMigrationPlan.filter(row => row.status !== 'unchanged');
+            const visibleRows = rows.slice(0, 200);
+            document.getElementById('garment-id-preview').innerHTML = visibleRows.length === 0
+                ? '<div class="rounded bg-emerald-50 p-3 text-xs font-bold text-emerald-700">全部商品已有永久编号。</div>'
+                : visibleRows.map(row => {
+                    const statusClass = row.status === 'ready' ? 'text-emerald-700' : 'text-red-700';
+                    return `<div class="grid grid-cols-1 gap-2 border-b border-stone-100 p-3 md:grid-cols-[1fr_120px_1fr]">
+                        <div class="text-xs"><b>${escapeHtml(row.itemName || '未填品名')}</b><br><span class="font-mono text-stone-500">${escapeHtml(row.sku || '未填 SKU')}</span></div>
+                        <div class="text-xs text-stone-500">共 ${row.pieceCount} 件<br>缺 ${row.missingCount} 个编号</div>
+                        <div class="text-xs font-bold ${statusClass}">${escapeHtml(row.message)}</div>
+                    </div>`;
+                }).join('') + (rows.length > visibleRows.length
+                    ? `<div class="p-3 text-center text-xs text-stone-400">另有 ${rows.length - visibleRows.length} 笔；执行或重新扫描后会继续显示。</div>`
+                    : '');
+
+            document.getElementById('garment-id-scan-button').disabled = garmentIdMigrationRunning;
+            document.getElementById('garment-id-backup-button').disabled = garmentIdMigrationRunning || garmentIdMigrationPlan.length === 0;
+            document.getElementById('garment-id-run-button').disabled = garmentIdMigrationRunning || !garmentIdBackupReady || counts.ready === 0;
+            document.getElementById('garment-id-status').textContent = garmentIdMigrationRunning
+                ? '正在安全补编号，请不要关闭页面…'
+                : garmentIdBackupReady
+                    ? `备份已下载；每次最多处理 ${GARMENT_ID_MIGRATION_BATCH_SIZE} 笔工单。`
+                    : '请先检查预览并下载完整备份；冲突资料不会自动处理。';
+        }
+
+        window.refreshGarmentIdMigration = function() {
+            if (garmentIdMigrationRunning) return;
+            garmentIdMigrationPlan = buildGarmentIdMigrationPlan(db, appSettings.styleSkus);
+            garmentIdBackupReady = false;
+            renderGarmentIdMigration();
+        };
+
+        window.downloadGarmentIdBackup = function() {
+            const payload = makeGarmentIdMigrationBackup(db, garmentIdMigrationPlan);
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `weiweiwei-garment-id-backup-${new Date().toISOString().slice(0, 10)}.json`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            garmentIdBackupReady = true;
+            renderGarmentIdMigration();
+        };
+
+        window.runGarmentIdMigration = async function() {
+            if (garmentIdMigrationRunning || !garmentIdBackupReady) return;
+            const batch = garmentIdMigrationPlan
+                .filter(row => row.status === 'ready')
+                .slice(0, GARMENT_ID_MIGRATION_BATCH_SIZE);
+            if (batch.length === 0) return;
+            const pieceCount = batch.reduce((sum, row) => sum + row.missingCount, 0);
+            if (!confirm(`将为 ${batch.length} 笔工单补上 ${pieceCount} 个永久 Garment ID。包含 Sold；不会改变售价、地点或销售状态。确定继续？`)) return;
+
+            garmentIdMigrationRunning = true;
+            renderGarmentIdMigration();
+            const errors = [];
+            let completed = 0;
+            for (const row of batch) {
+                try {
+                    const itemRef = doc(dbFirestore, 'stock_items', row.itemId);
+                    const counterRef = doc(dbFirestore, 'settings', 'garment_counters');
+                    await runTransaction(dbFirestore, async transaction => {
+                        const itemSnapshot = await transaction.get(itemRef);
+                        if (!itemSnapshot.exists()) throw new Error('商品已不存在');
+                        const latestItem = itemSnapshot.data();
+                        assertVersion(latestItem, row.version);
+                        if (normalizeStyleSku(latestItem.styleSku) !== row.sku) throw new Error('Style SKU 已改变，请重新扫描');
+
+                        const counterSnapshot = await transaction.get(counterRef);
+                        const counters = { ...(counterSnapshot.exists() ? counterSnapshot.data().counters || {} : {}) };
+                        const allocation = assignLegacyGarmentIds(latestItem, Number(counters[row.sku]) || 0, row.maximumSequence);
+                        counters[row.sku] = allocation.nextCounter;
+                        transaction.set(counterRef, { counters, updatedAt: serverTimestamp() }, { merge: true });
+                        transaction.update(itemRef, {
+                            photos: allocation.photos,
+                            _version: nextVersion(latestItem),
+                            updatedAt: serverTimestamp()
+                        });
+                    });
+                    completed++;
+                    document.getElementById('garment-id-status').textContent = `已完成 ${completed}/${batch.length} 笔…`;
+                } catch (error) {
+                    errors.push(`${row.itemName || row.itemId}: ${error.message}`);
+                }
+            }
+
+            garmentIdMigrationRunning = false;
+            garmentIdMigrationPlan = buildGarmentIdMigrationPlan(db, appSettings.styleSkus);
+            garmentIdBackupReady = false;
+            renderGarmentIdMigration();
+            document.getElementById('garment-id-status').textContent = `本批完成 ${completed} 笔，失败或跳过 ${errors.length} 笔。请重新扫描确认；如仍有待处理资料，请重新下载备份后继续。`;
+            const errorEl = document.getElementById('garment-id-errors');
             errorEl.textContent = errors.join('\n');
             errorEl.classList.toggle('hidden', errors.length === 0);
         };

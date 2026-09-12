@@ -5,7 +5,7 @@
   "scripts": {
     "build:css": "tailwindcss -i ./tailwind-input.css -o ./styles.css --minify",
     "check:css": "npm run build:css && git diff --exit-code -- styles.css",
-    "test": "node --test view-utils.test.mjs auth-utils.test.mjs data-integrity.test.mjs security-utils.test.mjs image-utils.test.mjs image-migration-utils.test.mjs inventory-utils.test.mjs sku-utils.test.mjs sku-migration-utils.test.mjs pdf-export-utils.test.mjs app-shell.test.mjs",
+    "test": "node --test view-utils.test.mjs auth-utils.test.mjs data-integrity.test.mjs security-utils.test.mjs image-utils.test.mjs image-migration-utils.test.mjs inventory-utils.test.mjs sku-utils.test.mjs sku-migration-utils.test.mjs garment-id-migration-utils.test.mjs pdf-export-utils.test.mjs app-shell.test.mjs",
     "test:mobile": "playwright test",
     "check": "npm test && npm run check:css && npm run test:mobile"
   },
