@@ -1,5 +1,6 @@
         import { ADMIN_EMAIL, getAuthErrorMessage, isAuthorizedAdmin } from "./auth-utils.js";
         import { isLocationReferenced, isStyleSkuReferenced, partitionStockItems } from "./archive-utils.js";
+        import { POPUP_SALES_CHANNEL, POPUP_SALES_EVENT, formatSoldMoney, getPopupSoldLocation, getSoldCurrency } from "./sales-utils.js";
         import { assertVersion, deriveItemStatus, getVersion, nextVersion } from "./data-integrity.js";
         import { optimizeImage } from "./image-utils.js";
         import { reconcileNewItemPhotos, resizeItemPhotos } from "./inventory-utils.js";
@@ -371,6 +372,12 @@
                     notes: p.notes || '',
                     soldPrice: p.soldPrice !== undefined ? p.soldPrice : null,
                     soldAt: p.soldAt || null,
+                    soldCurrency: p.soldCurrency || null,
+                    paymentMethod: p.paymentMethod || null,
+                    salesChannel: p.salesChannel || null,
+                    saleEvent: p.saleEvent || null,
+                    soldLocation: p.soldLocation || null,
+                    salesNote: p.salesNote || '',
                     specificPrice: p.specificPrice !== undefined ? p.specificPrice : null
                 };
             });
@@ -995,6 +1002,7 @@
                 
                 photos.forEach(p => {
                     if (p.status === 'Sold') {
+                        if (getSoldCurrency(p) !== 'MYR') return;
                         const soldPrice = Number(p.soldPrice) || Number(item.price) || 0;
                         
                         let loc = p.locations.length > 0 ? p.locations[p.locations.length - 1] : 'Unknown';
@@ -1537,12 +1545,20 @@
             
             let priceText = displaySpecPrice ? `RM${displaySpecPrice}` : '未定價';
             if(p.status === 'Sold') {
-                const soldPrice = p.soldPrice || '-';
+                const soldPrice = formatSoldMoney(p.soldPrice, getSoldCurrency(p));
                 let dateStr = '';
                 if(p.soldAt) { const dateObj = p.soldAt.seconds ? new Date(p.soldAt.seconds * 1000) : new Date(p.soldAt); dateStr = ` @ ${dateObj.toLocaleDateString()}`; }
-                priceText += ` (Sold: RM${soldPrice}${dateStr})`;
+                priceText += ` (Sold: ${soldPrice}${dateStr})`;
             }
             document.getElementById('detail-price-display').innerText = `Price: ${priceText}`;
+            const saleMeta = document.getElementById('detail-sale-meta');
+            if (p.status === 'Sold' && (p.paymentMethod || p.salesNote || p.saleEvent || p.soldLocation)) {
+                saleMeta.textContent = [p.paymentMethod, p.soldLocation, p.saleEvent, p.salesNote].filter(Boolean).join(' · ');
+                saleMeta.classList.remove('hidden');
+            } else {
+                saleMeta.textContent = '';
+                saleMeta.classList.add('hidden');
+            }
             
             document.getElementById('detail-notes').value = p.notes;
             document.getElementById('detail-photo-upload').value = ''; 
@@ -1635,31 +1651,64 @@
         
         window.triggerSoldFlow = function() {
             let photos = normalizePhotos(currentDetailItem); const currentStatus = photos[currentDetailPhotoIdx].status;
-            if (currentStatus === 'Sold') { if(confirm("確認取消售出？物品將回到庫存中。")) updateItemStatus({ status: 'Available', soldPrice: null, soldAt: null }); }
+            if (currentStatus === 'Sold') { if(confirm("確認取消售出？物品將回到庫存中。")) updateItemStatus({ status: 'Available', soldPrice: null, soldAt: null, soldCurrency: null, paymentMethod: null, salesChannel: null, saleEvent: null, soldLocation: null, salesNote: '' }); }
             else { 
-                let basePrice = currentDetailItem.price || '';
-                let piecePrice = photos[currentDetailPhotoIdx].specificPrice !== undefined && photos[currentDetailPhotoIdx].specificPrice !== null ? photos[currentDetailPhotoIdx].specificPrice : basePrice;
-                
-                document.getElementById('sold-price-input').value = piecePrice; 
+                document.getElementById('sold-price-input').value = '';
+                document.getElementById('sold-payment-method').value = '';
                 document.getElementById('sold-note-input').value = ''; 
                 document.getElementById('sold-date-input').valueAsDate = new Date(); 
                 document.getElementById('sold-modal').classList.remove('hidden'); 
             }
         };
-        window.confirmSoldAction = function() {
-            const soldPrice = document.getElementById('sold-price-input').value; const note = document.getElementById('sold-note-input').value; const dateVal = document.getElementById('sold-date-input').value;
+        window.confirmSoldAction = async function() {
+            const soldPriceInput = document.getElementById('sold-price-input');
+            const paymentInput = document.getElementById('sold-payment-method');
+            const dateInput = document.getElementById('sold-date-input');
+            const noteInput = document.getElementById('sold-note-input');
+            const button = document.getElementById('btn-confirm-sold');
+            const soldPrice = Number(soldPriceInput.value);
+            const paymentMethod = paymentInput.value;
+            const dateVal = dateInput.value;
+            if (soldPriceInput.value === '' || !Number.isFinite(soldPrice) || soldPrice < 0) {
+                alert('请输入正确的 SGD 售出价格。');
+                soldPriceInput.focus();
+                return;
+            }
+            if (!paymentMethod) {
+                alert('请选择付款方式。');
+                paymentInput.focus();
+                return;
+            }
+            if (!dateVal) {
+                alert('请选择售出日期。');
+                dateInput.focus();
+                return;
+            }
             const patch = {
                 status: 'Sold',
                 soldPrice,
-                soldAt: dateVal ? new Date(dateVal.replace(/-/g, '/')) : new Date(),
+                soldCurrency: 'SGD',
+                paymentMethod,
+                soldAt: new Date(dateVal.replace(/-/g, '/')),
+                salesChannel: POPUP_SALES_CHANNEL,
+                saleEvent: POPUP_SALES_EVENT,
+                soldLocation: getPopupSoldLocation(tempLocations),
+                salesNote: noteInput.value.trim(),
                 locations: [...tempLocations]
             };
-            document.getElementById('sold-modal').classList.add('hidden');
-            updateItemStatus(patch, note);
+            button.disabled = true;
+            button.textContent = '记录中...';
+            const succeeded = await updateItemStatus(patch, '', true);
+            if (succeeded) document.getElementById('sold-modal').classList.add('hidden');
+            button.disabled = false;
+            button.textContent = '确认售出';
         };
-        async function updateItemStatus(patch, noteToAppend = '') {
+        async function updateItemStatus(patch, noteToAppend = '', preventDuplicateSale = false) {
             try {
                 await updatePhotoAtomic(currentDetailItem.id, currentDetailPhotoIdx, latestPhoto => {
+                    if (preventDuplicateSale && latestPhoto.status === 'Sold') {
+                        throw new Error('此商品已经被标记为售出，请重新整理确认。');
+                    }
                     if (!noteToAppend) return patch;
                     return {
                         ...patch,
@@ -1667,8 +1716,10 @@
                     };
                 }, true);
                 window.closeDetailModal();
+                return true;
             } catch (error) {
                 alert('更新售出狀態失敗：' + error.message);
+                return false;
             }
         }
         window.closeDetailModal = () => document.getElementById('detail-modal').classList.add('hidden');
@@ -2214,8 +2265,12 @@
                 const imageUrl = safeImageUrl(photo.thumbnailUrl || photo.url);
                 const locations = Array.isArray(photo.locations) && photo.locations.length ? photo.locations.join(' + ') : '无地点';
                 const price = photo.status === 'Sold'
-                    ? (photo.soldPrice ? `Sold RM${photo.soldPrice}` : 'Sold')
+                    ? (photo.soldPrice !== null && photo.soldPrice !== undefined && photo.soldPrice !== '' ? `Sold ${formatSoldMoney(photo.soldPrice, getSoldCurrency(photo))}` : 'Sold')
                     : (photo.specificPrice !== undefined && photo.specificPrice !== null ? `RM${photo.specificPrice}` : (item.price ? `RM${item.price}` : '未定价'));
+                const soldDate = photo.soldAt ? formatDateForInput(photo.soldAt) : '';
+                const saleDetails = photo.status === 'Sold'
+                    ? [soldDate, photo.paymentMethod, photo.soldLocation, photo.saleEvent, photo.salesNote].filter(Boolean).join(' · ')
+                    : '';
                 return `<div class="flex gap-3 rounded border border-stone-200 p-3">
                     <div class="h-20 w-16 flex-shrink-0 overflow-hidden rounded bg-stone-100">
                         ${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="" class="h-full w-full object-cover">` : '<div class="flex h-full items-center justify-center text-[10px] text-stone-400">No Img</div>'}
@@ -2224,6 +2279,7 @@
                         <div class="font-mono font-bold text-stone-800">${escapeHtml(photo.garmentId || `${item.styleSku || 'Item'} #${index + 1}`)}</div>
                         <div class="mt-1">${escapeHtml(photo.status || item.status || 'Unknown')} · ${escapeHtml(price)}</div>
                         <div class="mt-1 break-words">位置：${escapeHtml(locations)}</div>
+                        ${saleDetails ? `<div class="mt-1 break-words text-stone-500">销售：${escapeHtml(saleDetails)}</div>` : ''}
                         ${photo.notes ? `<div class="mt-1 break-words text-stone-500">备注：${escapeHtml(photo.notes)}</div>` : ''}
                     </div>
                 </div>`;
