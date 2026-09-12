@@ -130,6 +130,7 @@ test('Singapore popup sale form remains usable on a phone', async ({ page }) => 
     await expect(modal).toBeInViewport();
     await expect(page.locator('#sold-price-input')).toHaveAttribute('inputmode', 'decimal');
     await expect(page.locator('#sold-payment-method')).toBeVisible();
+    await expect(page.locator('#popup-sale-mode')).toBeVisible();
     const confirmButton = page.locator('#btn-confirm-sold');
     expect((await confirmButton.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
     expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
