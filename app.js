@@ -1,6 +1,7 @@
         import { ADMIN_EMAIL, getAuthErrorMessage, isAuthorizedAdmin } from "./auth-utils.js";
         import { isLocationReferenced, isStyleSkuReferenced, partitionStockItems } from "./archive-utils.js";
         import { POPUP_SALES_CHANNEL, POPUP_SALES_EVENT, formatSoldMoney, getPopupSoldLocation, getSoldCurrency, hasSingaporePopupLocation } from "./sales-utils.js";
+        import { buildPopupSalesCsv, collectPopupSales, filterPopupSales, summarizePopupSales } from "./popup-report-utils.js";
         import { assertVersion, deriveItemStatus, getVersion, nextVersion } from "./data-integrity.js";
         import { optimizeImage } from "./image-utils.js";
         import { reconcileNewItemPhotos, resizeItemPhotos } from "./inventory-utils.js";
@@ -533,6 +534,7 @@
             document.getElementById('kpi-studio').textContent = studioCount;
             document.getElementById('kpi-unallocated').textContent = unallocatedCount;
             document.getElementById('kpi-sold').textContent = soldCount;
+            renderPopupSalesSnapshot();
 
             renderCategoryBadges(catUnsoldStats, catUnshippedStats);
             renderLocationButtons(locStats);
@@ -545,6 +547,115 @@
             window.updateCatLocDistribution();
             window.updateBusinessAnalytics();
         }
+
+        function getPopupSalesRecords() {
+            return collectPopupSales([...db, ...archivedItems], normalizePhotos).map(record => ({
+                ...record,
+                category: getCleanCategory(record.category)
+            }));
+        }
+
+        function formatSgdAmount(value) {
+            return `SGD ${(Number(value) || 0).toFixed(2)}`;
+        }
+
+        function renderPopupSalesSnapshot() {
+            const records = getPopupSalesRecords();
+            const summary = summarizePopupSales(records);
+            const count = document.getElementById('popup-sales-dashboard-count');
+            const total = document.getElementById('popup-sales-dashboard-total');
+            if (count) count.textContent = `${summary.count} 件`;
+            if (total) total.textContent = formatSgdAmount(summary.total);
+            const modal = document.getElementById('popup-sales-report-modal');
+            if (modal && !modal.classList.contains('hidden') && typeof window.renderPopupSalesReport === 'function') {
+                window.renderPopupSalesReport();
+            }
+        }
+
+        window.openPopupSalesReport = function() {
+            const modal = document.getElementById('popup-sales-report-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            window.renderPopupSalesReport();
+        };
+
+        window.closePopupSalesReport = function() {
+            const modal = document.getElementById('popup-sales-report-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        };
+
+        window.resetPopupSalesFilters = function() {
+            document.getElementById('popup-report-start-date').value = '';
+            document.getElementById('popup-report-end-date').value = '';
+            document.getElementById('popup-report-payment').value = 'all';
+            window.renderPopupSalesReport();
+        };
+
+        window.renderPopupSalesReport = function() {
+            const records = filterPopupSales(getPopupSalesRecords(), {
+                startDate: document.getElementById('popup-report-start-date').value,
+                endDate: document.getElementById('popup-report-end-date').value,
+                paymentMethod: document.getElementById('popup-report-payment').value
+            });
+            const summary = summarizePopupSales(records);
+            document.getElementById('popup-report-count').textContent = summary.count;
+            document.getElementById('popup-report-total').textContent = formatSgdAmount(summary.total);
+            document.getElementById('popup-report-average').textContent = formatSgdAmount(summary.average);
+            document.getElementById('popup-report-filter-status').textContent = `${summary.count} records`;
+            document.getElementById('popup-report-export-button').disabled = records.length === 0;
+
+            const renderBreakdown = (entries, emptyText) => entries.length
+                ? entries.map(([label, value]) => `<div class="flex items-center justify-between gap-3 rounded bg-stone-50 px-3 py-2 text-xs"><span class="font-bold text-stone-600">${escapeHtml(label)}</span><span class="text-stone-500">${value.count} 件 · <b class="text-stone-800">${escapeHtml(formatSgdAmount(value.total))}</b></span></div>`).join('')
+                : `<p class="py-2 text-xs text-stone-400">${emptyText}</p>`;
+
+            const dailyEntries = Object.entries(summary.byDate).sort(([a], [b]) => a.localeCompare(b));
+            const paymentEntries = Object.entries(summary.byPayment).sort(([, a], [, b]) => b.total - a.total);
+            document.getElementById('popup-report-daily').innerHTML = renderBreakdown(dailyEntries, '没有符合条件的销售。');
+            document.getElementById('popup-report-payments').innerHTML = renderBreakdown(paymentEntries, '没有付款记录。');
+
+            const list = document.getElementById('popup-report-list');
+            if (!records.length) {
+                list.innerHTML = '<div class="rounded bg-stone-50 py-8 text-center text-sm text-stone-400">没有符合条件的 Singapore Popup 销售。</div>';
+                return;
+            }
+            list.innerHTML = records.map(record => {
+                const identity = record.garmentId || `${record.styleSku || 'Item'} #${record.photoIndex + 1}`;
+                const originalLocation = record.originalLocations.join(' + ') || 'No location';
+                return `<div class="rounded border border-stone-200 p-3">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <div class="break-words font-mono text-sm font-black text-stone-800">${escapeHtml(identity)}</div>
+                            <div class="mt-1 break-words text-xs text-stone-600">${escapeHtml(record.itemName || record.styleSku || '-')} · ${escapeHtml(record.category || '-')}</div>
+                        </div>
+                        <div class="flex-shrink-0 text-right"><div class="font-black text-pink-700">${escapeHtml(formatSgdAmount(record.soldPrice))}</div><div class="mt-1 text-[10px] text-stone-500">${escapeHtml(record.paymentMethod)}</div></div>
+                    </div>
+                    <div class="mt-2 text-[10px] leading-5 text-stone-500">${escapeHtml(record.soldDate || 'Date not recorded')} · Sold at: ${escapeHtml(record.soldLocation || 'Singapore Popup')} · From: ${escapeHtml(originalLocation)}</div>
+                    ${record.salesNote ? `<div class="mt-1 break-words rounded bg-yellow-50 px-2 py-1 text-xs text-stone-600">Note: ${escapeHtml(record.salesNote)}</div>` : ''}
+                </div>`;
+            }).join('');
+        };
+
+        window.exportPopupSalesCsv = function() {
+            const records = filterPopupSales(getPopupSalesRecords(), {
+                startDate: document.getElementById('popup-report-start-date').value,
+                endDate: document.getElementById('popup-report-end-date').value,
+                paymentMethod: document.getElementById('popup-report-payment').value
+            });
+            if (!records.length) {
+                alert('没有可导出的 Singapore Popup 销售记录。');
+                return;
+            }
+            const blob = new Blob([`\uFEFF${buildPopupSalesCsv(records)}`], { type: 'text/csv;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `Singapore_Popup_Sales_${new Date().toISOString().slice(0, 10)}.csv`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+        };
         
         window.renderMonthlyCategorySales = function() {
             const container = document.getElementById('monthly-category-sales-container');
