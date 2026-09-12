@@ -68,8 +68,8 @@ test('inventory product filter remains usable on a phone', async ({ page }) => {
     const search = page.locator('#allocation-garment-search');
     await expect(search).toBeVisible();
     expect((await search.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
-    await expect(page.locator('#allocation-page-numbers-mobile')).toBeVisible();
-    await expect(page.locator('#allocation-page-numbers-desktop')).toBeHidden();
+    await expect(page.locator('#allocation-page-numbers-mobile')).toHaveCSS('display', 'flex');
+    await expect(page.locator('#allocation-page-numbers-desktop')).toHaveCSS('display', 'none');
     expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
 });
 
