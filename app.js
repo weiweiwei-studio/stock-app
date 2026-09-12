@@ -2176,10 +2176,64 @@
                         <div class="truncate text-sm font-bold text-stone-700">${escapeHtml(item.itemName || item.styleSku || '未命名工单')}</div>
                         <div class="mt-1 text-[10px] text-stone-500"><span class="font-mono">${escapeHtml(item.styleSku || '未配对 SKU')}</span> · ${pieceCount} 件 · 封存于 ${escapeHtml(archivedDate)}</div>
                     </div>
-                    <button type="button" onclick="window.restoreArchivedItem(${inlineString(item.id)})" class="min-h-[44px] flex-shrink-0 rounded border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100">恢复工单</button>
+                    <div class="flex flex-shrink-0 gap-2">
+                        <button type="button" onclick="window.openArchivedItemDetails(${inlineString(item.id)})" class="min-h-[44px] rounded border border-stone-200 bg-white px-3 py-2 text-xs font-bold text-stone-700 hover:bg-stone-50">查看详情</button>
+                        <button type="button" onclick="window.restoreArchivedItem(${inlineString(item.id)})" class="min-h-[44px] rounded border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100">恢复工单</button>
+                    </div>
                 </div>`;
             }).join('');
         }
+
+        window.openArchivedItemDetails = function(itemId) {
+            const item = archivedItems.find(candidate => candidate.id === itemId);
+            if (!item) {
+                alert('找不到此封存工单，资料可能已经恢复。');
+                return;
+            }
+
+            const photos = normalizePhotos(item);
+            const archivedDate = item.archivedAt ? formatDateForInput(item.archivedAt) || '日期待同步' : '旧封存资料';
+            document.getElementById('archived-detail-title').textContent = item.itemName || item.styleSku || '未命名工单';
+            document.getElementById('archived-detail-summary').textContent = [
+                item.styleSku || '未配对 SKU',
+                getCleanCategory(item.category) || '未分类',
+                `${photos.length || Number(item.quantity) || 1} 件`,
+                `封存于 ${archivedDate}`
+            ].join(' · ');
+            document.getElementById('archived-detail-meta').innerHTML = [
+                ['月份', item.month || '-'],
+                ['制作人', item.maker || '-'],
+                ['生产 Studio', item.studio || '-'],
+                ['颜色', item.color || '-'],
+                ['尺寸', item.size || '-'],
+                ['主定价', item.price ? `RM${item.price}` : '-']
+            ].map(([label, value]) => `<div class="rounded bg-stone-50 p-2"><div class="text-[10px] text-stone-400">${escapeHtml(label)}</div><div class="mt-0.5 text-xs font-bold text-stone-700">${escapeHtml(value)}</div></div>`).join('');
+
+            const pieces = photos.length ? photos : [{ locations: [], status: item.status || 'Unknown' }];
+            document.getElementById('archived-detail-pieces').innerHTML = pieces.map((photo, index) => {
+                const imageUrl = safeImageUrl(photo.thumbnailUrl || photo.url);
+                const locations = Array.isArray(photo.locations) && photo.locations.length ? photo.locations.join(' + ') : '无地点';
+                const price = photo.status === 'Sold'
+                    ? (photo.soldPrice ? `Sold RM${photo.soldPrice}` : 'Sold')
+                    : (photo.specificPrice !== undefined && photo.specificPrice !== null ? `RM${photo.specificPrice}` : (item.price ? `RM${item.price}` : '未定价'));
+                return `<div class="flex gap-3 rounded border border-stone-200 p-3">
+                    <div class="h-20 w-16 flex-shrink-0 overflow-hidden rounded bg-stone-100">
+                        ${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="" class="h-full w-full object-cover">` : '<div class="flex h-full items-center justify-center text-[10px] text-stone-400">No Img</div>'}
+                    </div>
+                    <div class="min-w-0 flex-1 text-xs text-stone-600">
+                        <div class="font-mono font-bold text-stone-800">${escapeHtml(photo.garmentId || `${item.styleSku || 'Item'} #${index + 1}`)}</div>
+                        <div class="mt-1">${escapeHtml(photo.status || item.status || 'Unknown')} · ${escapeHtml(price)}</div>
+                        <div class="mt-1 break-words">位置：${escapeHtml(locations)}</div>
+                        ${photo.notes ? `<div class="mt-1 break-words text-stone-500">备注：${escapeHtml(photo.notes)}</div>` : ''}
+                    </div>
+                </div>`;
+            }).join('');
+            document.getElementById('archived-detail-modal').classList.remove('hidden');
+        };
+
+        window.closeArchivedItemDetails = function() {
+            document.getElementById('archived-detail-modal').classList.add('hidden');
+        };
 
         window.restoreArchivedItem = async function(itemId) {
             if (!confirm('确定恢复此工单？恢复后会重新出现在日常页面、统计和 PDF。')) return;
