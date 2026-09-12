@@ -5,7 +5,7 @@
         import { DEFAULT_STYLE_SKUS, assignMissingGarmentIds, hasGarmentIds, normalizeStyleSku, normalizeStyleSkuCatalog, normalizeStyleSkuCategory } from "./sku-utils.js";
         import { buildLegacySkuPlan, garmentIdsMatchSku, makeSkuMigrationBackup } from "./sku-migration-utils.js";
         import { GARMENT_ID_MIGRATION_BATCH_SIZE, assignLegacyGarmentIds, buildGarmentIdMigrationPlan, makeGarmentIdMigrationBackup } from "./garment-id-migration-utils.js";
-        import { getRemainingTimeout, mapWithConcurrency } from "./pdf-export-utils.js";
+        import { getRemainingTimeout, mapWithConcurrency, summarizeCurrentLocations } from "./pdf-export-utils.js";
         import { MIGRATION_BATCH_SIZE, collectMigrationState, makeBackupPayload } from "./image-migration-utils.js";
         import { escapeHtml, inlineString, safeImageUrl } from "./security-utils.js";
         import { DEFAULT_PAGE_SIZE, buildPaginationItems, filterAllocationItemsByCategory, filterAllocationItemsByStyleSku, normalizeGarmentIdSearch, paginate, photoMatchesGarmentSearch, prepareAllocationPage } from "./view-utils.js";
@@ -1246,6 +1246,7 @@
             const selectedStyleSku = normalizeStyleSku(styleSkuFilter);
             const selectedStyleEntry = normalizeStyleSkuCatalog(appSettings.styleSkus).find(entry => entry.sku === selectedStyleSku);
             const displayStyle = styleSkuFilter === 'all' ? '全部商品' : `${selectedStyleSku}${selectedStyleEntry?.name ? ` · ${selectedStyleEntry.name}` : ''}`;
+            const includeLocationColumn = locFilter === 'all' || Boolean(garmentIdSearch);
             
             const summaryLabel = garmentIdSearch ? '编号搜索结果' : (locFilter === 'Sold' ? '已售出總計' : '未售出庫存');
 
@@ -2670,6 +2671,7 @@ window.closeImageViewer = function() {
                         category: getCleanCategory(item.category),
                         itemName: item.itemName,
                         garmentIds: locPhotos.map(photo => photo.garmentId || item.styleSku || '尚未編號'),
+                        currentLocations: summarizeCurrentLocations(locPhotos),
                         color: item.color || '-',
                         size: item.size || '-',
                         price: item.price ? `RM ${item.price}` : '-',
@@ -2735,6 +2737,12 @@ window.closeImageViewer = function() {
             container.style.backgroundColor = '#ffffff';
 
             const dateStr = new Date().toLocaleString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+            const columnWidths = includeLocationColumn
+                ? { image: 16, date: 11, category: 10, item: 24, spec: 11, location: 14, price: 8, qty: 6 }
+                : { image: 18, date: 12, category: 12, item: 28, spec: 12, location: 0, price: 10, qty: 8 };
+            const locationHeaderHtml = includeLocationColumn
+                ? `<th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: ${columnWidths.location}%; line-height: 1.35; vertical-align: middle;">目前位置</th>`
+                : '';
 
             let html = `
                 <div class="pdf-report-header" style="text-align: center; margin-bottom: 25px; border-bottom: 2px solid #78716c; padding-bottom: 15px; page-break-inside: avoid; break-inside: avoid;">
@@ -2748,13 +2756,14 @@ window.closeImageViewer = function() {
                 <table style="width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 11px; line-height: 1.45; text-align: left;">
                     <thead style="display: table-header-group;">
                         <tr style="background-color: #f5f5f4; color: #78716c;">
-                            <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 18%; line-height: 1.35; vertical-align: middle; text-align: center;">商品圖</th>
-                            <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 12%; line-height: 1.35; vertical-align: middle;">入庫日期</th>
-                            <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 12%; line-height: 1.35; vertical-align: middle;">類別</th>
-                            <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 28%; line-height: 1.35; vertical-align: middle;">品名項目 (Item Name)</th>
-                            <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 12%; line-height: 1.35; vertical-align: middle;">規格</th>
-                            <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 10%; line-height: 1.35; vertical-align: middle; text-align: right;">主定價</th>
-                            <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: 8%; line-height: 1.35; vertical-align: middle; text-align: center;">數量</th>
+                            <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: ${columnWidths.image}%; line-height: 1.35; vertical-align: middle; text-align: center;">商品圖</th>
+                            <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: ${columnWidths.date}%; line-height: 1.35; vertical-align: middle;">入庫日期</th>
+                            <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: ${columnWidths.category}%; line-height: 1.35; vertical-align: middle;">類別</th>
+                            <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: ${columnWidths.item}%; line-height: 1.35; vertical-align: middle;">品名項目 (Item Name)</th>
+                            <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: ${columnWidths.spec}%; line-height: 1.35; vertical-align: middle;">規格</th>
+                            ${locationHeaderHtml}
+                            <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: ${columnWidths.price}%; line-height: 1.35; vertical-align: middle; text-align: right;">主定價</th>
+                            <th style="padding: 8px 5px; border-bottom: 2px solid #d6d3d1; width: ${columnWidths.qty}%; line-height: 1.35; vertical-align: middle; text-align: center;">數量</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -2762,6 +2771,9 @@ window.closeImageViewer = function() {
 
             exportData.forEach((row, idx) => {
                 const rowBg = idx % 2 === 0 ? '#ffffff' : '#fafaf9';
+                const locationCellHtml = includeLocationColumn
+                    ? `<td style="padding: 8px 5px; color: #57534e; vertical-align: middle; font-size: 10px; line-height: 1.45; overflow-wrap: anywhere; word-break: break-word;">${row.currentLocations.map(entry => `<div>${escapeHtml(entry.label)}${entry.count > 1 ? ` ×${entry.count}` : ''}</div>`).join('')}</td>`
+                    : '';
                 
                 // 多張照片的排版邏輯
                 let imgHtml = '';
@@ -2784,6 +2796,7 @@ window.closeImageViewer = function() {
                             <div style="line-height: 1.45;">${escapeHtml(row.color)}</div>
                             <div style="margin-top: 2px; line-height: 1.45; font-size: 10px; color: #78716c;">Size: ${escapeHtml(row.size)}</div>
                         </td>
+                        ${locationCellHtml}
                         <td style="padding: 8px 5px; text-align: right; color: #44403c; vertical-align: middle; line-height: 1.45; white-space: nowrap;">${escapeHtml(row.price)}</td>
                         <td style="padding: 8px 5px; text-align: center; font-weight: 800; font-size: 13px; line-height: 1.45; color: #1c1917; vertical-align: middle; white-space: nowrap;">${row.qty}</td>
                     </tr>
@@ -2806,7 +2819,7 @@ window.closeImageViewer = function() {
                 image:        { type: 'jpeg', quality: 0.98 },
                 html2canvas:  { scale: 2, useCORS: true },
                 pagebreak:    { mode: ['css', 'legacy'], avoid: ['tr', '.pdf-report-header', '.pdf-footer'] },
-                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: includeLocationColumn ? 'landscape' : 'portrait' }
             };
 
             html2pdf().set(opt).from(container).save().then(() => {

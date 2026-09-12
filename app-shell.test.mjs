@@ -56,6 +56,13 @@ test('PDF export keeps complete inventory rows together across pages', () => {
     assert.match(app, /pagebreak:\s*\{ mode: \[['"]css['"], ['"]legacy['"]\], avoid: \[['"]tr['"], ['"]\.pdf-report-header['"], ['"]\.pdf-footer['"]\] \}/);
 });
 
+test('all-location PDF identifies current locations without crowding specific-location reports', () => {
+    assert.match(app, /const includeLocationColumn = locFilter === ['"]all['"] \|\| Boolean\(garmentIdSearch\)/);
+    assert.match(app, /summarizeCurrentLocations\(locPhotos\)/);
+    assert.match(app, /includeLocationColumn[\s\S]*目前位置/);
+    assert.match(app, /orientation: includeLocationColumn \? ['"]landscape['"] : ['"]portrait['"]/);
+});
+
 test('allocation and PDF export preserve product filtering after category migration', () => {
     assert.match(html, /id=["']alloc-filter-style-sku["']/);
     assert.match(app, /prepareAllocationPage\(\{[\s\S]*?styleSkuFilter,/);

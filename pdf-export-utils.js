@@ -25,3 +25,17 @@ export function getRemainingTimeout(deadline, perImageTimeout = 8000) {
     if (remaining <= 0) return 0;
     return Math.min(Math.max(1, Number(perImageTimeout) || 1), remaining);
 }
+
+export function summarizeCurrentLocations(photos) {
+    const counts = new Map();
+    (Array.isArray(photos) ? photos : []).forEach(photo => {
+        const locations = Array.isArray(photo?.locations)
+            ? photo.locations.map(value => String(value || '').trim()).filter(Boolean)
+            : [];
+        const label = photo?.status === 'Sold'
+            ? 'Sold'
+            : (locations.length > 0 ? locations.join(' + ') : '未分配');
+        counts.set(label, (counts.get(label) || 0) + 1);
+    });
+    return [...counts].map(([label, count]) => ({ label, count }));
+}
