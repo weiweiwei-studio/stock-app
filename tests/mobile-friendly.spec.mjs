@@ -135,3 +135,21 @@ test('Singapore popup sale form remains usable on a phone', async ({ page }) => 
     expect((await confirmButton.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
     expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
 });
+
+test('Singapore popup sales report remains usable on a phone', async ({ page }) => {
+    await page.evaluate(() => {
+        document.getElementById('auth-screen')?.classList.add('hidden');
+        document.body.classList.remove('auth-pending');
+        const modal = document.getElementById('popup-sales-report-modal');
+        modal?.classList.remove('hidden');
+        modal?.classList.add('flex');
+    });
+
+    const modal = page.locator('#popup-sales-report-modal');
+    await expect(modal).toBeInViewport();
+    await expect(page.locator('#popup-report-start-date')).toBeVisible();
+    await expect(page.locator('#popup-report-payment')).toBeVisible();
+    const exportButton = page.locator('#popup-report-export-button');
+    expect((await exportButton.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+});
