@@ -118,3 +118,19 @@ test('archived item detail modal remains usable on a phone', async ({ page }) =>
     expect((await closeButton.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
     expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
 });
+
+test('Singapore popup sale form remains usable on a phone', async ({ page }) => {
+    await page.evaluate(() => {
+        document.getElementById('auth-screen')?.classList.add('hidden');
+        document.body.classList.remove('auth-pending');
+        document.getElementById('sold-modal')?.classList.remove('hidden');
+    });
+
+    const modal = page.locator('#sold-modal');
+    await expect(modal).toBeInViewport();
+    await expect(page.locator('#sold-price-input')).toHaveAttribute('inputmode', 'decimal');
+    await expect(page.locator('#sold-payment-method')).toBeVisible();
+    const confirmButton = page.locator('#btn-confirm-sold');
+    expect((await confirmButton.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+});
