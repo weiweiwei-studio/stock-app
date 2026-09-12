@@ -130,4 +130,6 @@ test('work orders use recoverable archive instead of permanent deletion', () => 
     assert.match(app, /window\.restoreArchivedItem\s*=\s*async function/);
     assert.match(app, /archived:\s*false,[\s\S]*?archivedAt:\s*null/);
     assert.match(app, /db = partitionedItems\.active/);
+    assert.match(app, /isStyleSkuReferenced\(allItems, normalizedSku, normalizeStyleSku\)/);
+    assert.match(app, /isLocationReferenced\(Array\.from\(stockItemsById\.values\(\)\), val\)/);
 });
