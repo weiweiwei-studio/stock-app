@@ -427,6 +427,16 @@
                     </div>
                 </div>
             </div>
+            <details id="archived-items-panel" class="bg-white rounded-lg shadow-sm border border-stone-200">
+                <summary class="min-h-[44px] cursor-pointer list-none p-4 font-bold text-stone-700 flex items-center justify-between">
+                    <span>已封存工单</span>
+                    <span class="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-500" id="archived-items-count">0</span>
+                </summary>
+                <div class="border-t border-stone-100 p-3">
+                    <p class="mb-2 text-[10px] text-stone-500">封存资料不会出现在日常页面、统计或 PDF；恢复后所有编号、照片、地点与销售资料都会保留。</p>
+                    <div id="archived-items-list"></div>
+                </div>
+            </details>
             <div class="bg-white p-6 rounded-lg shadow-sm border border-stone-200">
                 <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
@@ -645,7 +655,7 @@
                 </div>
             </div>
             <div class="flex justify-between mt-6">
-                <button onclick="window.handleDelete()" class="text-red-500 text-xs flex items-center gap-1 hover:bg-red-50 px-2 py-1 rounded transition"><i data-lucide="trash-2" class="w-3 h-3"></i> 刪除工單</button>
+                <button onclick="window.handleArchive()" class="min-h-[44px] text-amber-700 text-xs flex items-center gap-1 hover:bg-amber-50 px-3 py-2 rounded transition border border-amber-200"><i data-lucide="archive" class="w-3 h-3"></i> 封存工單</button>
                 <div class="flex gap-2">
                     <button onclick="window.closeEditModal()" class="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded transition">取消</button>
                     <button onclick="window.handleEditSubmit()" id="btn-edit-save" class="px-4 py-1.5 text-sm bg-stone-800 hover:bg-stone-900 text-white rounded transition shadow-sm">儲存變更</button>

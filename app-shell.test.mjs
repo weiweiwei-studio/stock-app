@@ -120,3 +120,16 @@ test('legacy Garment ID migration is backup-first and transaction protected', ()
     assert.match(app, /normalizeStyleSku\(latestItem\.styleSku\) !== row\.sku/);
     assert.match(app, /transaction\.update\(itemRef, \{\s*photos: allocation\.photos,\s*_version:/);
 });
+
+test('work orders use recoverable archive instead of permanent deletion', () => {
+    assert.match(html, /id=["']archived-items-panel["']/);
+    assert.match(html, /onclick=["']window\.handleArchive\(\)["']/);
+    assert.doesNotMatch(app, /transaction\.delete\(itemRef\)/);
+    assert.match(app, /window\.handleArchive\s*=\s*async\s*(?:function\s*\(\)|\(\)\s*=>)/);
+    assert.match(app, /archived:\s*true,[\s\S]*?archivedAt:\s*serverTimestamp\(\)/);
+    assert.match(app, /window\.restoreArchivedItem\s*=\s*async function/);
+    assert.match(app, /archived:\s*false,[\s\S]*?archivedAt:\s*null/);
+    assert.match(app, /db = partitionedItems\.active/);
+    assert.match(app, /isStyleSkuReferenced\(allItems, normalizedSku, normalizeStyleSku\)/);
+    assert.match(app, /isLocationReferenced\(Array\.from\(stockItemsById\.values\(\)\), val\)/);
+});
