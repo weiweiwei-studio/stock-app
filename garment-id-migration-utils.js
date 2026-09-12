@@ -15,6 +15,17 @@ function existingGarmentId(piece) {
         : '';
 }
 
+function hasExplicitPieceLifecycle(item = {}) {
+    const pieces = Array.isArray(item.photos) && item.photos.length > 0
+        ? item.photos
+        : (typeof item.photo === 'object' && item.photo !== null ? [item.photo] : []);
+    return pieces.length > 0 && pieces.every(piece =>
+        typeof piece === 'object'
+        && piece !== null
+        && ['Available', 'Sold'].includes(piece.status)
+    );
+}
+
 export function parseGarmentId(value) {
     const normalized = String(value || '').trim().toUpperCase();
     const match = normalized.match(/^([A-Z0-9]+)-(\d+)$/);
@@ -64,8 +75,8 @@ export function buildGarmentIdMigrationPlan(items = [], catalog = []) {
         }
 
         if (missingCount === 0) return { ...base, status: 'unchanged', message: '每件商品已有永久编号' };
-        if (item.status === 'Partial Sold' && !Array.isArray(item.photos)) {
-            return { ...base, status: 'blocked', message: '旧 Partial Sold 工单缺少逐件资料，无法安全判断' };
+        if (['Sold', 'Partial Sold'].includes(item.status) && !hasExplicitPieceLifecycle(item)) {
+            return { ...base, status: 'blocked', message: '旧售出工单缺少明确逐件状态，无法安全判断' };
         }
         return { ...base, status: 'ready', message: `可安全补上 ${missingCount} 个编号` };
     });
@@ -89,6 +100,9 @@ function materializePiece(piece, item) {
 
 export function assignLegacyGarmentIds(item, currentCounter = 0, minimumCounter = 0) {
     const sku = normalizeStyleSku(item.styleSku);
+    if (['Sold', 'Partial Sold'].includes(item.status) && !hasExplicitPieceLifecycle(item)) {
+        throw new Error('旧售出工单缺少明确逐件状态，无法安全编号。');
+    }
     let counter = Math.max(Number(currentCounter) || 0, Number(minimumCounter) || 0);
     const pieces = rawPieces(item).map(piece => materializePiece(piece, item));
     const seen = new Set(pieces.map(existingGarmentId).filter(Boolean));

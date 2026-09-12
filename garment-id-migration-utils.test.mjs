@@ -55,22 +55,29 @@ test('preserves every existing field and allocates only missing IDs', () => {
     assert.equal(result.nextCounter, 13);
 });
 
-test('materializes quantity-only Sold records without changing their lifecycle', () => {
+test('preserves explicit per-piece Sold data while adding IDs', () => {
     const result = assignLegacyGarmentIds({
-        styleSku: '2DRS012', status: 'Sold', quantity: 2,
-        soldPrice: 399, soldAt: '2026-01-01', originStudio: 'PNG Studio'
+        styleSku: '2DRS012', status: 'Sold',
+        photos: [{ status: 'Sold', soldPrice: 399, soldAt: '2026-01-01', locations: ['Singapore Popup'] }]
     }, 0, 0);
-    assert.deepEqual(result.photos.map(photo => photo.garmentId), ['2DRS012-001', '2DRS012-002']);
-    assert.ok(result.photos.every(photo => photo.status === 'Sold' && photo.locations.length === 0));
-    assert.ok(result.photos.every(photo => photo.soldPrice === 399 && photo.soldAt === '2026-01-01'));
+    assert.deepEqual(result.photos, [{
+        garmentId: '2DRS012-001', status: 'Sold', soldPrice: 399,
+        soldAt: '2026-01-01', locations: ['Singapore Popup']
+    }]);
 });
 
-test('blocks quantity-only Partial Sold records and backs up Sold items', () => {
-    const items = [{ id: 'partial', styleSku: '2DRS012', status: 'Partial Sold', quantity: 2 }];
+test('blocks sold records without explicit per-piece lifecycle and backs them up', () => {
+    const items = [
+        { id: 'sold', styleSku: '2DRS012', status: 'Sold', quantity: 2, soldPrice: 799 },
+        { id: 'partial', styleSku: '2DRS012', status: 'Partial Sold', photo: 'legacy.jpg' }
+    ];
     const plan = buildGarmentIdMigrationPlan(items, catalog);
     assert.equal(plan[0].status, 'blocked');
+    assert.equal(plan[1].status, 'blocked');
+    assert.match(plan[0].message, /明确逐件状态/);
+    assert.throws(() => assignLegacyGarmentIds(items[0]), /明确逐件状态/);
     const backup = makeGarmentIdMigrationBackup(items, plan, new Date('2026-09-12T00:00:00Z'));
-    assert.equal(backup.stockItems[0].status, 'Partial Sold');
+    assert.equal(backup.stockItems[0].status, 'Sold');
     assert.equal(backup.format, 'weiweiwei-garment-id-backup-v1');
 });
 
