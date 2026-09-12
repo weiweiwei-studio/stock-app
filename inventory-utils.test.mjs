@@ -115,6 +115,12 @@ test('resizing protects every supported history and pricing field', () => {
         { ...createBlankPhoto(), migratedAt: 1 },
         { ...createBlankPhoto(), soldAt: new Date('2026-01-01') },
         { ...createBlankPhoto(), soldPrice: 0 },
+        { ...createBlankPhoto(), soldCurrency: 'SGD' },
+        { ...createBlankPhoto(), paymentMethod: 'PayNow' },
+        { ...createBlankPhoto(), salesChannel: 'Popup' },
+        { ...createBlankPhoto(), saleEvent: 'Common Rare Singapore · Sep 2026' },
+        { ...createBlankPhoto(), soldLocation: 'Singapore Popup' },
+        { ...createBlankPhoto(), salesNote: 'Bundle discount' },
         { ...createBlankPhoto(), specificPrice: 0 }
     ];
 
