@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { getRemainingTimeout, mapWithConcurrency } from './pdf-export-utils.js';
+import { getRemainingTimeout, mapWithConcurrency, summarizeCurrentLocations } from './pdf-export-utils.js';
 
 test('maps images concurrently while preserving their original order', async () => {
     let active = 0;
@@ -30,4 +30,19 @@ test('handles an empty image list without starting a worker', async () => {
     let called = false;
     assert.deepEqual(await mapWithConcurrency([], async () => { called = true; }), []);
     assert.equal(called, false);
+});
+
+test('summarizes each garment by its current location without double counting', () => {
+    assert.deepEqual(summarizeCurrentLocations([
+        { status: 'Available', locations: ['PNG Studio'] },
+        { status: 'Available', locations: ['PNG Studio'] },
+        { status: 'Available', locations: ['JB Studio', 'Online'] },
+        { status: 'Sold', locations: ['Singapore Popup'] },
+        { status: 'Available', locations: [] }
+    ]), [
+        { label: 'PNG Studio', count: 2 },
+        { label: 'JB Studio + Online', count: 1 },
+        { label: 'Sold', count: 1 },
+        { label: '未分配', count: 1 }
+    ]);
 });
