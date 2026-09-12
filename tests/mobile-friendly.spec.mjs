@@ -89,3 +89,18 @@ test('legacy Garment ID migration controls remain usable on a phone', async ({ p
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
 });
+
+test('archive recovery panel remains usable on a phone', async ({ page }) => {
+    await page.evaluate(() => {
+        document.getElementById('auth-screen')?.classList.add('hidden');
+        document.body.classList.remove('auth-pending');
+        document.getElementById('view-settings')?.classList.remove('hidden');
+    });
+
+    const panel = page.locator('#archived-items-panel');
+    await panel.scrollIntoViewIfNeeded();
+    await expect(panel).toBeInViewport();
+    const summary = panel.locator('summary');
+    expect((await summary.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+});

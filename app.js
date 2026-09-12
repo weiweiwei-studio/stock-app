@@ -1,4 +1,5 @@
         import { ADMIN_EMAIL, getAuthErrorMessage, isAuthorizedAdmin } from "./auth-utils.js";
+        import { partitionStockItems } from "./archive-utils.js";
         import { assertVersion, deriveItemStatus, getVersion, nextVersion } from "./data-integrity.js";
         import { optimizeImage } from "./image-utils.js";
         import { reconcileNewItemPhotos, resizeItemPhotos } from "./inventory-utils.js";
@@ -29,6 +30,7 @@
         const storage = getStorage(app);
 
         let db = [];
+        let archivedItems = [];
         let calendarMode = 'production'; 
         let currentCalDate = new Date(); 
         let activeView = 'dashboard';
@@ -242,13 +244,17 @@
                         });
                     }
                 });
-                db = Array.from(stockItemsById.values());
-                db.sort((a, b) => {
+                const partitionedItems = partitionStockItems(Array.from(stockItemsById.values()));
+                db = partitionedItems.active;
+                archivedItems = partitionedItems.archived;
+                const sortNewestFirst = (a, b) => {
                     if (a.createdAt && b.createdAt) return b.createdAt.seconds - a.createdAt.seconds;
                     if (!a.createdAt) return 1;
                     if (!b.createdAt) return -1;
                     return 0; 
-                });
+                };
+                db.sort(sortNewestFirst);
+                archivedItems.sort(sortNewestFirst);
                 updateDropdowns();
                 markAllViewsDirty();
                 scheduleActiveViewRender();
@@ -263,6 +269,7 @@
             unsubscribeSettings = null;
             unsubscribeStock = null;
             db = [];
+            archivedItems = [];
             stockItemsById.clear();
             dropdownSignature = '';
             markAllViewsDirty();
@@ -1910,19 +1917,25 @@
             } 
         };
 
-        window.handleDelete = async () => {
-            if (!confirm('確定刪除此整個主工單嗎？')) return;
+        window.handleArchive = async () => {
+            if (!confirm('確定封存此工單？封存後不會出現在日常頁面、統計或 PDF，可到設定頁恢復。')) return;
             const itemRef = doc(dbFirestore, "stock_items", document.getElementById('edit-id').value);
             try {
                 await runTransaction(dbFirestore, async transaction => {
                     const snapshot = await transaction.get(itemRef);
-                    if (!snapshot.exists()) throw new Error('此工單已被刪除。');
-                    assertVersion(snapshot.data(), editBaseVersion);
-                    transaction.delete(itemRef);
+                    if (!snapshot.exists()) throw new Error('找不到此工單。');
+                    const latestItem = snapshot.data();
+                    assertVersion(latestItem, editBaseVersion);
+                    transaction.update(itemRef, {
+                        archived: true,
+                        archivedAt: serverTimestamp(),
+                        _version: nextVersion(latestItem),
+                        updatedAt: serverTimestamp()
+                    });
                 });
                 window.closeEditModal();
             } catch (error) {
-                alert('刪除失敗：' + error.message);
+                alert('封存失敗：' + error.message);
             }
         };
         
@@ -2136,9 +2149,57 @@
             document.getElementById('settings-styleSkus-list').innerHTML = normalizeStyleSkuCatalog(appSettings.styleSkus)
                 .map(entry => `<span class="bg-stone-100 px-2 py-1 rounded text-[10px] mr-1 mb-1 inline-block border cursor-pointer hover:bg-red-50 hover:text-red-500" onclick="window.removeStyleSku(${inlineString(entry.sku)})"><b>${escapeHtml(entry.category || 'OTHER')}</b> · <b class="font-mono">${escapeHtml(entry.sku)}</b>${entry.name ? ` · ${escapeHtml(entry.name)}` : ''} &times;</span>`)
                 .join('');
+            renderArchivedItems();
             window.refreshImageMigrationStatus();
             if (legacySkuPlan.length === 0 && !legacySkuMigrationRunning) window.refreshLegacySkuMigration();
             if (garmentIdMigrationPlan.length === 0 && !garmentIdMigrationRunning) window.refreshGarmentIdMigration();
+        };
+
+        function renderArchivedItems() {
+            const count = document.getElementById('archived-items-count');
+            const container = document.getElementById('archived-items-list');
+            if (!count || !container) return;
+
+            count.textContent = archivedItems.length;
+            if (archivedItems.length === 0) {
+                container.innerHTML = '<div class="rounded bg-stone-50 p-3 text-xs text-stone-400">目前沒有封存工單。</div>';
+                return;
+            }
+
+            container.innerHTML = archivedItems.map(item => {
+                const archivedDate = item.archivedAt
+                    ? formatDateForInput(item.archivedAt) || '日期待同步'
+                    : '旧封存资料';
+                const pieceCount = normalizePhotos(item).length || Number(item.quantity) || 1;
+                return `<div class="flex flex-col gap-3 border-b border-stone-100 p-3 last:border-0 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="min-w-0">
+                        <div class="truncate text-sm font-bold text-stone-700">${escapeHtml(item.itemName || item.styleSku || '未命名工单')}</div>
+                        <div class="mt-1 text-[10px] text-stone-500"><span class="font-mono">${escapeHtml(item.styleSku || '未配对 SKU')}</span> · ${pieceCount} 件 · 封存于 ${escapeHtml(archivedDate)}</div>
+                    </div>
+                    <button type="button" onclick="window.restoreArchivedItem(${inlineString(item.id)})" class="min-h-[44px] flex-shrink-0 rounded border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100">恢复工单</button>
+                </div>`;
+            }).join('');
+        }
+
+        window.restoreArchivedItem = async function(itemId) {
+            if (!confirm('确定恢复此工单？恢复后会重新出现在日常页面、统计和 PDF。')) return;
+            const itemRef = doc(dbFirestore, "stock_items", itemId);
+            try {
+                await runTransaction(dbFirestore, async transaction => {
+                    const snapshot = await transaction.get(itemRef);
+                    if (!snapshot.exists()) throw new Error('找不到此封存工单。');
+                    const latestItem = snapshot.data();
+                    if (latestItem.archived !== true && !latestItem.archivedAt) return;
+                    transaction.update(itemRef, {
+                        archived: false,
+                        archivedAt: null,
+                        _version: nextVersion(latestItem),
+                        updatedAt: serverTimestamp()
+                    });
+                });
+            } catch (error) {
+                alert('恢复失败：' + error.message);
+            }
         };
 
         function renderLegacySkuMigration() {
