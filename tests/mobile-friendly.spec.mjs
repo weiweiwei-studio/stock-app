@@ -153,3 +153,30 @@ test('Singapore popup sales report remains usable on a phone', async ({ page }) 
     expect((await exportButton.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
     expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
 });
+
+test('item detail modal scrolls to its actions on a phone', async ({ page }) => {
+    await page.evaluate(() => {
+        document.getElementById('auth-screen')?.classList.add('hidden');
+        document.body.classList.remove('auth-pending');
+        const modal = document.getElementById('detail-modal');
+        modal?.classList.remove('hidden');
+        const image = document.getElementById('detail-img');
+        if (image) {
+            image.classList.remove('hidden');
+            image.style.width = '280px';
+            image.style.height = '280px';
+        }
+        const locations = document.getElementById('detail-location-options');
+        if (locations) locations.innerHTML = Array.from({ length: 10 }, (_, index) => `<button class="min-h-[44px]">Location ${index + 1}</button>`).join('');
+    });
+
+    const panel = page.locator('#detail-modal-panel');
+    const scrollState = await panel.evaluate(element => {
+        element.scrollTop = element.scrollHeight;
+        return { clientHeight: element.clientHeight, scrollHeight: element.scrollHeight, scrollTop: element.scrollTop };
+    });
+    expect(scrollState.scrollHeight).toBeGreaterThan(scrollState.clientHeight);
+    expect(scrollState.scrollTop).toBeGreaterThan(0);
+    await expect(page.locator('#btn-save-detail')).toBeInViewport();
+    await expect(page.locator('#btn-toggle-sold')).toBeInViewport();
+});

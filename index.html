@@ -675,13 +675,13 @@
         </div>
     </div>
 
-    <div id="detail-modal" class="fixed inset-0 bg-black bg-opacity-80 hidden z-[60] flex items-center justify-center p-4">
-        <div class="bg-white rounded-lg shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col md:flex-row max-h-[90vh]">
-            <div class="w-full md:w-1/2 bg-stone-100 flex items-center justify-center p-4 relative">
-                <img id="detail-img" src="" class="max-w-full max-h-[300px] md:max-h-full object-contain rounded shadow-sm border border-black/5">
+    <div id="detail-modal" class="fixed inset-0 bg-black bg-opacity-80 hidden z-[60] flex items-center justify-center p-2 sm:p-4">
+        <div id="detail-modal-panel" class="flex max-h-[calc(100dvh-1rem)] w-full max-w-2xl flex-col overflow-y-auto overscroll-contain rounded-lg bg-white shadow-2xl md:max-h-[90vh] md:flex-row md:overflow-hidden">
+            <div class="relative flex w-full flex-shrink-0 items-center justify-center bg-stone-100 p-2 sm:p-4 md:w-1/2">
+                <img id="detail-img" src="" class="max-h-[32dvh] max-w-full rounded border border-black/5 object-contain shadow-sm sm:max-h-[300px] md:max-h-full">
                 <div id="detail-sold-badge" class="absolute top-4 right-4 text-white px-3 py-1 text-xs font-bold hidden shadow-lg border border-white" style="background-color: #ce3375;">SOLD</div>
             </div>
-            <div class="w-full md:w-1/2 p-6 flex flex-col">
+            <div class="flex w-full flex-shrink-0 flex-col p-4 sm:p-6 md:min-h-0 md:w-1/2 md:flex-1">
                 <div class="flex justify-between items-start mb-4 border-b border-stone-100 pb-3">
                     <div>
                         <h3 class="text-lg font-bold text-stone-800 leading-tight" id="detail-title">Name</h3>
@@ -692,7 +692,7 @@
                     <button onclick="window.closeDetailModal()" class="text-stone-400 hover:text-stone-800 text-2xl transition">&times;</button>
                 </div>
 
-                <div class="space-y-4 flex-grow overflow-y-auto pr-2 custom-scrollbar">
+                <div class="space-y-4 overflow-visible pr-2 custom-scrollbar md:min-h-0 md:flex-grow md:overflow-y-auto">
                     <div class="bg-stone-50 p-3 rounded border border-stone-200 shadow-sm">
                         <label class="text-[11px] font-bold text-stone-700 uppercase tracking-wider mb-2 block border-b border-stone-200 pb-1">單品專屬設定 (Piece-Level Settings)</label>
                         <div class="grid grid-cols-2 gap-3 mt-2">
