@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { isArchived, partitionStockItems } from './archive-utils.js';
+import {
+    isArchived,
+    isLocationReferenced,
+    isStyleSkuReferenced,
+    partitionStockItems
+} from './archive-utils.js';
 
 test('legacy and restored records remain active without a migration', () => {
     assert.equal(isArchived({ id: 'legacy' }), false);
@@ -22,4 +27,18 @@ test('partitions archived records out of the active operational data set', () =>
         active: [legacy, active],
         archived: [archived]
     });
+});
+
+test('settings references include archived work orders', () => {
+    const items = [{
+        archived: true,
+        studio: 'Tokyo Stockist',
+        styleSku: 'custom-001',
+        photos: [{ locations: ['Singapore Popup'] }]
+    }];
+
+    assert.equal(isStyleSkuReferenced(items, 'CUSTOM-001'), true);
+    assert.equal(isLocationReferenced(items, 'Tokyo Stockist'), true);
+    assert.equal(isLocationReferenced(items, 'Singapore Popup'), true);
+    assert.equal(isLocationReferenced(items, 'Unused Location'), false);
 });
