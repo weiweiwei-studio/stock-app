@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { formatSoldMoney, getPopupSoldLocation, getSoldCurrency } from './sales-utils.js';
+import {
+    POPUP_SALES_LOCATION,
+    formatSoldMoney,
+    getPopupSoldLocation,
+    getSoldCurrency,
+    hasSingaporePopupLocation
+} from './sales-utils.js';
 
 test('legacy sales remain MYR while popup sales display SGD', () => {
     assert.equal(getSoldCurrency({ soldPrice: 299 }), 'MYR');
@@ -13,5 +19,7 @@ test('legacy sales remain MYR while popup sales display SGD', () => {
 
 test('popup sale keeps the physical location instead of Online', () => {
     assert.equal(getPopupSoldLocation(['Singapore Popup', 'Online']), 'Singapore Popup');
-    assert.equal(getPopupSoldLocation(['Online']), 'Singapore Popup');
+    assert.equal(getPopupSoldLocation(['Online']), POPUP_SALES_LOCATION);
+    assert.equal(hasSingaporePopupLocation(['Singapore Common Rare Popup · Sep 2026', 'Online']), true);
+    assert.equal(hasSingaporePopupLocation(['Online']), false);
 });
