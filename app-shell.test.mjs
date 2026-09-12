@@ -172,3 +172,9 @@ test('Singapore popup report summarizes the event and exports only the filtered 
     assert.match(app, /buildPopupSalesCsv\(records\)/);
     assert.match(app, /URL\.revokeObjectURL\(url\)/);
 });
+
+test('mobile item detail uses a dynamic viewport scroll container', () => {
+    assert.match(html, /id=["']detail-modal-panel["'][^>]*max-h-\[calc\(100dvh-1rem\)\][^>]*overflow-y-auto/);
+    assert.match(html, /id=["']detail-img["'][^>]*max-h-\[32dvh\]/);
+    assert.match(html, /md:overflow-y-auto/);
+});
