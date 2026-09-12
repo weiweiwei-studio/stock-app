@@ -1,5 +1,5 @@
         import { ADMIN_EMAIL, getAuthErrorMessage, isAuthorizedAdmin } from "./auth-utils.js";
-        import { partitionStockItems } from "./archive-utils.js";
+        import { isLocationReferenced, isStyleSkuReferenced, partitionStockItems } from "./archive-utils.js";
         import { assertVersion, deriveItemStatus, getVersion, nextVersion } from "./data-integrity.js";
         import { optimizeImage } from "./image-utils.js";
         import { reconcileNewItemPhotos, resizeItemPhotos } from "./inventory-utils.js";
@@ -2462,7 +2462,8 @@
                 alert(`Style SKU ${normalizedSku} 來自 2026 COGS 清單，不能在網站刪除。`);
                 return;
             }
-            if (db.some(item => normalizeStyleSku(item.styleSku) === normalizedSku)) {
+            const allItems = Array.from(stockItemsById.values());
+            if (isStyleSkuReferenced(allItems, normalizedSku, normalizeStyleSku)) {
                 alert(`Style SKU ${normalizedSku} 已被工單使用，不能刪除。`);
                 return;
             }
@@ -2479,6 +2480,10 @@
         window.removeSetting = async function(type, val) { 
             if (type === 'locations' && ['JB Studio', 'PNG Studio', 'Online'].includes(val)) {
                 alert("此為系統預設核心地點，為保證運作正常，無法被刪除！");
+                return;
+            }
+            if (type === 'locations' && isLocationReferenced(Array.from(stockItemsById.values()), val)) {
+                alert(`地點 ${val} 已被工單使用，不能刪除。`);
                 return;
             }
             if(confirm(`確定要刪除 ${val}?`)) {
