@@ -187,8 +187,28 @@ test('Singapore popup sales report remains usable on a phone', async ({ page }) 
     await expect(modal).toBeInViewport();
     await expect(page.locator('#popup-report-start-date')).toBeVisible();
     await expect(page.locator('#popup-report-payment')).toBeVisible();
+    await expect(page.locator('#popup-report-event')).toBeVisible();
     const exportButton = page.locator('#popup-report-export-button');
     expect((await exportButton.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+});
+
+test('garment history and sold-item correction actions remain usable on a phone', async ({ page }) => {
+    await page.evaluate(() => {
+        document.getElementById('auth-screen')?.classList.add('hidden');
+        document.body.classList.remove('auth-pending');
+        document.getElementById('detail-modal')?.classList.remove('hidden');
+        document.getElementById('btn-return-stock')?.classList.remove('hidden');
+        document.getElementById('detail-history').innerHTML = Array.from({ length: 8 }, (_, index) => `<div>History ${index + 1}</div>`).join('');
+    });
+
+    const history = page.locator('#detail-history');
+    await history.scrollIntoViewIfNeeded();
+    await expect(history).toBeInViewport();
+    for (const selector of ['#btn-toggle-sold', '#btn-return-stock', '#btn-save-detail']) {
+        const box = await page.locator(selector).boundingBox();
+        expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+    }
     expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
 });
 
