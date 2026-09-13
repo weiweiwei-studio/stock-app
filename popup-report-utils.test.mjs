@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { POPUP_SALES_EVENT } from './sales-utils.js';
-import { buildPopupSalesCsv, collectPopupSales, filterPopupSales, formatSingaporeDate, summarizePopupSales } from './popup-report-utils.js';
+import { buildPopupSalesCsv, buildSalesCsv, collectAllSales, collectPopupSales, filterPopupSales, filterSales, formatSingaporeDate, summarizePopupSales, summarizeSalesByCurrency } from './popup-report-utils.js';
 
 const items = [{
     id: 'batch-1', styleSku: '2DRS012', itemName: 'Clairo Dress', category: 'DRESS', photos: [
@@ -59,4 +59,33 @@ test('exports safe CSV content and prevents spreadsheet formulas', () => {
 test('formats timestamps in Singapore time', () => {
     assert.equal(formatSingaporeDate({ seconds: Date.parse('2026-09-17T16:30:00Z') / 1000 }), '2026-09-18');
     assert.equal(formatSingaporeDate('invalid'), '');
+});
+
+test('collects legacy MYR and popup SGD sales without mixing currencies', () => {
+    const records = collectAllSales(items);
+    assert.equal(records.length, 3);
+    assert.equal(records.find(record => record.garmentId === '2DRS012-003').soldCurrency, 'MYR');
+    assert.equal(filterSales(records, { scope: 'event', eventName: POPUP_SALES_EVENT }).length, 2);
+    assert.equal(filterSales(records, { scope: 'popup' }).length, 2);
+    assert.equal(filterSales(records, { scope: 'all', currency: 'MYR' }).length, 1);
+
+    const summary = summarizeSalesByCurrency(records);
+    assert.deepEqual(summary.currencies.SGD, { count: 2, total: 600, average: 300 });
+    assert.deepEqual(summary.currencies.MYR, { count: 1, total: 499, average: 499 });
+});
+
+test('unified sales CSV includes currency, channel and event with formula protection', () => {
+    const records = collectAllSales(items);
+    records[0].salesNote = '=HYPERLINK("bad")';
+    const csv = buildSalesCsv(records);
+    assert.match(csv, /"Currency","Sales Channel","Sale Event"/);
+    assert.match(csv, /"SGD","Popup"/);
+    assert.match(csv, /"'=HYPERLINK\(""bad""\)"/);
+});
+
+test('currency breakdown preserves zero-price sales instead of hiding them', () => {
+    const summary = summarizeSalesByCurrency([{ soldCurrency: 'SGD', soldPrice: 0, soldDate: '2026-09-20', paymentMethod: 'Cash' }]);
+    assert.equal(summary.currencies.SGD.count, 1);
+    assert.equal(summary.byDate['2026-09-20'].SGDCount, 1);
+    assert.equal(summary.byPayment.Cash.SGD, 0);
 });

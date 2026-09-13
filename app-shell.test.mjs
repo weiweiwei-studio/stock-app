@@ -162,15 +162,26 @@ test('popup sales capture SGD price, payment, date, location and note without ch
     assert.match(app, /isPopupSale \? '' : noteInput\.value\.trim\(\)/);
 });
 
-test('Singapore popup report summarizes the event and exports only the filtered rows', () => {
+test('unified sales report keeps popup, all-sales and currency filters separate', () => {
     assert.match(html, /id=["']popup-sales-report-modal["']/);
     assert.match(html, /id=["']popup-sales-dashboard-total["']/);
     assert.match(html, /id=["']popup-report-start-date["']/);
     assert.match(html, /id=["']popup-report-payment["']/);
+    assert.match(html, /id=["']sales-report-scope["']/);
+    assert.match(html, /id=["']sales-report-currency["']/);
     assert.match(app, /collectPopupSales\(\[\.\.\.db, \.\.\.archivedItems\], normalizePhotos,/);
-    assert.match(app, /filterPopupSales\(getPopupSalesRecords\(selectedEvent\)/);
-    assert.match(app, /buildPopupSalesCsv\(records\)/);
+    assert.match(app, /collectAllSales\(\[\.\.\.db, \.\.\.archivedItems\], normalizePhotos\)/);
+    assert.match(app, /filterSales\(getAllSalesRecords\(\), filters\)/);
+    assert.match(app, /summarizeSalesByCurrency\(records\)/);
+    assert.match(app, /buildSalesCsv\(records\)/);
     assert.match(app, /URL\.revokeObjectURL\(url\)/);
+});
+
+test('inventory cards expose a transaction-backed quick sale entry point', () => {
+    assert.match(app, /window\.quickStartSold = function\(event, itemId, photoIndex\)/);
+    assert.match(app, /quickStartSold\(event,[\s\S]*?min-h-\[44px\][\s\S]*?>售出</);
+    assert.match(app, /detailBaseVersion = getVersion\(item\);[\s\S]*?window\.triggerSoldFlow\(\)/);
+    assert.match(app, /preventDuplicateSale && latestPhoto\.status === ['"]Sold['"]/);
 });
 
 test('mobile item detail uses a dynamic viewport scroll container', () => {
@@ -203,7 +214,7 @@ test('active popup settings drive new sales while old events remain selectable',
     assert.match(html, /id=["']popup-report-event["']/);
     assert.match(app, /existingPopupSale \? currentPhoto\.saleEvent \|\| appSettings\.popupEvent\.name : appSettings\.popupEvent\.name/);
     assert.match(app, /existingPopupSale \? currentPhoto\.soldLocation \|\| appSettings\.popupEvent\.location : appSettings\.popupEvent\.location/);
-    assert.match(app, /collectPopupSales\(\[\.\.\.db, \.\.\.archivedItems\], normalizePhotos, ''\)/);
+    assert.match(app, /getAllSalesRecords\(\)[\s\S]*?filter\(record => record\.isPopupSale\)/);
     assert.match(app, /updateDoc\(doc\(dbFirestore, 'settings', 'config'\), \{ popupEvent \}\)/);
 });
 
