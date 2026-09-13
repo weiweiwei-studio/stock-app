@@ -20,6 +20,18 @@ test('collects only completed SGD sales for the Singapore popup event', () => {
     assert.deepEqual(records[1].originalLocations, ['Online']);
 });
 
+test('selects a configurable popup event without losing the legacy event', () => {
+    const custom = [{
+        id: 'batch-2', photos: [
+            { status: 'Sold', soldCurrency: 'SGD', soldPrice: 100, salesChannel: 'Popup', saleEvent: 'KL Fairy Market' },
+            { status: 'Sold', soldCurrency: 'SGD', soldPrice: 200, salesChannel: 'Popup', saleEvent: POPUP_SALES_EVENT }
+        ]
+    }];
+    assert.equal(collectPopupSales(custom, item => item.photos, 'KL Fairy Market').length, 1);
+    assert.equal(collectPopupSales(custom, item => item.photos, POPUP_SALES_EVENT).length, 1);
+    assert.equal(collectPopupSales(custom, item => item.photos, '').length, 2);
+});
+
 test('filters popup sales by inclusive Singapore date and payment method', () => {
     const records = collectPopupSales(items);
     assert.deepEqual(filterPopupSales(records, { startDate: '2026-09-19', endDate: '2026-09-19' }).map(record => record.garmentId), ['2DRS012-002']);
