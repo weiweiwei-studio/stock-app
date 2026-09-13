@@ -224,3 +224,28 @@ test('legacy maintenance scans only when the settings panel is opened', () => {
     assert.doesNotMatch(settingsRender, /refreshLegacySkuMigration|refreshGarmentIdMigration|refreshImageMigrationStatus/);
     assert.doesNotMatch(html, /id=["']settings-categories-list["']/);
 });
+
+test('complete JSON backup waits for live snapshots and includes protected counters', () => {
+    assert.match(html, /id=["']system-backup-button["']/);
+    assert.match(html, /id=["']system-backup-status["'][^>]*aria-live=["']polite["']/);
+    assert.match(app, /import \{ getSystemBackupFilename, makeSystemBackup \} from ["']\.\/backup-utils\.js["']/);
+    assert.match(app, /let settingsSnapshotReady = false;/);
+    assert.match(app, /let stockSnapshotReady = false;/);
+    assert.match(app, /if \(!settingsSnapshotReady \|\| !stockSnapshotReady\)/);
+    assert.match(app, /getDoc\(doc\(dbFirestore, ['"]settings['"], ['"]garment_counters['"]\)\)/);
+    assert.match(app, /Array\.from\(stockItemsById, \(\[id, item\]\) => \(\{ \.\.\.item, id \}\)\)/);
+    assert.match(app, /new Blob\(\[JSON\.stringify\(payload, null, 2\)\]/);
+    assert.match(app, /getSystemBackupFilename\(now\)/);
+    assert.doesNotMatch(html, /restore-system-backup/);
+});
+
+test('sale writes expose pending, success and failure states without offline queuing', () => {
+    assert.match(html, /id=["']sold-save-status["'][^>]*aria-live=["']assertive["']/);
+    assert.match(html, /id=["']operation-toast["'][^>]*aria-live=["']polite["']/);
+    assert.match(app, /if \(button\.disabled\) return;/);
+    assert.match(app, /if \(navigator\.onLine === false\)/);
+    assert.match(app, /正在写入 Firebase/);
+    assert.match(app, /showOperationToast\(`\$\{editingExistingSale[\s\S]*?\$\{garmentIdentity\}[\s\S]*?\$\{currency\} \$\{soldPrice\}/);
+    assert.match(app, /setSoldWriteStatus\(`未写入 Firebase：\$\{error\.message\}/);
+    assert.doesNotMatch(app, /enablePersistence|persistentLocalCache|offlineQueue/);
+});
