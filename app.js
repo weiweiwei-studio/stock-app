@@ -662,6 +662,26 @@
             window.renderPopupSalesReport();
         };
 
+        window.handleSalesReportImageError = function(event, fallbackUrl) {
+            const image = event.currentTarget;
+            const safeFallbackUrl = safeImageUrl(fallbackUrl);
+            const currentUrl = safeImageUrl(image.currentSrc || image.src);
+            if (image.dataset.fallbackAttempted !== 'true' && safeFallbackUrl && safeFallbackUrl !== currentUrl) {
+                image.dataset.fallbackAttempted = 'true';
+                image.src = safeFallbackUrl;
+                return;
+            }
+
+            image.classList.add('hidden');
+            image.nextElementSibling?.classList.remove('hidden');
+            const button = image.closest('button');
+            if (button) {
+                button.disabled = true;
+                button.removeAttribute('onclick');
+                button.setAttribute('aria-label', '图片无法载入');
+            }
+        };
+
         window.renderPopupSalesReport = function() {
             const filters = getSalesReportFilters();
             const isActiveEvent = filters.scope === 'event' && filters.eventName === appSettings.popupEvent.name;
@@ -703,7 +723,8 @@
                 const fullImageUrl = safeImageUrl(record.imageUrl) || thumbnailUrl;
                 const imageHtml = thumbnailUrl
                     ? `<button type="button" aria-label="放大查看 ${escapeHtml(identity)} 图片" onclick="window.openImageViewer(${inlineString(fullImageUrl)})" class="sales-report-thumbnail h-24 w-[72px] flex-shrink-0 overflow-hidden rounded border border-stone-200 bg-stone-50">
-                        <img src="${escapeHtml(thumbnailUrl)}" loading="lazy" decoding="async" fetchpriority="low" width="72" height="96" class="h-full w-full object-cover" alt="${escapeHtml(identity)}">
+                        <img src="${escapeHtml(thumbnailUrl)}" onerror="window.handleSalesReportImageError(event, ${inlineString(fullImageUrl)})" loading="lazy" decoding="async" fetchpriority="low" width="72" height="96" class="h-full w-full object-cover" alt="${escapeHtml(identity)}">
+                        <span class="sales-report-image-fallback hidden h-full w-full items-center justify-center px-1 text-center text-[9px] text-stone-400">No Image</span>
                     </button>`
                     : '<div class="flex h-24 w-[72px] flex-shrink-0 items-center justify-center rounded border border-dashed border-stone-300 bg-stone-50 px-1 text-center text-[9px] text-stone-400">No Image</div>';
                 return `<div class="flex items-start gap-3 rounded border border-stone-200 p-3">

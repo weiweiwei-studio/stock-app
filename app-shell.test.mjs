@@ -190,7 +190,11 @@ test('sales report uses lazy safe thumbnails with a no-image fallback', () => {
     assert.match(app, /safeImageUrl\(record\.thumbnailUrl\) \|\| safeImageUrl\(record\.imageUrl\)/);
     assert.match(app, /loading=["']lazy["'][^>]*decoding=["']async["'][^>]*fetchpriority=["']low["']/);
     assert.match(app, /window\.openImageViewer\(\$\{inlineString\(fullImageUrl\)\}\)/);
+    assert.match(app, /window\.handleSalesReportImageError = function\(event, fallbackUrl\)/);
+    assert.match(app, /image\.dataset\.fallbackAttempted !== ['"]true['"][\s\S]*?image\.src = safeFallbackUrl/);
+    assert.match(app, /button\.disabled = true;[\s\S]*?button\.removeAttribute\(['"]onclick['"]\)/);
     assert.match(app, />No Image<\/div>/);
+    assert.match(app, /sales-report-image-fallback hidden[\s\S]*?>No Image<\/span>/);
     assert.match(html, /id=["']image-viewer-modal["'][^>]*z-\[90\]/);
 });
 
