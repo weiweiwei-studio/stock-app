@@ -14,6 +14,16 @@ export function formatSingaporeDate(value) {
     return `${part('year')}-${part('month')}-${part('day')}`;
 }
 
+export function getSalesReportEventDateRange(selectedEvent, activeEvent = {}) {
+    if (String(selectedEvent || '') !== String(activeEvent.name || '')) {
+        return { startDate: '', endDate: '' };
+    }
+    return {
+        startDate: String(activeEvent.startDate || ''),
+        endDate: String(activeEvent.endDate || '')
+    };
+}
+
 export function collectPopupSales(items = [], normalizePhotos = item => item.photos || [], eventName = POPUP_SALES_EVENT) {
     const records = [];
     items.forEach(item => {

@@ -1,7 +1,7 @@
         import { ADMIN_EMAIL, getAuthErrorMessage, isAuthorizedAdmin } from "./auth-utils.js";
         import { isLocationReferenced, isStyleSkuReferenced, partitionStockItems } from "./archive-utils.js";
         import { POPUP_SALES_CHANNEL, POPUP_SALES_EVENT, formatSoldMoney, getSoldCurrency, hasSingaporePopupLocation } from "./sales-utils.js";
-        import { buildSalesCsv, collectAllSales, collectPopupSales, filterSales, summarizePopupSales, summarizeSalesByCurrency } from "./popup-report-utils.js";
+        import { buildSalesCsv, collectAllSales, collectPopupSales, filterSales, getSalesReportEventDateRange, summarizePopupSales, summarizeSalesByCurrency } from "./popup-report-utils.js";
         import { appendGarmentHistory, describeGarmentHistory, sameLocations } from "./garment-history-utils.js";
         import { computeDashboardStats, photoMatchesDashboardKpi } from "./dashboard-utils.js";
         import { getSystemBackupFilename, makeSystemBackup } from "./backup-utils.js";
@@ -638,19 +638,27 @@
             window.renderPopupSalesReport();
         };
 
+        function setSalesReportDatesForSelectedEvent() {
+            const selectedEvent = document.getElementById('popup-report-event').value;
+            const range = getSalesReportEventDateRange(selectedEvent, appSettings.popupEvent);
+            document.getElementById('popup-report-start-date').value = range.startDate;
+            document.getElementById('popup-report-end-date').value = range.endDate;
+        }
+
         window.handleSalesReportScopeChange = function() {
             const isEventScope = document.getElementById('sales-report-scope').value === 'event';
             document.getElementById('popup-report-event').disabled = !isEventScope;
-            document.getElementById('popup-report-start-date').value = isEventScope ? appSettings.popupEvent.startDate : '';
-            document.getElementById('popup-report-end-date').value = isEventScope ? appSettings.popupEvent.endDate : '';
+            if (isEventScope) {
+                setSalesReportDatesForSelectedEvent();
+            } else {
+                document.getElementById('popup-report-start-date').value = '';
+                document.getElementById('popup-report-end-date').value = '';
+            }
             window.renderPopupSalesReport();
         };
 
         window.handlePopupReportEventChange = function() {
-            const selectedEvent = document.getElementById('popup-report-event').value;
-            const isActiveEvent = selectedEvent === appSettings.popupEvent.name;
-            document.getElementById('popup-report-start-date').value = isActiveEvent ? appSettings.popupEvent.startDate : '';
-            document.getElementById('popup-report-end-date').value = isActiveEvent ? appSettings.popupEvent.endDate : '';
+            setSalesReportDatesForSelectedEvent();
             window.renderPopupSalesReport();
         };
 

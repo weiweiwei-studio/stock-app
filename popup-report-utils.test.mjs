@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { POPUP_SALES_EVENT } from './sales-utils.js';
-import { buildPopupSalesCsv, buildSalesCsv, collectAllSales, collectPopupSales, filterPopupSales, filterSales, formatSingaporeDate, summarizePopupSales, summarizeSalesByCurrency } from './popup-report-utils.js';
+import { buildPopupSalesCsv, buildSalesCsv, collectAllSales, collectPopupSales, filterPopupSales, filterSales, formatSingaporeDate, getSalesReportEventDateRange, summarizePopupSales, summarizeSalesByCurrency } from './popup-report-utils.js';
 
 const items = [{
     id: 'batch-1', styleSku: '2DRS012', itemName: 'Clairo Dress', category: 'DRESS', photos: [
@@ -88,4 +88,16 @@ test('currency breakdown preserves zero-price sales instead of hiding them', () 
     assert.equal(summary.currencies.SGD.count, 1);
     assert.equal(summary.byDate['2026-09-20'].SGDCount, 1);
     assert.equal(summary.byPayment.Cash.SGD, 0);
+});
+
+test('historical event selection never inherits the active popup date range', () => {
+    const activeEvent = { name: POPUP_SALES_EVENT, startDate: '2026-09-18', endDate: '2026-09-20' };
+    assert.deepEqual(getSalesReportEventDateRange(POPUP_SALES_EVENT, activeEvent), {
+        startDate: '2026-09-18',
+        endDate: '2026-09-20'
+    });
+    assert.deepEqual(getSalesReportEventDateRange('Older Popup', activeEvent), {
+        startDate: '',
+        endDate: ''
+    });
 });

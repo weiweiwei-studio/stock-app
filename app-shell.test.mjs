@@ -174,6 +174,8 @@ test('unified sales report keeps popup, all-sales and currency filters separate'
     assert.match(app, /filterSales\(getAllSalesRecords\(\), filters\)/);
     assert.match(app, /summarizeSalesByCurrency\(records\)/);
     assert.match(app, /buildSalesCsv\(records\)/);
+    assert.match(app, /function setSalesReportDatesForSelectedEvent\(\)[\s\S]*?getSalesReportEventDateRange\(selectedEvent, appSettings\.popupEvent\)/);
+    assert.match(app, /if \(isEventScope\) \{[\s\S]*?setSalesReportDatesForSelectedEvent\(\);[\s\S]*?\} else \{/);
     assert.match(app, /URL\.revokeObjectURL\(url\)/);
 });
 
