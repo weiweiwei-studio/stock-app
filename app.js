@@ -3,6 +3,7 @@
         import { POPUP_SALES_CHANNEL, POPUP_SALES_EVENT, formatSoldMoney, getSoldCurrency, hasSingaporePopupLocation } from "./sales-utils.js";
         import { buildPopupSalesCsv, collectPopupSales, filterPopupSales, summarizePopupSales } from "./popup-report-utils.js";
         import { appendGarmentHistory, describeGarmentHistory, sameLocations } from "./garment-history-utils.js";
+        import { computeDashboardStats, photoMatchesDashboardKpi } from "./dashboard-utils.js";
         import { assertVersion, deriveItemStatus, getVersion, nextVersion } from "./data-integrity.js";
         import { optimizeImage } from "./image-utils.js";
         import { reconcileNewItemPhotos, resizeItemPhotos } from "./inventory-utils.js";
@@ -46,6 +47,7 @@
         let allocationPage = 1;
         let garmentSearchTimer = null;
         const stockItemsById = new Map();
+        const normalizedPhotoCache = new WeakMap();
         let dropdownSignature = '';
         const dirtyViews = new Set(['dashboard', 'production', 'allocation', 'settings']);
         
@@ -330,6 +332,8 @@
         }
 
         function normalizePhotos(item) {
+            const cached = normalizedPhotoCache.get(item);
+            if (cached) return cached;
             let raw = [];
             if (item.photos && Array.isArray(item.photos)) raw = item.photos;
             else if (item.photo) raw = [item.photo];
@@ -337,10 +341,12 @@
             const fallbackStudio = item.originStudio || 'JB Studio';
 
             if (raw.length === 0 && item.quantity > 0) {
-                 return Array.from({ length: item.quantity }, () => ({ url: '', thumbnailUrl: '', status: 'Available', locations: [fallbackStudio], notes: '', soldPrice: null, specificPrice: null }));
+                 const generated = Array.from({ length: item.quantity }, () => ({ url: '', thumbnailUrl: '', status: 'Available', locations: [fallbackStudio], notes: '', soldPrice: null, specificPrice: null }));
+                 normalizedPhotoCache.set(item, generated);
+                 return generated;
             }
 
-            return raw.map(p => {
+            const normalized = raw.map(p => {
                 if (typeof p === 'string') return { url: p, thumbnailUrl: '', status: 'Available', locations: [fallbackStudio], notes: '', soldPrice: null, specificPrice: null };
                 
                 let locs = [];
@@ -394,6 +400,8 @@
                     specificPrice: p.specificPrice !== undefined ? p.specificPrice : null
                 };
             });
+            normalizedPhotoCache.set(item, normalized);
+            return normalized;
         }
 
         function normalizePopupEvent(value = {}) {
@@ -492,77 +500,19 @@
         }
 
         function updateDashboard() {
-            const totalPieces = db.reduce((sum, item) => sum + (parseInt(item.quantity)||1), 0);
-            document.getElementById('kpi-total').textContent = totalPieces;
-            const making = db.filter(i => i.status === 'Making').reduce((sum, item) => sum + (parseInt(item.quantity) || 1), 0);
-            let soldCount = 0, studioCount = 0, unallocatedCount = 0;
-            
-            const catUnsoldStats = {};
-            const catUnshippedStats = {}; 
-            const locStats = { 'Unallocated': 0, 'Sold': 0 };
-            
-            appSettings.locations.forEach(l => {
-                locStats[l] = 0;
-            });
-
-            db.forEach(i => {
-                const count = i.photos && i.photos.length > 0 ? i.photos.length : (parseInt(i.quantity)||1);
-                const cat = getCleanCategory(i.category);
-                
-                if (cat) {
-                    catUnsoldStats[cat] = catUnsoldStats[cat] || 0;
-                    catUnshippedStats[cat] = catUnshippedStats[cat] || 0;
-                }
-                
-                const isUnderProduction = ['Pending', 'To Make', 'Making', 'QC'].includes(i.status);
-                const photos = normalizePhotos(i);
-                
-                photos.forEach((p, idx) => {
-                    if (p.status === 'Sold') {
-                        soldCount++; locStats['Sold']++; 
-                    } else {
-                        if (cat) {
-                            catUnsoldStats[cat]++;
-                            
-                            const isPhysicalShipped = p.locations.some(loc => {
-                                const u = loc.toUpperCase();
-                                return !u.includes('JB') && !u.includes('PNG') && u !== 'ONLINE';
-                            });
-                            if (!isPhysicalShipped && !isUnderProduction) {
-                                catUnshippedStats[cat]++; 
-                            }
-                        }
-
-                        if (p.locations.length > 0) {
-                            const isOnline = p.locations.some(loc => loc.toUpperCase() === 'ONLINE');
-                            const hasStudio = p.locations.some(loc => loc.toUpperCase().includes('JB') || loc.toUpperCase().includes('PNG'));
-                            
-                            if (hasStudio && !isOnline && !isUnderProduction) {
-                                studioCount++;
-                            }
-                            
-                            p.locations.forEach(loc => {
-                                const isStudioLoc = loc.toUpperCase().includes('JB') || loc.toUpperCase().includes('PNG');
-                                if (isStudioLoc && isOnline) return; 
-                                if(locStats[loc] !== undefined) locStats[loc]++;
-                            });
-                        } else {
-                            unallocatedCount++; locStats['Unallocated']++;
-                        }
-                    }
-                });
-            });
-
-            document.getElementById('kpi-making').textContent = making;
-            document.getElementById('kpi-studio').textContent = studioCount;
-            document.getElementById('kpi-unallocated').textContent = unallocatedCount;
-            document.getElementById('kpi-sold').textContent = soldCount;
+            const stats = computeDashboardStats(db, normalizePhotos, getCleanCategory, appSettings.locations);
+            document.getElementById('kpi-available').textContent = stats.available;
+            document.getElementById('kpi-total-context').textContent = `系统共 ${stats.total} 件（含生产中与已售）`;
+            document.getElementById('kpi-production').textContent = stats.production;
+            document.getElementById('kpi-studio').textContent = stats.studio;
+            document.getElementById('kpi-unallocated').textContent = stats.unallocated;
+            document.getElementById('kpi-sold').textContent = stats.sold;
             renderPopupSalesSnapshot();
 
-            renderCategoryBadges(catUnsoldStats, catUnshippedStats);
-            renderLocationButtons(locStats);
+            renderCategoryBadges(stats.categoryUnsold, stats.categoryUnshipped);
+            renderLocationButtons(stats.location);
             
-            updateCharts(locStats, catUnsoldStats);
+            updateCharts(stats.location, stats.categoryUnsold);
             renderCalendar(); 
             window.renderPerformanceStats(); 
             window.renderMonthlyCategorySales();
@@ -1554,7 +1504,7 @@
 
         window.openListModal = function(type, value) {
             const titleMap = {
-                'Total': '總生產件數 (Total)', 'Making': '製作中', 'Studio': '待出貨 (Studio在庫)', 'Unallocated': '無地點標記', 'Sold': '已售出'
+                'Available': '目前可售库存', 'Production': '生产流程中', 'Studio': '待上架／待出货 (Studio在库)', 'Unallocated': '需要处理：无地点', 'Sold': '已售出'
             };
             const titleEl = document.getElementById('list-modal-title');
             if (type === 'kpi') titleEl.innerText = titleMap[value] || value;
@@ -1580,11 +1530,7 @@
                     const isOnline = p.locations.some(l => l.toUpperCase() === 'ONLINE');
                     
                     if (type === 'kpi') {
-                        if (value === 'Total') match = true;
-                        if (value === 'Making' && item.status === 'Making') match = true;
-                        if (value === 'Studio' && p.locations.some(loc => loc.toUpperCase().includes('JB') || loc.toUpperCase().includes('PNG')) && p.status !== 'Sold' && !isOnline) match = true;
-                        if (value === 'Unallocated' && p.locations.length === 0 && p.status !== 'Sold') match = true;
-                        if (value === 'Sold' && p.status === 'Sold') match = true;
+                        match = photoMatchesDashboardKpi(item, p, value);
                     } else if (type === 'category') {
                         if (cleanCat === value) match = true;
                     } else if (type === 'location') {
@@ -2450,7 +2396,6 @@
                 .map(i => `<span class="bg-stone-100 px-2 py-1 rounded text-xs mr-1 mb-1 inline-block border cursor-pointer hover:bg-red-50 hover:text-red-500" onclick="window.removeSetting(${inlineString(type)}, ${inlineString(i)})">${escapeHtml(i)} &times;</span>`).join('');
             document.getElementById('settings-makers-list').innerHTML = render('makers'); 
             document.getElementById('settings-locations-list').innerHTML = render('locations'); 
-            document.getElementById('settings-categories-list').innerHTML = render('categories'); 
             document.getElementById('settings-styleSkus-list').innerHTML = normalizeStyleSkuCatalog(appSettings.styleSkus)
                 .map(entry => `<span class="bg-stone-100 px-2 py-1 rounded text-[10px] mr-1 mb-1 inline-block border cursor-pointer hover:bg-red-50 hover:text-red-500" onclick="window.removeStyleSku(${inlineString(entry.sku)})"><b>${escapeHtml(entry.category || 'OTHER')}</b> · <b class="font-mono">${escapeHtml(entry.sku)}</b>${entry.name ? ` · ${escapeHtml(entry.name)}` : ''} &times;</span>`)
                 .join('');
@@ -2459,9 +2404,13 @@
             document.getElementById('popup-event-start').value = appSettings.popupEvent.startDate;
             document.getElementById('popup-event-end').value = appSettings.popupEvent.endDate;
             renderArchivedItems();
-            window.refreshImageMigrationStatus();
-            if (legacySkuPlan.length === 0 && !legacySkuMigrationRunning) window.refreshLegacySkuMigration();
-            if (garmentIdMigrationPlan.length === 0 && !garmentIdMigrationRunning) window.refreshGarmentIdMigration();
+        };
+
+        window.handleDataMaintenanceToggle = function(panel) {
+            if (!panel?.open || panel.dataset.loaded === 'true') return;
+            window.refreshLegacySkuMigration();
+            window.refreshGarmentIdMigration();
+            panel.dataset.loaded = 'true';
         };
 
         window.savePopupEventSettings = async function() {

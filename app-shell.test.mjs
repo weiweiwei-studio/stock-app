@@ -206,3 +206,21 @@ test('active popup settings drive new sales while old events remain selectable',
     assert.match(app, /collectPopupSales\(\[\.\.\.db, \.\.\.archivedItems\], normalizePhotos, ''\)/);
     assert.match(app, /updateDoc\(doc\(dbFirestore, 'settings', 'config'\), \{ popupEvent \}\)/);
 });
+
+test('dashboard uses operational piece definitions and reuses normalized photos', () => {
+    assert.match(app, /import \{ computeDashboardStats, photoMatchesDashboardKpi \} from ["']\.\/dashboard-utils\.js["']/);
+    assert.match(html, /id=["']kpi-available["']/);
+    assert.match(html, /id=["']kpi-production["']/);
+    assert.match(app, /computeDashboardStats\(db, normalizePhotos, getCleanCategory, appSettings\.locations\)/);
+    assert.match(app, /const normalizedPhotoCache = new WeakMap\(\)/);
+    assert.match(app, /normalizedPhotoCache\.get\(item\)/);
+    assert.match(app, /photoMatchesDashboardKpi\(item, p, value\)/);
+});
+
+test('legacy maintenance scans only when the settings panel is opened', () => {
+    assert.match(html, /id=["']data-maintenance-panel["'][^>]*ontoggle=["']window\.handleDataMaintenanceToggle\(this\)["']/);
+    assert.match(app, /handleDataMaintenanceToggle = function\(panel\)[\s\S]*?refreshLegacySkuMigration\(\)[\s\S]*?refreshGarmentIdMigration\(\)/);
+    const settingsRender = app.match(/window\.renderSettingsView = function\(\)[\s\S]*?\n\s*};/)?.[0] || '';
+    assert.doesNotMatch(settingsRender, /refreshLegacySkuMigration|refreshGarmentIdMigration|refreshImageMigrationStatus/);
+    assert.doesNotMatch(html, /id=["']settings-categories-list["']/);
+});
