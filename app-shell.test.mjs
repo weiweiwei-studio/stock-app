@@ -186,6 +186,14 @@ test('inventory cards expose a transaction-backed quick sale entry point', () =>
     assert.match(app, /preventDuplicateSale && latestPhoto\.status === ['"]Sold['"]/);
 });
 
+test('sales report uses lazy safe thumbnails with a no-image fallback', () => {
+    assert.match(app, /safeImageUrl\(record\.thumbnailUrl\) \|\| safeImageUrl\(record\.imageUrl\)/);
+    assert.match(app, /loading=["']lazy["'][^>]*decoding=["']async["'][^>]*fetchpriority=["']low["']/);
+    assert.match(app, /window\.openImageViewer\(\$\{inlineString\(fullImageUrl\)\}\)/);
+    assert.match(app, />No Image<\/div>/);
+    assert.match(html, /id=["']image-viewer-modal["'][^>]*z-\[90\]/);
+});
+
 test('mobile item detail uses a dynamic viewport scroll container', () => {
     assert.match(html, /id=["']detail-modal-panel["'][^>]*max-h-\[calc\(100dvh-1rem\)\][^>]*overflow-y-auto/);
     assert.match(html, /id=["']detail-img["'][^>]*max-h-\[32dvh\]/);

@@ -699,16 +699,26 @@
             list.innerHTML = records.map(record => {
                 const identity = record.garmentId || `${record.styleSku || 'Item'} #${record.photoIndex + 1}`;
                 const originalLocation = record.originalLocations.join(' + ') || 'No location';
-                return `<div class="rounded border border-stone-200 p-3">
-                    <div class="flex items-start justify-between gap-3">
-                        <div class="min-w-0">
-                            <div class="break-words font-mono text-sm font-black text-stone-800">${escapeHtml(identity)}</div>
-                            <div class="mt-1 break-words text-xs text-stone-600">${escapeHtml(record.itemName || record.styleSku || '-')} · ${escapeHtml(record.category || '-')}</div>
+                const thumbnailUrl = safeImageUrl(record.thumbnailUrl) || safeImageUrl(record.imageUrl);
+                const fullImageUrl = safeImageUrl(record.imageUrl) || thumbnailUrl;
+                const imageHtml = thumbnailUrl
+                    ? `<button type="button" aria-label="放大查看 ${escapeHtml(identity)} 图片" onclick="window.openImageViewer(${inlineString(fullImageUrl)})" class="sales-report-thumbnail h-24 w-[72px] flex-shrink-0 overflow-hidden rounded border border-stone-200 bg-stone-50">
+                        <img src="${escapeHtml(thumbnailUrl)}" loading="lazy" decoding="async" fetchpriority="low" width="72" height="96" class="h-full w-full object-cover" alt="${escapeHtml(identity)}">
+                    </button>`
+                    : '<div class="flex h-24 w-[72px] flex-shrink-0 items-center justify-center rounded border border-dashed border-stone-300 bg-stone-50 px-1 text-center text-[9px] text-stone-400">No Image</div>';
+                return `<div class="flex items-start gap-3 rounded border border-stone-200 p-3">
+                    ${imageHtml}
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <div class="break-words font-mono text-sm font-black text-stone-800">${escapeHtml(identity)}</div>
+                                <div class="mt-1 break-words text-xs text-stone-600">${escapeHtml(record.itemName || record.styleSku || '-')} · ${escapeHtml(record.category || '-')}</div>
+                            </div>
+                            <div class="flex-shrink-0 text-right"><div class="font-black text-pink-700">${escapeHtml(formatSoldMoney(record.soldPrice, record.soldCurrency))}</div><div class="mt-1 text-[10px] text-stone-500">${escapeHtml(record.paymentMethod)}</div></div>
                         </div>
-                        <div class="flex-shrink-0 text-right"><div class="font-black text-pink-700">${escapeHtml(formatSoldMoney(record.soldPrice, record.soldCurrency))}</div><div class="mt-1 text-[10px] text-stone-500">${escapeHtml(record.paymentMethod)}</div></div>
+                        <div class="mt-2 text-[10px] leading-5 text-stone-500">${escapeHtml(record.soldDate || 'Date not recorded')} · ${escapeHtml(record.salesChannel)}${record.saleEvent ? ` · ${escapeHtml(record.saleEvent)}` : ''} · Sold at: ${escapeHtml(record.soldLocation || originalLocation)}</div>
+                        ${record.salesNote ? `<div class="mt-1 break-words rounded bg-yellow-50 px-2 py-1 text-xs text-stone-600">Note: ${escapeHtml(record.salesNote)}</div>` : ''}
                     </div>
-                    <div class="mt-2 text-[10px] leading-5 text-stone-500">${escapeHtml(record.soldDate || 'Date not recorded')} · ${escapeHtml(record.salesChannel)}${record.saleEvent ? ` · ${escapeHtml(record.saleEvent)}` : ''} · Sold at: ${escapeHtml(record.soldLocation || originalLocation)}</div>
-                    ${record.salesNote ? `<div class="mt-1 break-words rounded bg-yellow-50 px-2 py-1 text-xs text-stone-600">Note: ${escapeHtml(record.salesNote)}</div>` : ''}
                 </div>`;
             }).join('');
         };
