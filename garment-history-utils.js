@@ -33,6 +33,11 @@ export function describeGarmentHistory(entry = {}) {
     if (entry.type === 'location') return `位置：${from} → ${to}`;
     if (entry.type === 'sold') return `售出：${entry.soldCurrency || ''} ${entry.soldPrice ?? '-'}${entry.saleEvent ? ` · ${entry.saleEvent}` : ''}`.trim();
     if (entry.type === 'sale_corrected') return `更正售出资料：${entry.soldCurrency || ''} ${entry.soldPrice ?? '-'}`.trim();
-    if (entry.type === 'sale_reversed') return '取消售出，返回库存';
+    if (entry.type === 'sale_reversed') {
+        const sale = entry.soldCurrency || entry.soldPrice !== null && entry.soldPrice !== undefined
+            ? `（原销售：${entry.soldCurrency || ''} ${entry.soldPrice ?? '-'}${entry.saleEvent ? ` · ${entry.saleEvent}` : ''}）`
+            : '';
+        return `取消售出，返回库存${sale}`;
+    }
     return entry.note || entry.type || '更新';
 }
