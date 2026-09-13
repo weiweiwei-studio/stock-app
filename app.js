@@ -1951,14 +1951,16 @@
                         notes: (latestPhoto.notes ? latestPhoto.notes + ' | ' : '') + noteToAppend
                     } : { ...patch };
                     if (historyType) {
+                        const historySale = historyType === 'sale_reversed' ? latestPhoto : nextPatch;
                         nextPatch.history = appendGarmentHistory(latestPhoto.history, {
                             type: historyType,
                             fromLocations: latestPhoto.locations,
                             toLocations: nextPatch.locations || latestPhoto.locations,
-                            saleEvent: nextPatch.saleEvent,
-                            soldCurrency: nextPatch.soldCurrency,
-                            soldPrice: nextPatch.soldPrice,
-                            paymentMethod: nextPatch.paymentMethod
+                            saleEvent: historySale.saleEvent,
+                            soldCurrency: historySale.soldCurrency,
+                            soldPrice: historySale.soldPrice,
+                            paymentMethod: historySale.paymentMethod,
+                            note: historyType === 'sale_reversed' ? historySale.salesNote : ''
                         });
                     }
                     return nextPatch;
