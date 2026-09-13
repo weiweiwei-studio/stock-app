@@ -1873,6 +1873,7 @@
             const dateInput = document.getElementById('sold-date-input');
             const noteInput = document.getElementById('sold-note-input');
             const button = document.getElementById('btn-confirm-sold');
+            const cancelButton = document.getElementById('btn-cancel-sold');
             if (button.disabled) return;
             const isPopupSale = document.getElementById('popup-sale-mode').checked;
             const soldPrice = Number(soldPriceInput.value);
@@ -1915,6 +1916,7 @@
                 locations: [...tempLocations]
             };
             button.disabled = true;
+            cancelButton.disabled = true;
             button.textContent = '记录中...';
             setSoldWriteStatus('正在写入 Firebase，请不要关闭页面…');
             const succeeded = await updateItemStatus(patch, isPopupSale ? '' : noteInput.value.trim(), !editingExistingSale, editingExistingSale ? 'sale_corrected' : 'sold');
@@ -1925,6 +1927,7 @@
                 showOperationToast(`${editingExistingSale ? '已更新' : '已记录'} ${garmentIdentity} · ${currency} ${soldPrice}${payment}`);
             }
             button.disabled = false;
+            cancelButton.disabled = false;
             button.textContent = editingExistingSale ? '储存更正' : '确认售出';
         };
         async function updateItemStatus(patch, noteToAppend = '', preventDuplicateSale = false, historyType = '') {

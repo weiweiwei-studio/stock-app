@@ -173,6 +173,8 @@ test('Singapore popup sale form remains usable on a phone', async ({ page }) => 
     await expect(page.locator('#popup-sale-mode')).toBeVisible();
     const confirmButton = page.locator('#btn-confirm-sold');
     expect((await confirmButton.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+    const cancelButton = page.locator('#btn-cancel-sold');
+    expect((await cancelButton.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
     await page.evaluate(() => {
         const status = document.getElementById('sold-save-status');
         if (status) {

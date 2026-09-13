@@ -816,7 +816,7 @@
                 </div>
                 <p id="sold-save-status" class="hidden" role="status" aria-live="assertive"></p>
                 <div class="flex gap-2 justify-end mt-4">
-                    <button onclick="document.getElementById('sold-modal').classList.add('hidden')" class="px-4 py-2 text-sm text-stone-500 hover:bg-stone-50 rounded transition-colors">取消</button>
+                    <button id="btn-cancel-sold" type="button" onclick="document.getElementById('sold-modal').classList.add('hidden')" class="min-h-[44px] px-4 py-2 text-sm text-stone-500 hover:bg-stone-50 rounded transition-colors disabled:cursor-wait disabled:opacity-50">取消</button>
                     <button id="btn-confirm-sold" onclick="window.confirmSoldAction()" class="min-h-[44px] bg-stone-800 hover:bg-stone-900 text-white px-4 py-2 rounded text-sm font-bold shadow-sm transition-colors disabled:cursor-wait disabled:opacity-60">确认售出</button>
                 </div>
             </div>
