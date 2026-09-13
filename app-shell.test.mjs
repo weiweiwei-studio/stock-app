@@ -195,6 +195,7 @@ test('garment history and sale corrections are transaction-backed and legacy-com
     assert.match(html, /id=["']btn-return-stock["']/);
     assert.match(app, /editingExistingSale \? 'sale_corrected' : 'sold'/);
     assert.match(app, /if \(expectedVersion !== null\) assertVersion\(latestItem, expectedVersion\)/);
+    assert.match(app, /historyType === 'sale_reversed' \? latestPhoto : nextPatch/);
 });
 
 test('active popup settings drive new sales while old events remain selectable', () => {
