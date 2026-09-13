@@ -20,4 +20,8 @@ test('history is append-only, normalized and bounded', () => {
 test('history descriptions cover movement and sale corrections', () => {
     assert.equal(describeGarmentHistory({ type: 'location', fromLocations: ['JB Studio'], toLocations: ['PNG Studio', 'Online'] }), '位置：JB Studio → PNG Studio + Online');
     assert.equal(describeGarmentHistory({ type: 'sale_corrected', soldCurrency: 'SGD', soldPrice: 220 }), '更正售出资料：SGD 220');
+    assert.equal(
+        describeGarmentHistory({ type: 'sale_reversed', soldCurrency: 'SGD', soldPrice: 188, saleEvent: 'Common Rare 2026' }),
+        '取消售出，返回库存（原销售：SGD 188 · Common Rare 2026）'
+    );
 });
