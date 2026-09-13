@@ -310,20 +310,26 @@
                     <span>&#43;</span> 新增工單
                 </button>
             </div>
-            <div class="flex items-center gap-2 bg-white p-3 rounded-lg shadow-sm">
-                <span class="text-sm font-medium text-stone-600 flex-shrink-0">過濾:</span>
-                <select id="prod-filter-maker" onchange="window.resetProductionPage()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5 dynamic-maker-select"><option value="all">全部製作人</option></select>
-                <select id="prod-filter-category" onchange="window.handleCategoryFilterChange('prod')" class="min-h-[44px] bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5 dynamic-category-select"><option value="all">全部类别</option></select>
-                <select id="prod-filter-style-sku" onchange="window.handleStyleSkuFilterChange('prod')" class="min-h-[44px] max-w-[210px] bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5"><option value="all">全部商品</option></select>
-                
-                <select id="prod-filter-status" onchange="window.resetProductionPage()" class="bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5">
-                    <option value="all">全部狀態</option>
-                    <option value="Pending">Pending</option>
-                    <option value="To Make">To Make</option>
-                    <option value="Making">Making</option>
-                    <option value="QC">QC</option>
-                    <option value="Ready">Ready</option>
-                </select>
+            <div id="production-filter-panel" class="grid grid-cols-1 gap-3 rounded-lg bg-white p-3 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
+                <label class="min-w-0 text-xs font-bold text-stone-600">製作人
+                    <select id="prod-filter-maker" onchange="window.resetProductionPage()" class="dynamic-maker-select mt-1 min-h-[44px] w-full min-w-0 rounded-md border border-stone-200 bg-stone-50 p-2 text-sm font-normal"><option value="all">全部製作人</option></select>
+                </label>
+                <label class="min-w-0 text-xs font-bold text-stone-600">Category
+                    <select id="prod-filter-category" onchange="window.handleCategoryFilterChange('prod')" class="dynamic-category-select mt-1 min-h-[44px] w-full min-w-0 rounded-md border border-stone-200 bg-stone-50 p-2 text-sm font-normal"><option value="all">全部类别</option></select>
+                </label>
+                <label class="min-w-0 text-xs font-bold text-stone-600">Style SKU／商品
+                    <select id="prod-filter-style-sku" onchange="window.handleStyleSkuFilterChange('prod')" class="mt-1 min-h-[44px] w-full min-w-0 rounded-md border border-stone-200 bg-stone-50 p-2 text-sm font-normal"><option value="all">全部商品</option></select>
+                </label>
+                <label class="min-w-0 text-xs font-bold text-stone-600">狀態
+                    <select id="prod-filter-status" onchange="window.resetProductionPage()" class="mt-1 min-h-[44px] w-full min-w-0 rounded-md border border-stone-200 bg-stone-50 p-2 text-sm font-normal">
+                        <option value="all">全部狀態</option>
+                        <option value="Pending">Pending</option>
+                        <option value="To Make">To Make</option>
+                        <option value="Making">Making</option>
+                        <option value="QC">QC</option>
+                        <option value="Ready">Ready</option>
+                    </select>
+                </label>
             </div>
             <div class="bg-white rounded-lg shadow-sm overflow-hidden border border-stone-200">
                 <div class="overflow-x-auto custom-scrollbar">
@@ -386,12 +392,12 @@
                     </div>
                 </div>
                 
-                <div class="flex items-center gap-3">
-                    <button id="btn-export-pdf" onclick="window.exportLocationPDF()" class="flex items-center gap-1.5 bg-red-50 text-red-600 border border-red-200 px-3 py-2 rounded-md shadow-sm text-sm font-bold hover:bg-red-100 transition-colors">
+                <div id="allocation-actions" class="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+                    <button id="btn-export-pdf" onclick="window.exportLocationPDF()" class="flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-bold text-red-600 shadow-sm transition-colors hover:bg-red-100 sm:w-auto">
                         <i data-lucide="file-output" class="w-4 h-4"></i> 匯出目前篩選結果 PDF
                     </button>
 
-                    <div id="alloc-summary-badge" class="flex items-center px-4 py-2 bg-blue-50 border border-blue-200 rounded-md shadow-inner transition-all">
+                    <div id="alloc-summary-badge" class="flex min-h-[44px] w-full items-center justify-center rounded-md border border-blue-200 bg-blue-50 px-4 py-2 shadow-inner transition-all sm:w-auto">
                         <div id="alloc-summary-text" class="text-sm flex items-center">
                         </div>
                     </div>

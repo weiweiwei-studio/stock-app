@@ -178,3 +178,11 @@ test('mobile item detail uses a dynamic viewport scroll container', () => {
     assert.match(html, /id=["']detail-img["'][^>]*max-h-\[32dvh\]/);
     assert.match(html, /md:overflow-y-auto/);
 });
+
+test('mobile operational controls use responsive layouts and full-width touch targets', () => {
+    assert.match(html, /id=["']production-filter-panel["'][^>]*grid-cols-1[^>]*sm:grid-cols-2[^>]*lg:grid-cols-4/);
+    for (const id of ['prod-filter-maker', 'prod-filter-category', 'prod-filter-style-sku', 'prod-filter-status']) {
+        assert.match(html, new RegExp(`id=["']${id}["'][^>]*min-h-\\[44px\\][^>]*w-full`));
+    }
+    assert.match(html, /id=["']allocation-actions["'][^>]*flex-col[^>]*sm:flex-row/);
+});

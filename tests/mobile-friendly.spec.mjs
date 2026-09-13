@@ -73,6 +73,44 @@ test('inventory product filter remains usable on a phone', async ({ page }) => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
 });
 
+test('production filters stack without horizontal overflow on a phone', async ({ page }) => {
+    await page.evaluate(() => {
+        document.getElementById('auth-screen')?.classList.add('hidden');
+        document.body.classList.remove('auth-pending');
+        document.getElementById('view-dashboard')?.classList.add('hidden');
+        document.getElementById('view-production')?.classList.remove('hidden');
+    });
+
+    const panel = page.locator('#production-filter-panel');
+    await expect(panel).toBeVisible();
+    for (const selector of ['#prod-filter-maker', '#prod-filter-category', '#prod-filter-style-sku', '#prod-filter-status']) {
+        const control = page.locator(selector);
+        await expect(control).toBeInViewport();
+        const box = await control.boundingBox();
+        expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+        expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(390);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+});
+
+test('inventory export actions stack without horizontal overflow on a phone', async ({ page }) => {
+    await page.evaluate(() => {
+        document.getElementById('auth-screen')?.classList.add('hidden');
+        document.body.classList.remove('auth-pending');
+        document.getElementById('view-dashboard')?.classList.add('hidden');
+        document.getElementById('view-allocation')?.classList.remove('hidden');
+    });
+
+    for (const selector of ['#btn-export-pdf', '#alloc-summary-badge']) {
+        const element = page.locator(selector);
+        await expect(element).toBeVisible();
+        const box = await element.boundingBox();
+        expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+        expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(390);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+});
+
 test('legacy Garment ID migration controls remain usable on a phone', async ({ page }) => {
     await page.evaluate(() => {
         document.getElementById('auth-screen')?.classList.add('hidden');
