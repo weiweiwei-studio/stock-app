@@ -4,6 +4,7 @@
         import { buildPopupSalesCsv, collectPopupSales, filterPopupSales, summarizePopupSales } from "./popup-report-utils.js";
         import { appendGarmentHistory, describeGarmentHistory, sameLocations } from "./garment-history-utils.js";
         import { computeDashboardStats, photoMatchesDashboardKpi } from "./dashboard-utils.js";
+        import { getSystemBackupFilename, makeSystemBackup } from "./backup-utils.js";
         import { assertVersion, deriveItemStatus, getVersion, nextVersion } from "./data-integrity.js";
         import { optimizeImage } from "./image-utils.js";
         import { reconcileNewItemPhotos, resizeItemPhotos } from "./inventory-utils.js";
@@ -16,7 +17,7 @@
         import { DEFAULT_PAGE_SIZE, buildPaginationItems, filterAllocationItemsByCategory, filterAllocationItemsByStyleSku, normalizeGarmentIdSearch, paginate, photoMatchesGarmentSearch, prepareAllocationPage } from "./view-utils.js";
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, collection, updateDoc, doc, onSnapshot, runTransaction, serverTimestamp, arrayUnion } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, updateDoc, doc, getDoc, onSnapshot, runTransaction, serverTimestamp, arrayUnion } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
         const firebaseConfig = {
@@ -41,6 +42,10 @@
         let renderFrame = null;
         let unsubscribeSettings = null;
         let unsubscribeStock = null;
+        let settingsConfigSnapshot = null;
+        let settingsSnapshotReady = false;
+        let stockSnapshotReady = false;
+        let operationToastTimer = null;
         let chartsInitialized = false;
         const PAGE_SIZE = DEFAULT_PAGE_SIZE;
         let productionPage = 1;
@@ -222,8 +227,10 @@
 
         function startListeners() {
             unsubscribeSettings = onSnapshot(doc(dbFirestore, "settings", "config"), (snap) => {
+                settingsConfigSnapshot = snap.exists() ? snap.data() : null;
+                settingsSnapshotReady = true;
                 if(snap.exists()) {
-                    const data = snap.data();
+                    const data = settingsConfigSnapshot;
                     let fetchedLocations = data.locations || appSettings.locations;
                     ['JB Studio', 'PNG Studio', 'Online'].forEach(coreLoc => {
                         if (!fetchedLocations.includes(coreLoc)) {
@@ -270,6 +277,7 @@
                 };
                 db.sort(sortNewestFirst);
                 archivedItems.sort(sortNewestFirst);
+                stockSnapshotReady = true;
                 updateDropdowns();
                 markAllViewsDirty();
                 scheduleActiveViewRender();
@@ -285,6 +293,9 @@
             unsubscribeStock = null;
             db = [];
             archivedItems = [];
+            settingsConfigSnapshot = null;
+            settingsSnapshotReady = false;
+            stockSnapshotReady = false;
             stockItemsById.clear();
             dropdownSignature = '';
             markAllViewsDirty();
@@ -308,6 +319,24 @@
             statusEl.innerText = "Sync Error";
             statusEl.className = "ml-2 px-2 py-0.5 rounded text-[10px] bg-red-100 text-red-600";
             console.error("Firebase sync failed:", error);
+        }
+
+        function showOperationToast(message, isError = false) {
+            const toast = document.getElementById('operation-toast');
+            if (!toast) return;
+            if (operationToastTimer) clearTimeout(operationToastTimer);
+            toast.textContent = message;
+            toast.className = `fixed bottom-4 left-1/2 z-[100] max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-lg px-4 py-3 text-center text-sm font-bold text-white shadow-xl ${isError ? 'bg-red-600' : 'bg-emerald-600'}`;
+            operationToastTimer = setTimeout(() => toast.classList.add('hidden'), isError ? 7000 : 4500);
+        }
+
+        function setSoldWriteStatus(message = '', isError = false) {
+            const status = document.getElementById('sold-save-status');
+            if (!status) return;
+            status.textContent = message;
+            status.className = message
+                ? `mt-3 rounded p-2 text-xs font-bold ${isError ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'}`
+                : 'hidden';
         }
 
         function renderActiveView() {
@@ -1815,6 +1844,7 @@
             document.getElementById('sold-date-input').value = editingExistingSale ? formatDateForInput(photo.soldAt) : formatDateForInput(new Date());
             window.updateSaleModeUI(!editingExistingSale);
             if (editingExistingSale) document.getElementById('sold-price-input').value = photo.soldPrice ?? '';
+            setSoldWriteStatus();
             document.getElementById('sold-modal').classList.remove('hidden');
         };
         window.updateSaleModeUI = function(resetPrice = false) {
@@ -1843,6 +1873,8 @@
             const dateInput = document.getElementById('sold-date-input');
             const noteInput = document.getElementById('sold-note-input');
             const button = document.getElementById('btn-confirm-sold');
+            const cancelButton = document.getElementById('btn-cancel-sold');
+            if (button.disabled) return;
             const isPopupSale = document.getElementById('popup-sale-mode').checked;
             const soldPrice = Number(soldPriceInput.value);
             const paymentMethod = paymentInput.value;
@@ -1862,7 +1894,14 @@
                 dateInput.focus();
                 return;
             }
+            if (navigator.onLine === false) {
+                const message = '目前装置没有网络，销售尚未写入 Firebase。请连接网络后再重试。';
+                setSoldWriteStatus(message, true);
+                showOperationToast('销售未记录：目前没有网络', true);
+                return;
+            }
             const currentPhoto = normalizePhotos(currentDetailItem)[currentDetailPhotoIdx];
+            const garmentIdentity = currentPhoto.garmentId || currentDetailItem.styleSku || `商品 #${currentDetailPhotoIdx + 1}`;
             const existingPopupSale = editingExistingSale && currentPhoto.salesChannel === POPUP_SALES_CHANNEL;
             const patch = {
                 status: 'Sold',
@@ -1877,10 +1916,18 @@
                 locations: [...tempLocations]
             };
             button.disabled = true;
+            cancelButton.disabled = true;
             button.textContent = '记录中...';
+            setSoldWriteStatus('正在写入 Firebase，请不要关闭页面…');
             const succeeded = await updateItemStatus(patch, isPopupSale ? '' : noteInput.value.trim(), !editingExistingSale, editingExistingSale ? 'sale_corrected' : 'sold');
-            if (succeeded) document.getElementById('sold-modal').classList.add('hidden');
+            if (succeeded) {
+                document.getElementById('sold-modal').classList.add('hidden');
+                const currency = isPopupSale ? 'SGD' : 'RM';
+                const payment = isPopupSale ? ` · ${paymentMethod}` : '';
+                showOperationToast(`${editingExistingSale ? '已更新' : '已记录'} ${garmentIdentity} · ${currency} ${soldPrice}${payment}`);
+            }
             button.disabled = false;
+            cancelButton.disabled = false;
             button.textContent = editingExistingSale ? '储存更正' : '确认售出';
         };
         async function updateItemStatus(patch, noteToAppend = '', preventDuplicateSale = false, historyType = '') {
@@ -1914,6 +1961,7 @@
                 window.closeDetailModal();
                 return true;
             } catch (error) {
+                setSoldWriteStatus(`未写入 Firebase：${error.message}。请确认网络后重试。`, true);
                 alert('更新售出狀態失敗：' + error.message);
                 return false;
             }
@@ -2411,6 +2459,49 @@
             window.refreshLegacySkuMigration();
             window.refreshGarmentIdMigration();
             panel.dataset.loaded = 'true';
+        };
+
+        window.downloadSystemBackup = async function() {
+            const button = document.getElementById('system-backup-button');
+            const status = document.getElementById('system-backup-status');
+            if (!button || button.disabled) return;
+            button.disabled = true;
+            button.textContent = '准备完整资料…';
+            status.textContent = '正在读取商品、封存资料与编号计数器…';
+            status.className = 'mt-2 text-xs font-medium text-blue-700';
+            try {
+                if (!settingsSnapshotReady || !stockSnapshotReady) {
+                    throw new Error('Firebase 资料仍在同步，请稍后再试');
+                }
+                const countersSnapshot = await getDoc(doc(dbFirestore, 'settings', 'garment_counters'));
+                const stockItems = Array.from(stockItemsById, ([id, item]) => ({ ...item, id }));
+                const now = new Date();
+                const payload = makeSystemBackup({
+                    stockItems,
+                    settingsConfig: settingsConfigSnapshot || appSettings,
+                    garmentCounters: countersSnapshot.exists() ? countersSnapshot.data() : null,
+                    createdAt: now
+                });
+                const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = getSystemBackupFilename(now);
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+                status.textContent = `备份已下载：${payload.counts.stockItems} 笔工单／${payload.counts.garments} 件商品（含 ${payload.counts.archivedItems} 笔封存工单）。`;
+                status.className = 'mt-2 text-xs font-bold text-emerald-700';
+                showOperationToast('完整系统资料备份已下载');
+            } catch (error) {
+                status.textContent = `备份失败：${error.message}`;
+                status.className = 'mt-2 text-xs font-bold text-red-700';
+                showOperationToast('备份失败，请检查网络后重试', true);
+            } finally {
+                button.disabled = false;
+                button.textContent = '下载完整系统备份 JSON';
+            }
         };
 
         window.savePopupEventSettings = async function() {

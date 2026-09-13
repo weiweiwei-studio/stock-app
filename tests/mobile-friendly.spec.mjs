@@ -173,6 +173,32 @@ test('Singapore popup sale form remains usable on a phone', async ({ page }) => 
     await expect(page.locator('#popup-sale-mode')).toBeVisible();
     const confirmButton = page.locator('#btn-confirm-sold');
     expect((await confirmButton.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+    const cancelButton = page.locator('#btn-cancel-sold');
+    expect((await cancelButton.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+    await page.evaluate(() => {
+        const status = document.getElementById('sold-save-status');
+        if (status) {
+            status.textContent = '未写入 Firebase：请确认网络后重试。';
+            status.className = 'mt-3 rounded p-2 text-xs font-bold bg-red-50 text-red-700';
+        }
+    });
+    await expect(page.locator('#sold-save-status')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+});
+
+test('complete backup control remains usable on a phone', async ({ page }) => {
+    await page.evaluate(() => {
+        document.getElementById('auth-screen')?.classList.add('hidden');
+        document.body.classList.remove('auth-pending');
+        document.getElementById('view-dashboard')?.classList.add('hidden');
+        document.getElementById('view-settings')?.classList.remove('hidden');
+    });
+
+    const button = page.locator('#system-backup-button');
+    await button.scrollIntoViewIfNeeded();
+    await expect(button).toBeInViewport();
+    expect((await button.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+    await expect(page.locator('#system-backup-status')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
 });
 
