@@ -150,15 +150,15 @@ test('popup sales capture SGD price, payment, date, location and note without ch
     assert.match(app, /soldCurrency:\s*isPopupSale \? ['"]SGD['"] : ['"]MYR['"]/);
     assert.match(app, /paymentMethod,/);
     assert.match(app, /salesChannel:\s*isPopupSale \? POPUP_SALES_CHANNEL : null/);
-    assert.match(app, /saleEvent:\s*isPopupSale \? POPUP_SALES_EVENT : null/);
-    assert.match(app, /soldLocation:\s*isPopupSale \? getPopupSoldLocation\(tempLocations\) : null/);
+    assert.match(app, /saleEvent:\s*isPopupSale \? \(existingPopupSale \?/);
+    assert.match(app, /soldLocation:\s*isPopupSale \? \(existingPopupSale \?/);
     assert.match(app, /salesNote:\s*isPopupSale \? noteInput\.value\.trim\(\) : ['"]/);
-    assert.match(app, /button\.disabled = true;[\s\S]*?await updateItemStatus\(patch, isPopupSale \? '' : noteInput\.value\.trim\(\), true\)/);
+    assert.match(app, /button\.disabled = true;[\s\S]*?await updateItemStatus\(patch, isPopupSale \? '' : noteInput\.value\.trim\(\), !editingExistingSale/);
     assert.match(app, /preventDuplicateSale && latestPhoto\.status === ['"]Sold['"]/);
     assert.match(app, /soldCurrency:\s*p\.soldCurrency \|\| null/);
     assert.match(app, /getSoldCurrency\(p\) !== ['"]MYR['"]\) return/);
     assert.match(html, /id=["']detail-sale-meta["']/);
-    assert.match(app, /checked = hasSingaporePopupLocation\(tempLocations\)/);
+    assert.match(app, /hasSingaporePopupLocation\(tempLocations\)/);
     assert.match(app, /isPopupSale \? '' : noteInput\.value\.trim\(\)/);
 });
 
@@ -167,8 +167,8 @@ test('Singapore popup report summarizes the event and exports only the filtered 
     assert.match(html, /id=["']popup-sales-dashboard-total["']/);
     assert.match(html, /id=["']popup-report-start-date["']/);
     assert.match(html, /id=["']popup-report-payment["']/);
-    assert.match(app, /collectPopupSales\(\[\.\.\.db, \.\.\.archivedItems\], normalizePhotos\)/);
-    assert.match(app, /filterPopupSales\(getPopupSalesRecords\(\)/);
+    assert.match(app, /collectPopupSales\(\[\.\.\.db, \.\.\.archivedItems\], normalizePhotos,/);
+    assert.match(app, /filterPopupSales\(getPopupSalesRecords\(selectedEvent\)/);
     assert.match(app, /buildPopupSalesCsv\(records\)/);
     assert.match(app, /URL\.revokeObjectURL\(url\)/);
 });
@@ -185,4 +185,24 @@ test('mobile operational controls use responsive layouts and full-width touch ta
         assert.match(html, new RegExp(`id=["']${id}["'][^>]*min-h-\\[44px\\][^>]*w-full`));
     }
     assert.match(html, /id=["']allocation-actions["'][^>]*flex-col[^>]*sm:flex-row/);
+});
+
+test('garment history and sale corrections are transaction-backed and legacy-compatible', () => {
+    assert.match(app, /history:\s*Array\.isArray\(p\.history\)/);
+    assert.match(app, /appendGarmentHistory\(photo\.history,[\s\S]*?type:\s*'location'/);
+    assert.match(app, /historyType\s*=\s*''[\s\S]*?appendGarmentHistory\(latestPhoto\.history/);
+    assert.match(html, /id=["']detail-history["']/);
+    assert.match(html, /id=["']btn-return-stock["']/);
+    assert.match(app, /editingExistingSale \? 'sale_corrected' : 'sold'/);
+    assert.match(app, /if \(expectedVersion !== null\) assertVersion\(latestItem, expectedVersion\)/);
+    assert.match(app, /historyType === 'sale_reversed' \? latestPhoto : nextPatch/);
+});
+
+test('active popup settings drive new sales while old events remain selectable', () => {
+    assert.match(html, /id=["']popup-event-name["']/);
+    assert.match(html, /id=["']popup-report-event["']/);
+    assert.match(app, /existingPopupSale \? currentPhoto\.saleEvent \|\| appSettings\.popupEvent\.name : appSettings\.popupEvent\.name/);
+    assert.match(app, /existingPopupSale \? currentPhoto\.soldLocation \|\| appSettings\.popupEvent\.location : appSettings\.popupEvent\.location/);
+    assert.match(app, /collectPopupSales\(\[\.\.\.db, \.\.\.archivedItems\], normalizePhotos, ''\)/);
+    assert.match(app, /updateDoc\(doc\(dbFirestore, 'settings', 'config'\), \{ popupEvent \}\)/);
 });

@@ -156,7 +156,7 @@
             <button type="button" onclick="window.openPopupSalesReport()" class="flex min-h-[72px] w-full flex-col justify-between gap-3 rounded-lg border border-pink-200 bg-pink-50 p-4 text-left shadow-sm transition hover:border-pink-300 hover:shadow-md sm:flex-row sm:items-center">
                 <div>
                     <div class="text-xs font-black uppercase tracking-wider text-pink-700">Singapore Popup Sales</div>
-                    <div class="mt-1 text-xs text-stone-500">Common Rare · 18–20 Sep 2026 · 点击查看完整销售报告</div>
+                    <div class="mt-1 text-xs text-stone-500"><span id="popup-sales-dashboard-event">Common Rare Singapore · Sep 2026</span> · 点击查看完整销售报告</div>
                 </div>
                 <div class="flex items-baseline gap-3 sm:text-right">
                     <span id="popup-sales-dashboard-count" class="text-sm font-bold text-stone-600">0 件</span>
@@ -432,6 +432,19 @@
                     <div class="flex gap-2"><input id="new-location-input" placeholder="新增地點..." class="flex-1 border text-sm rounded px-2"><button onclick="window.addSetting('locations')" class="bg-stone-800 text-white px-2 rounded">+</button></div>
                     <p class="text-[9px] text-red-500 mt-2 font-bold">* JB Studio / PNG Studio / Online 為核心系統地點，不可刪除。</p>
                 </div>
+                <div class="bg-white p-6 rounded-lg shadow-sm">
+                    <h3 class="font-bold text-stone-700">当前 Popup 销售活动</h3>
+                    <p class="mt-1 text-[10px] leading-4 text-stone-400">新售出记录会使用此活动；更改设定不会修改旧销售。</p>
+                    <div class="mt-3 space-y-2">
+                        <label class="block text-xs font-bold text-stone-600">活动名称<input id="popup-event-name" class="mt-1 min-h-[44px] w-full rounded border px-2 font-normal" placeholder="例如 Common Rare Singapore · Sep 2026"></label>
+                        <label class="block text-xs font-bold text-stone-600">售出地点<input id="popup-event-location" class="mt-1 min-h-[44px] w-full rounded border px-2 font-normal" placeholder="例如 Singapore Popup"></label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <label class="block text-xs font-bold text-stone-600">开始<input id="popup-event-start" type="date" class="mt-1 min-h-[44px] w-full rounded border px-2 font-normal"></label>
+                            <label class="block text-xs font-bold text-stone-600">结束<input id="popup-event-end" type="date" class="mt-1 min-h-[44px] w-full rounded border px-2 font-normal"></label>
+                        </div>
+                        <button id="popup-event-save" type="button" onclick="window.savePopupEventSettings()" class="min-h-[44px] w-full rounded bg-stone-800 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">储存 Popup 设定（SGD）</button>
+                    </div>
+                </div>
                 <div class="hidden" aria-hidden="true"><h3>旧类别资料（由 Style SKU catalog 取代）</h3><div id="settings-categories-list"></div><input id="new-category-input"></div>
                 <div class="bg-white p-6 rounded-lg shadow-sm">
                     <h3 class="font-bold text-stone-700 mb-2">Category → Style SKU／商品</h3>
@@ -567,6 +580,7 @@
                         <label class="block text-xs font-medium text-stone-500 mb-1">主定價 (Price RM)</label>
                         <input type="number" name="price" placeholder="RM" required class="w-full border-stone-300 rounded-md shadow-sm text-sm p-2 border">
                     </div>
+
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
@@ -727,13 +741,19 @@
                         <label class="text-[11px] font-bold text-stone-700 uppercase tracking-wider mb-2 block">單品備註</label>
                         <textarea id="detail-notes" rows="2" class="w-full border border-stone-200 rounded p-2 text-sm bg-stone-50 focus:border-stone-500 focus:outline-none shadow-sm transition" placeholder="微瑕疵、VIP保留等..."></textarea>
                     </div>
+
+                    <div class="rounded border border-stone-200 bg-stone-50 p-3">
+                        <div class="text-[11px] font-bold uppercase tracking-wider text-stone-700">单品 History</div>
+                        <div id="detail-history" class="mt-2 max-h-40 space-y-2 overflow-y-auto text-xs text-stone-500 custom-scrollbar"></div>
+                    </div>
                 </div>
 
                 <div class="pt-4 border-t border-stone-100 mt-4 flex justify-between items-center gap-2">
-                    <button id="btn-toggle-sold" onclick="window.triggerSoldFlow()" class="bg-stone-800 hover:bg-stone-700 text-white px-4 py-2 rounded text-sm w-full font-bold shadow-sm transition-colors">
+                    <button id="btn-toggle-sold" onclick="window.triggerSoldFlow()" class="min-h-[44px] w-full rounded bg-stone-800 px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-stone-700">
                         標記為已售出
                     </button>
-                    <button id="btn-save-detail" onclick="window.saveItemDetails()" class="bg-blue-600 text-white px-4 py-2 rounded text-sm font-bold w-1/3 hover:bg-blue-700 shadow-sm transition-colors">
+                    <button id="btn-return-stock" onclick="window.returnSoldItemToStock()" class="hidden min-h-[44px] rounded border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600">取消售出</button>
+                    <button id="btn-save-detail" onclick="window.saveItemDetails()" class="min-h-[44px] w-1/3 rounded bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-blue-700">
                         儲存
                     </button>
                 </div>
@@ -748,7 +768,7 @@
             <div class="space-y-4">
                 <label class="flex min-h-[44px] cursor-pointer items-center gap-3 rounded border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-bold text-blue-800">
                     <input type="checkbox" id="popup-sale-mode" onchange="window.updateSaleModeUI(true)" class="h-5 w-5">
-                    Singapore Popup Sale（SGD）
+                    <span id="popup-sale-mode-label">Singapore Popup Sale（SGD）</span>
                 </label>
                 <div>
                     <label id="sold-price-label" class="text-xs font-bold text-stone-700">成交价 (SGD)</label>
@@ -787,13 +807,16 @@
         <div class="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
             <div class="flex items-start justify-between gap-3 border-b border-stone-200 p-4">
                 <div>
-                    <h3 class="text-lg font-black text-stone-800">Singapore Popup Sales Report</h3>
-                    <p class="mt-1 text-xs text-stone-500">Common Rare · 18–20 Sep 2026 · SGD</p>
+                    <h3 id="popup-report-title" class="text-lg font-black text-stone-800">Singapore Popup Sales Report</h3>
+                    <p id="popup-report-event-meta" class="mt-1 text-xs text-stone-500">18–20 Sep 2026 · SGD</p>
                 </div>
                 <button type="button" aria-label="关闭销售报告" onclick="window.closePopupSalesReport()" class="min-h-[44px] min-w-[44px] text-2xl leading-none text-stone-400 hover:text-stone-800">&times;</button>
             </div>
             <div class="flex-grow overflow-y-auto p-4 custom-scrollbar">
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <label class="text-xs font-bold text-stone-600">Popup 活动
+                        <select id="popup-report-event" onchange="window.handlePopupReportEventChange()" class="mt-1 min-h-[44px] w-full rounded border border-stone-300 bg-white px-2 font-normal"></select>
+                    </label>
                     <label class="text-xs font-bold text-stone-600">开始日期
                         <input id="popup-report-start-date" type="date" onchange="window.renderPopupSalesReport()" class="mt-1 min-h-[44px] w-full rounded border border-stone-300 bg-white px-2 font-normal">
                     </label>

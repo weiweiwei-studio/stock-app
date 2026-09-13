@@ -1,4 +1,4 @@
-import { POPUP_SALES_EVENT, getSoldCurrency } from './sales-utils.js';
+import { POPUP_SALES_CHANNEL, POPUP_SALES_EVENT, getSoldCurrency } from './sales-utils.js';
 
 export function formatSingaporeDate(value) {
     if (!value) return '';
@@ -14,11 +14,13 @@ export function formatSingaporeDate(value) {
     return `${part('year')}-${part('month')}-${part('day')}`;
 }
 
-export function collectPopupSales(items = [], normalizePhotos = item => item.photos || []) {
+export function collectPopupSales(items = [], normalizePhotos = item => item.photos || [], eventName = POPUP_SALES_EVENT) {
     const records = [];
     items.forEach(item => {
         normalizePhotos(item).forEach((photo, photoIndex) => {
-            if (photo.status !== 'Sold' || photo.saleEvent !== POPUP_SALES_EVENT || getSoldCurrency(photo) !== 'SGD') return;
+            const isPopupSale = Boolean(photo.saleEvent)
+                && (photo.salesChannel === POPUP_SALES_CHANNEL || photo.saleEvent === POPUP_SALES_EVENT);
+            if (photo.status !== 'Sold' || !isPopupSale || (eventName && photo.saleEvent !== eventName) || getSoldCurrency(photo) !== 'SGD') return;
             const amount = Number(photo.soldPrice);
             records.push({
                 itemId: item.id || '',
@@ -32,6 +34,7 @@ export function collectPopupSales(items = [], normalizePhotos = item => item.pho
                 paymentMethod: photo.paymentMethod || 'Not recorded',
                 salesNote: photo.salesNote || '',
                 soldLocation: photo.soldLocation || '',
+                saleEvent: photo.saleEvent || '',
                 originalLocations: Array.isArray(photo.locations) ? [...photo.locations] : []
             });
         });

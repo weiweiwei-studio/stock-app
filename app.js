@@ -1,7 +1,8 @@
         import { ADMIN_EMAIL, getAuthErrorMessage, isAuthorizedAdmin } from "./auth-utils.js";
         import { isLocationReferenced, isStyleSkuReferenced, partitionStockItems } from "./archive-utils.js";
-        import { POPUP_SALES_CHANNEL, POPUP_SALES_EVENT, formatSoldMoney, getPopupSoldLocation, getSoldCurrency, hasSingaporePopupLocation } from "./sales-utils.js";
+        import { POPUP_SALES_CHANNEL, POPUP_SALES_EVENT, formatSoldMoney, getSoldCurrency, hasSingaporePopupLocation } from "./sales-utils.js";
         import { buildPopupSalesCsv, collectPopupSales, filterPopupSales, summarizePopupSales } from "./popup-report-utils.js";
+        import { appendGarmentHistory, describeGarmentHistory, sameLocations } from "./garment-history-utils.js";
         import { assertVersion, deriveItemStatus, getVersion, nextVersion } from "./data-integrity.js";
         import { optimizeImage } from "./image-utils.js";
         import { reconcileNewItemPhotos, resizeItemPhotos } from "./inventory-utils.js";
@@ -55,9 +56,18 @@
             locations: ['JB Studio', 'PNG Studio', 'Online', 'Bev C', 'Fifth', 'Tamara Malas', 'Pop Up', 'Snub', 'Loan', 'Hahhah Store'], 
             categories: ['Top', 'Dress', 'Pants'], 
             styleSkus: DEFAULT_STYLE_SKUS,
+            popupEvent: {
+                name: POPUP_SALES_EVENT,
+                location: 'Singapore Common Rare Popup · Sep 2026',
+                startDate: '2026-09-18',
+                endDate: '2026-09-20',
+                currency: 'SGD'
+            },
             weekly_goals: {} 
         };
         let currentDetailItem = null, currentDetailPhotoIdx = -1, tempLocations = []; 
+        let editingExistingSale = false;
+        let detailBaseVersion = 0;
         let editBaseVersion = 0;
         let migrationBackupReady = false;
         let migrationRunning = false;
@@ -224,6 +234,7 @@
                         locations: fetchedLocations,
                         categories: data.categories || appSettings.categories,
                         styleSkus: normalizeStyleSkuCatalog([...(data.styleSkus || []), ...DEFAULT_STYLE_SKUS]),
+                        popupEvent: normalizePopupEvent(data.popupEvent),
                         weekly_goals: data.weekly_goals || {} 
                     };
                 }
@@ -379,18 +390,30 @@
                     saleEvent: p.saleEvent || null,
                     soldLocation: p.soldLocation || null,
                     salesNote: p.salesNote || '',
+                    history: Array.isArray(p.history) ? p.history.filter(entry => entry && typeof entry === 'object') : [],
                     specificPrice: p.specificPrice !== undefined ? p.specificPrice : null
                 };
             });
         }
 
-        async function updatePhotoAtomic(itemId, photoIdx, createPatch, updateStatus = false) {
+        function normalizePopupEvent(value = {}) {
+            return {
+                name: String(value.name || POPUP_SALES_EVENT).trim() || POPUP_SALES_EVENT,
+                location: String(value.location || 'Singapore Common Rare Popup · Sep 2026').trim() || 'Singapore Common Rare Popup · Sep 2026',
+                startDate: String(value.startDate || '2026-09-18'),
+                endDate: String(value.endDate || '2026-09-20'),
+                currency: 'SGD'
+            };
+        }
+
+        async function updatePhotoAtomic(itemId, photoIdx, createPatch, updateStatus = false, expectedVersion = null) {
             const itemRef = doc(dbFirestore, "stock_items", itemId);
             await runTransaction(dbFirestore, async transaction => {
                 const snapshot = await transaction.get(itemRef);
                 if (!snapshot.exists()) throw new Error('找不到此商品，可能已被刪除。');
 
                 const latestItem = snapshot.data();
+                if (expectedVersion !== null) assertVersion(latestItem, expectedVersion);
                 const photos = normalizePhotos(latestItem);
                 if (!Number.isInteger(photoIdx) || photoIdx < 0 || photoIdx >= photos.length) {
                     throw new Error('照片資料已變更，請重新開啟商品後再試。');
@@ -548,8 +571,8 @@
             window.updateBusinessAnalytics();
         }
 
-        function getPopupSalesRecords() {
-            return collectPopupSales([...db, ...archivedItems], normalizePhotos).map(record => ({
+        function getPopupSalesRecords(eventName = appSettings.popupEvent.name) {
+            return collectPopupSales([...db, ...archivedItems], normalizePhotos, eventName).map(record => ({
                 ...record,
                 category: getCleanCategory(record.category)
             }));
@@ -566,6 +589,8 @@
             const total = document.getElementById('popup-sales-dashboard-total');
             if (count) count.textContent = `${summary.count} 件`;
             if (total) total.textContent = formatSgdAmount(summary.total);
+            const eventName = document.getElementById('popup-sales-dashboard-event');
+            if (eventName) eventName.textContent = appSettings.popupEvent.name;
             const modal = document.getElementById('popup-sales-report-modal');
             if (modal && !modal.classList.contains('hidden') && typeof window.renderPopupSalesReport === 'function') {
                 window.renderPopupSalesReport();
@@ -576,6 +601,15 @@
             const modal = document.getElementById('popup-sales-report-modal');
             modal.classList.remove('hidden');
             modal.classList.add('flex');
+            const allEvents = collectPopupSales([...db, ...archivedItems], normalizePhotos, '')
+                .map(record => record.saleEvent)
+                .filter(Boolean);
+            const eventNames = [...new Set([appSettings.popupEvent.name, ...allEvents])];
+            const eventSelect = document.getElementById('popup-report-event');
+            eventSelect.innerHTML = eventNames.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
+            eventSelect.value = appSettings.popupEvent.name;
+            document.getElementById('popup-report-start-date').value = appSettings.popupEvent.startDate;
+            document.getElementById('popup-report-end-date').value = appSettings.popupEvent.endDate;
             window.renderPopupSalesReport();
         };
 
@@ -586,14 +620,29 @@
         };
 
         window.resetPopupSalesFilters = function() {
-            document.getElementById('popup-report-start-date').value = '';
-            document.getElementById('popup-report-end-date').value = '';
+            document.getElementById('popup-report-event').value = appSettings.popupEvent.name;
+            document.getElementById('popup-report-start-date').value = appSettings.popupEvent.startDate;
+            document.getElementById('popup-report-end-date').value = appSettings.popupEvent.endDate;
             document.getElementById('popup-report-payment').value = 'all';
             window.renderPopupSalesReport();
         };
 
+        window.handlePopupReportEventChange = function() {
+            const selectedEvent = document.getElementById('popup-report-event').value;
+            const isActiveEvent = selectedEvent === appSettings.popupEvent.name;
+            document.getElementById('popup-report-start-date').value = isActiveEvent ? appSettings.popupEvent.startDate : '';
+            document.getElementById('popup-report-end-date').value = isActiveEvent ? appSettings.popupEvent.endDate : '';
+            window.renderPopupSalesReport();
+        };
+
         window.renderPopupSalesReport = function() {
-            const records = filterPopupSales(getPopupSalesRecords(), {
+            const selectedEvent = document.getElementById('popup-report-event').value || appSettings.popupEvent.name;
+            const isActiveEvent = selectedEvent === appSettings.popupEvent.name;
+            document.getElementById('popup-report-title').textContent = `${selectedEvent} Sales Report`;
+            document.getElementById('popup-report-event-meta').textContent = isActiveEvent
+                ? `${appSettings.popupEvent.startDate} – ${appSettings.popupEvent.endDate} · SGD`
+                : '历史活动 · SGD';
+            const records = filterPopupSales(getPopupSalesRecords(selectedEvent), {
                 startDate: document.getElementById('popup-report-start-date').value,
                 endDate: document.getElementById('popup-report-end-date').value,
                 paymentMethod: document.getElementById('popup-report-payment').value
@@ -637,7 +686,8 @@
         };
 
         window.exportPopupSalesCsv = function() {
-            const records = filterPopupSales(getPopupSalesRecords(), {
+            const selectedEvent = document.getElementById('popup-report-event').value || appSettings.popupEvent.name;
+            const records = filterPopupSales(getPopupSalesRecords(selectedEvent), {
                 startDate: document.getElementById('popup-report-start-date').value,
                 endDate: document.getElementById('popup-report-end-date').value,
                 paymentMethod: document.getElementById('popup-report-payment').value
@@ -1477,12 +1527,23 @@
                 await updatePhotoAtomic(itemId, photoIdx, photo => {
                     const isTargetOnline = toLocation.toUpperCase() === 'ONLINE';
                     const locations = [...photo.locations];
+                    let nextLocations;
                     if (isTargetOnline) {
                         if (!locations.some(location => location.toUpperCase() === 'ONLINE')) locations.push('Online');
-                        return { locations };
+                        nextLocations = locations;
+                    } else {
+                        const onlineName = locations.find(location => location.toUpperCase() === 'ONLINE');
+                        nextLocations = onlineName ? [onlineName, toLocation] : [toLocation];
                     }
-                    const onlineName = locations.find(location => location.toUpperCase() === 'ONLINE');
-                    return { locations: onlineName ? [onlineName, toLocation] : [toLocation] };
+                    if (sameLocations(photo.locations, nextLocations)) return {};
+                    return {
+                        locations: nextLocations,
+                        history: appendGarmentHistory(photo.history, {
+                            type: 'location',
+                            fromLocations: photo.locations,
+                            toLocations: nextLocations
+                        })
+                    };
                 });
             } catch (err) {
                 alert("轉移失敗：" + err.message);
@@ -1640,6 +1701,7 @@
 
         window.openDetailModal = function(id, idx) {
             currentDetailItem = db.find(i => i.id === id); currentDetailPhotoIdx = idx;
+            detailBaseVersion = getVersion(currentDetailItem);
             const p = normalizePhotos(currentDetailItem)[idx];
             const imgEl = document.getElementById('detail-img');
             const detailImageUrl = safeImageUrl(p.url);
@@ -1676,9 +1738,33 @@
             
             tempLocations = [...p.locations]; 
             const btnSold = document.getElementById('btn-toggle-sold');
+            const btnReturn = document.getElementById('btn-return-stock');
             const badgeSold = document.getElementById('detail-sold-badge');
-            if(p.status === 'Sold') { btnSold.innerText = "取消售出 (Return to Stock)"; btnSold.className = "bg-red-50 text-red-600 hover:bg-red-100 px-4 py-2 rounded text-sm w-full font-bold border border-red-200 transition-colors"; badgeSold.classList.remove('hidden'); } 
-            else { btnSold.innerText = "標記為已售出 (SOLD)"; btnSold.className = "bg-stone-800 text-white hover:bg-stone-900 px-4 py-2 rounded text-sm w-full font-bold transition-colors"; badgeSold.classList.add('hidden'); }
+            if(p.status === 'Sold') {
+                btnSold.innerText = "更正售出资料";
+                btnSold.className = "min-h-[44px] rounded bg-stone-800 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-stone-900";
+                btnReturn.classList.remove('hidden');
+                badgeSold.classList.remove('hidden');
+            } else {
+                btnSold.innerText = "標記為已售出 (SOLD)";
+                btnSold.className = "min-h-[44px] w-full rounded bg-stone-800 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-stone-900";
+                btnReturn.classList.add('hidden');
+                badgeSold.classList.add('hidden');
+            }
+
+            const historyContainer = document.getElementById('detail-history');
+            const history = [...p.history].sort((a, b) => {
+                const time = value => Number(value?.seconds) * 1000 || Number(value) || 0;
+                return time(b.at) - time(a.at);
+            });
+            historyContainer.innerHTML = history.length
+                ? history.map(entry => {
+                    const rawDate = entry.at?.seconds ? entry.at.seconds * 1000 : entry.at;
+                    const date = rawDate ? new Date(rawDate) : null;
+                    const dateText = date && !Number.isNaN(date.getTime()) ? date.toLocaleString() : '时间未记录';
+                    return `<div class="rounded border border-stone-200 bg-white px-2 py-1.5"><div class="font-bold text-stone-700">${escapeHtml(describeGarmentHistory(entry))}</div><div class="mt-0.5 text-[10px] text-stone-400">${escapeHtml(dateText)}</div></div>`;
+                }).join('')
+                : '<div class="text-stone-400">尚无记录；之后的调货与销售会自动保存在这里。</div>';
             
             renderDetailLocationButtons();
             document.getElementById('detail-modal').classList.remove('hidden');
@@ -1751,7 +1837,16 @@
                     patch.thumbnailUrl = uploaded.thumbnailUrl;
                 }
 
-                await updatePhotoAtomic(currentDetailItem.id, currentDetailPhotoIdx, () => patch);
+                await updatePhotoAtomic(currentDetailItem.id, currentDetailPhotoIdx, latestPhoto => {
+                    if (!sameLocations(latestPhoto.locations, patch.locations)) {
+                        patch.history = appendGarmentHistory(latestPhoto.history, {
+                            type: 'location',
+                            fromLocations: latestPhoto.locations,
+                            toLocations: patch.locations
+                        });
+                    }
+                    return patch;
+                }, false, detailBaseVersion);
                 window.closeDetailModal(); 
             } catch(e) { 
                 alert("儲存失敗: " + e.message); 
@@ -1762,25 +1857,30 @@
         
         window.triggerSoldFlow = function() {
             let photos = normalizePhotos(currentDetailItem); const currentStatus = photos[currentDetailPhotoIdx].status;
-            if (currentStatus === 'Sold') { if(confirm("確認取消售出？物品將回到庫存中。")) updateItemStatus({ status: 'Available', soldPrice: null, soldAt: null, soldCurrency: null, paymentMethod: null, salesChannel: null, saleEvent: null, soldLocation: null, salesNote: '' }); }
-            else { 
-                document.getElementById('popup-sale-mode').checked = hasSingaporePopupLocation(tempLocations);
-                document.getElementById('sold-payment-method').value = '';
-                document.getElementById('sold-note-input').value = ''; 
-                document.getElementById('sold-date-input').valueAsDate = new Date(); 
-                window.updateSaleModeUI(true);
-                document.getElementById('sold-modal').classList.remove('hidden'); 
-            }
+            const photo = photos[currentDetailPhotoIdx];
+            editingExistingSale = currentStatus === 'Sold';
+            const saleEventLabel = editingExistingSale && photo.saleEvent ? photo.saleEvent : appSettings.popupEvent.name;
+            document.getElementById('popup-sale-mode-label').textContent = `${saleEventLabel}（SGD）`;
+            document.getElementById('popup-sale-mode').checked = editingExistingSale
+                ? getSoldCurrency(photo) === 'SGD' && photo.salesChannel === POPUP_SALES_CHANNEL
+                : (hasSingaporePopupLocation(tempLocations) || tempLocations.some(location => location === appSettings.popupEvent.location));
+            document.getElementById('sold-payment-method').value = editingExistingSale ? photo.paymentMethod || '' : '';
+            document.getElementById('sold-note-input').value = editingExistingSale ? photo.salesNote || '' : '';
+            document.getElementById('sold-date-input').value = editingExistingSale ? formatDateForInput(photo.soldAt) : formatDateForInput(new Date());
+            window.updateSaleModeUI(!editingExistingSale);
+            if (editingExistingSale) document.getElementById('sold-price-input').value = photo.soldPrice ?? '';
+            document.getElementById('sold-modal').classList.remove('hidden');
         };
         window.updateSaleModeUI = function(resetPrice = false) {
             const isPopupSale = document.getElementById('popup-sale-mode').checked;
             const priceInput = document.getElementById('sold-price-input');
             const paymentContainer = document.getElementById('sold-payment-container');
             const paymentInput = document.getElementById('sold-payment-method');
-            document.getElementById('sold-modal-title').textContent = isPopupSale ? 'Singapore Popup 售出' : '确认售出价格';
+            document.getElementById('sold-modal-title').textContent = editingExistingSale ? '更正售出资料' : (isPopupSale ? `${appSettings.popupEvent.name} 售出` : '确认售出价格');
             document.getElementById('sold-modal-subtitle').textContent = isPopupSale ? '记录 SGD 成交价、付款方式与售出日期' : '记录 MYR 成交价与售出日期';
             document.getElementById('sold-price-label').textContent = `成交价 (${isPopupSale ? 'SGD' : 'MYR'})`;
             document.getElementById('sold-currency-prefix').textContent = isPopupSale ? 'SGD' : 'RM';
+            document.getElementById('btn-confirm-sold').textContent = editingExistingSale ? '储存更正' : '确认售出';
             paymentContainer.classList.toggle('hidden', !isPopupSale);
             paymentInput.required = isPopupSale;
             if (resetPrice) {
@@ -1816,6 +1916,8 @@
                 dateInput.focus();
                 return;
             }
+            const currentPhoto = normalizePhotos(currentDetailItem)[currentDetailPhotoIdx];
+            const existingPopupSale = editingExistingSale && currentPhoto.salesChannel === POPUP_SALES_CHANNEL;
             const patch = {
                 status: 'Sold',
                 soldPrice,
@@ -1823,30 +1925,46 @@
                 paymentMethod: isPopupSale ? paymentMethod : null,
                 soldAt: new Date(dateVal.replace(/-/g, '/')),
                 salesChannel: isPopupSale ? POPUP_SALES_CHANNEL : null,
-                saleEvent: isPopupSale ? POPUP_SALES_EVENT : null,
-                soldLocation: isPopupSale ? getPopupSoldLocation(tempLocations) : null,
+                saleEvent: isPopupSale ? (existingPopupSale ? currentPhoto.saleEvent || appSettings.popupEvent.name : appSettings.popupEvent.name) : null,
+                soldLocation: isPopupSale ? (existingPopupSale ? currentPhoto.soldLocation || appSettings.popupEvent.location : appSettings.popupEvent.location) : null,
                 salesNote: isPopupSale ? noteInput.value.trim() : '',
                 locations: [...tempLocations]
             };
             button.disabled = true;
             button.textContent = '记录中...';
-            const succeeded = await updateItemStatus(patch, isPopupSale ? '' : noteInput.value.trim(), true);
+            const succeeded = await updateItemStatus(patch, isPopupSale ? '' : noteInput.value.trim(), !editingExistingSale, editingExistingSale ? 'sale_corrected' : 'sold');
             if (succeeded) document.getElementById('sold-modal').classList.add('hidden');
             button.disabled = false;
-            button.textContent = '确认售出';
+            button.textContent = editingExistingSale ? '储存更正' : '确认售出';
         };
-        async function updateItemStatus(patch, noteToAppend = '', preventDuplicateSale = false) {
+        async function updateItemStatus(patch, noteToAppend = '', preventDuplicateSale = false, historyType = '') {
             try {
                 await updatePhotoAtomic(currentDetailItem.id, currentDetailPhotoIdx, latestPhoto => {
                     if (preventDuplicateSale && latestPhoto.status === 'Sold') {
                         throw new Error('此商品已经被标记为售出，请重新整理确认。');
                     }
-                    if (!noteToAppend) return patch;
-                    return {
+                    if ((historyType === 'sale_corrected' || historyType === 'sale_reversed') && latestPhoto.status !== 'Sold') {
+                        throw new Error('此商品的售出状态已经改变，请重新开启商品后再试。');
+                    }
+                    const nextPatch = noteToAppend ? {
                         ...patch,
                         notes: (latestPhoto.notes ? latestPhoto.notes + ' | ' : '') + noteToAppend
-                    };
-                }, true);
+                    } : { ...patch };
+                    if (historyType) {
+                        const historySale = historyType === 'sale_reversed' ? latestPhoto : nextPatch;
+                        nextPatch.history = appendGarmentHistory(latestPhoto.history, {
+                            type: historyType,
+                            fromLocations: latestPhoto.locations,
+                            toLocations: nextPatch.locations || latestPhoto.locations,
+                            saleEvent: historySale.saleEvent,
+                            soldCurrency: historySale.soldCurrency,
+                            soldPrice: historySale.soldPrice,
+                            paymentMethod: historySale.paymentMethod,
+                            note: historyType === 'sale_reversed' ? historySale.salesNote : ''
+                        });
+                    }
+                    return nextPatch;
+                }, true, detailBaseVersion);
                 window.closeDetailModal();
                 return true;
             } catch (error) {
@@ -1854,6 +1972,10 @@
                 return false;
             }
         }
+        window.returnSoldItemToStock = async function() {
+            if (!currentDetailItem || !confirm('确认取消售出？原销售会保留在 History，商品将返回库存。')) return;
+            await updateItemStatus({ status: 'Available', soldPrice: null, soldAt: null, soldCurrency: null, paymentMethod: null, salesChannel: null, saleEvent: null, soldLocation: null, salesNote: '' }, '', false, 'sale_reversed');
+        };
         window.closeDetailModal = () => document.getElementById('detail-modal').classList.add('hidden');
 
         function allocateGarmentIdsFromCounter(counterData, photos, styleSku) {
@@ -1879,7 +2001,7 @@
                         const file = fileInput.files[i]; 
                         btn.innerText = `優化照片 ${i + 1}/${fileInput.files.length}...`;
                         const uploaded = await uploadOptimizedPhoto(file, 'new');
-                        photoObjs.push({ url: uploaded.url, thumbnailUrl: uploaded.thumbnailUrl, status: 'Available', locations: [originStudio], notes: '', soldPrice: null, specificPrice: null });
+                        photoObjs.push({ url: uploaded.url, thumbnailUrl: uploaded.thumbnailUrl, status: 'Available', locations: [originStudio], notes: '', soldPrice: null, history: [], specificPrice: null });
                     } 
                 } 
                 photoObjs = reconcileNewItemPhotos(photoObjs, form.get('quantity'), originStudio);
@@ -2049,7 +2171,7 @@
                         const file = photoInput.files[fileIdx++]; 
                         btn.innerText = `優化照片 ${fileIdx}/${photoInput.files.length}...`;
                         const uploaded = await uploadOptimizedPhoto(file, 'added');
-                        existingPhotos.push({ url: uploaded.url, thumbnailUrl: uploaded.thumbnailUrl, status: 'Available', locations: [newOriginStudio], notes: '', soldPrice: null, specificPrice: null });
+                        existingPhotos.push({ url: uploaded.url, thumbnailUrl: uploaded.thumbnailUrl, status: 'Available', locations: [newOriginStudio], notes: '', soldPrice: null, history: [], specificPrice: null });
                         photosModified = true;
                     }
                 } 
@@ -2332,10 +2454,46 @@
             document.getElementById('settings-styleSkus-list').innerHTML = normalizeStyleSkuCatalog(appSettings.styleSkus)
                 .map(entry => `<span class="bg-stone-100 px-2 py-1 rounded text-[10px] mr-1 mb-1 inline-block border cursor-pointer hover:bg-red-50 hover:text-red-500" onclick="window.removeStyleSku(${inlineString(entry.sku)})"><b>${escapeHtml(entry.category || 'OTHER')}</b> · <b class="font-mono">${escapeHtml(entry.sku)}</b>${entry.name ? ` · ${escapeHtml(entry.name)}` : ''} &times;</span>`)
                 .join('');
+            document.getElementById('popup-event-name').value = appSettings.popupEvent.name;
+            document.getElementById('popup-event-location').value = appSettings.popupEvent.location;
+            document.getElementById('popup-event-start').value = appSettings.popupEvent.startDate;
+            document.getElementById('popup-event-end').value = appSettings.popupEvent.endDate;
             renderArchivedItems();
             window.refreshImageMigrationStatus();
             if (legacySkuPlan.length === 0 && !legacySkuMigrationRunning) window.refreshLegacySkuMigration();
             if (garmentIdMigrationPlan.length === 0 && !garmentIdMigrationRunning) window.refreshGarmentIdMigration();
+        };
+
+        window.savePopupEventSettings = async function() {
+            const button = document.getElementById('popup-event-save');
+            const rawValues = {
+                name: document.getElementById('popup-event-name').value.trim(),
+                location: document.getElementById('popup-event-location').value.trim(),
+                startDate: document.getElementById('popup-event-start').value,
+                endDate: document.getElementById('popup-event-end').value
+            };
+            if (Object.values(rawValues).some(value => !value)) {
+                alert('请填写完整活动名称、地点与日期。');
+                return;
+            }
+            const popupEvent = normalizePopupEvent({
+                ...rawValues
+            });
+            if (popupEvent.startDate > popupEvent.endDate) {
+                alert('Popup 开始日期不可晚于结束日期。');
+                return;
+            }
+            if (!confirm(`确认将目前 Popup 设为「${popupEvent.name}」？旧销售记录不会被修改。`)) return;
+            button.disabled = true;
+            button.textContent = '储存中...';
+            try {
+                await updateDoc(doc(dbFirestore, 'settings', 'config'), { popupEvent });
+            } catch (error) {
+                alert('Popup 设定储存失败：' + error.message);
+            } finally {
+                button.disabled = false;
+                button.textContent = '储存 Popup 设定（SGD）';
+            }
         };
 
         function renderArchivedItems() {

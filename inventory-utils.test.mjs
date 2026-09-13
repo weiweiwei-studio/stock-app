@@ -121,6 +121,7 @@ test('resizing protects every supported history and pricing field', () => {
         { ...createBlankPhoto(), saleEvent: 'Common Rare Singapore · Sep 2026' },
         { ...createBlankPhoto(), soldLocation: 'Singapore Popup' },
         { ...createBlankPhoto(), salesNote: 'Bundle discount' },
+        { ...createBlankPhoto(), history: [{ type: 'location', at: 1 }] },
         { ...createBlankPhoto(), specificPrice: 0 }
     ];
 
