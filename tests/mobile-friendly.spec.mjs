@@ -41,6 +41,7 @@ test('legacy SKU migration controls remain usable on a phone', async ({ page }) 
         document.getElementById('auth-screen')?.classList.add('hidden');
         document.body.classList.remove('auth-pending');
         document.getElementById('view-settings')?.classList.remove('hidden');
+        document.getElementById('data-maintenance-panel').open = true;
     });
 
     const preview = page.locator('#sku-migration-preview');
@@ -116,6 +117,7 @@ test('legacy Garment ID migration controls remain usable on a phone', async ({ p
         document.getElementById('auth-screen')?.classList.add('hidden');
         document.body.classList.remove('auth-pending');
         document.getElementById('view-settings')?.classList.remove('hidden');
+        document.getElementById('data-maintenance-panel').open = true;
     });
 
     const preview = page.locator('#garment-id-preview');
