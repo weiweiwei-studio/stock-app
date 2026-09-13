@@ -78,6 +78,8 @@ export function collectAllSales(items = [], normalizePhotos = item => item.photo
                 soldLocation: photo.soldLocation || '',
                 saleEvent: photo.saleEvent || '',
                 isPopupSale,
+                thumbnailUrl: photo.thumbnailUrl || '',
+                imageUrl: photo.url || '',
                 originalLocations: Array.isArray(photo.locations) ? [...photo.locations] : []
             });
         });
@@ -189,7 +191,7 @@ export function buildPopupSalesCsv(records = []) {
 }
 
 export function buildSalesCsv(records = []) {
-    const headers = ['Sold Date', 'Garment ID', 'Style SKU', 'Product', 'Category', 'Sold Price', 'Currency', 'Sales Channel', 'Sale Event', 'Payment Method', 'Sales Note', 'Sold Location', 'Original Location'];
+    const headers = ['Sold Date', 'Garment ID', 'Style SKU', 'Product', 'Category', 'Sold Price', 'Currency', 'Sales Channel', 'Sale Event', 'Payment Method', 'Sales Note', 'Sold Location', 'Original Location', 'Image URL'];
     const rows = records.map(record => [
         record.soldDate,
         record.garmentId,
@@ -203,7 +205,8 @@ export function buildSalesCsv(records = []) {
         record.paymentMethod,
         record.salesNote,
         record.soldLocation,
-        record.originalLocations.join(' + ')
+        record.originalLocations.join(' + '),
+        record.imageUrl || record.thumbnailUrl
     ]);
     return [headers, ...rows].map(row => row.map(csvCell).join(',')).join('\r\n');
 }

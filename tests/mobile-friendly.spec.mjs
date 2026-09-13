@@ -226,6 +226,34 @@ test('Singapore popup sales report remains usable on a phone', async ({ page }) 
     expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
 });
 
+test('sales report thumbnails and image preview remain usable on a phone', async ({ page }) => {
+    await page.evaluate(() => {
+        document.getElementById('auth-screen')?.classList.add('hidden');
+        document.body.classList.remove('auth-pending');
+        const modal = document.getElementById('popup-sales-report-modal');
+        modal?.classList.remove('hidden');
+        modal?.classList.add('flex');
+        const list = document.getElementById('popup-report-list');
+        if (list) {
+            list.innerHTML = '<div class="flex items-start gap-3 rounded border p-3"><button class="sales-report-thumbnail h-24 w-[72px] flex-shrink-0 rounded border">Image</button><div class="min-w-0 flex-1 break-words">2DRS012-001 · Clairo Dress · Singapore Popup</div></div>';
+        }
+    });
+
+    const thumbnail = page.locator('.sales-report-thumbnail');
+    await thumbnail.scrollIntoViewIfNeeded();
+    const box = await thumbnail.boundingBox();
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+    expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
+    await page.evaluate(() => document.getElementById('image-viewer-modal')?.classList.remove('hidden'));
+    await expect(page.locator('#image-viewer-modal')).toBeVisible();
+    const layers = await page.evaluate(() => ({
+        report: Number.parseInt(getComputedStyle(document.getElementById('popup-sales-report-modal')).zIndex, 10),
+        image: Number.parseInt(getComputedStyle(document.getElementById('image-viewer-modal')).zIndex, 10)
+    }));
+    expect(layers.image).toBeGreaterThan(layers.report);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+});
+
 test('garment history and sold-item correction actions remain usable on a phone', async ({ page }) => {
     await page.evaluate(() => {
         document.getElementById('auth-screen')?.classList.add('hidden');

@@ -6,7 +6,7 @@ import { buildPopupSalesCsv, buildSalesCsv, collectAllSales, collectPopupSales, 
 
 const items = [{
     id: 'batch-1', styleSku: '2DRS012', itemName: 'Clairo Dress', category: 'DRESS', photos: [
-        { status: 'Sold', garmentId: '2DRS012-001', soldCurrency: 'SGD', soldPrice: 320, soldAt: { seconds: Date.parse('2026-09-18T08:00:00Z') / 1000 }, paymentMethod: 'PayNow', saleEvent: POPUP_SALES_EVENT, soldLocation: 'Singapore Popup', locations: ['Online'], salesNote: 'First day' },
+        { status: 'Sold', garmentId: '2DRS012-001', soldCurrency: 'SGD', soldPrice: 320, soldAt: { seconds: Date.parse('2026-09-18T08:00:00Z') / 1000 }, paymentMethod: 'PayNow', saleEvent: POPUP_SALES_EVENT, soldLocation: 'Singapore Popup', locations: ['Online'], salesNote: 'First day', url: 'https://example.com/full.jpg', thumbnailUrl: 'https://example.com/thumb.jpg' },
         { status: 'Sold', garmentId: '2DRS012-002', soldCurrency: 'SGD', soldPrice: 280, soldAt: { seconds: Date.parse('2026-09-19T08:00:00Z') / 1000 }, paymentMethod: 'Card', saleEvent: POPUP_SALES_EVENT, locations: ['Singapore Popup'] },
         { status: 'Sold', garmentId: '2DRS012-003', soldCurrency: 'MYR', soldPrice: 499, saleEvent: POPUP_SALES_EVENT },
         { status: 'Available', garmentId: '2DRS012-004', soldCurrency: 'SGD', soldPrice: 200, saleEvent: POPUP_SALES_EVENT }
@@ -81,6 +81,14 @@ test('unified sales CSV includes currency, channel and event with formula protec
     assert.match(csv, /"Currency","Sales Channel","Sale Event"/);
     assert.match(csv, /"SGD","Popup"/);
     assert.match(csv, /"'=HYPERLINK\(""bad""\)"/);
+    assert.match(csv, /"Image URL"/);
+    assert.match(csv, /"https:\/\/example\.com\/full\.jpg"/);
+});
+
+test('unified sales records preserve thumbnail and full image references', () => {
+    const record = collectAllSales(items).find(candidate => candidate.garmentId === '2DRS012-001');
+    assert.equal(record.thumbnailUrl, 'https://example.com/thumb.jpg');
+    assert.equal(record.imageUrl, 'https://example.com/full.jpg');
 });
 
 test('currency breakdown preserves zero-price sales instead of hiding them', () => {
