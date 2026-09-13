@@ -17,6 +17,7 @@ export function createBlankPhoto(originStudio = 'JB Studio') {
         saleEvent: null,
         soldLocation: null,
         salesNote: '',
+        history: [],
         specificPrice: null
     };
 }
@@ -40,6 +41,7 @@ export function isRemovableEmptyPhoto(photo = {}, originStudio = 'JB Studio') {
         && !photo.saleEvent
         && !photo.soldLocation
         && !String(photo.salesNote || '').trim()
+        && (!Array.isArray(photo.history) || photo.history.length === 0)
         && (photo.specificPrice === null || photo.specificPrice === undefined || photo.specificPrice === '');
 }
 
