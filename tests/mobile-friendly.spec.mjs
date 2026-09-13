@@ -216,6 +216,11 @@ test('Singapore popup sales report remains usable on a phone', async ({ page }) 
     await expect(page.locator('#popup-report-start-date')).toBeVisible();
     await expect(page.locator('#popup-report-payment')).toBeVisible();
     await expect(page.locator('#popup-report-event')).toBeVisible();
+    await expect(page.locator('#sales-report-scope')).toBeVisible();
+    await expect(page.locator('#sales-report-currency')).toBeVisible();
+    for (const selector of ['#sales-report-scope', '#sales-report-currency']) {
+        expect((await page.locator(selector).boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+    }
     const exportButton = page.locator('#popup-report-export-button');
     expect((await exportButton.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
     expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);

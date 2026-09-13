@@ -1,7 +1,7 @@
         import { ADMIN_EMAIL, getAuthErrorMessage, isAuthorizedAdmin } from "./auth-utils.js";
         import { isLocationReferenced, isStyleSkuReferenced, partitionStockItems } from "./archive-utils.js";
         import { POPUP_SALES_CHANNEL, POPUP_SALES_EVENT, formatSoldMoney, getSoldCurrency, hasSingaporePopupLocation } from "./sales-utils.js";
-        import { buildPopupSalesCsv, collectPopupSales, filterPopupSales, summarizePopupSales } from "./popup-report-utils.js";
+        import { buildSalesCsv, collectAllSales, collectPopupSales, filterSales, getSalesReportEventDateRange, summarizePopupSales, summarizeSalesByCurrency } from "./popup-report-utils.js";
         import { appendGarmentHistory, describeGarmentHistory, sameLocations } from "./garment-history-utils.js";
         import { computeDashboardStats, photoMatchesDashboardKpi } from "./dashboard-utils.js";
         import { getSystemBackupFilename, makeSystemBackup } from "./backup-utils.js";
@@ -561,6 +561,31 @@
             return `SGD ${(Number(value) || 0).toFixed(2)}`;
         }
 
+        function formatSalesSummary(summary, field) {
+            const values = ['MYR', 'SGD']
+                .filter(currency => summary.currencies[currency].count > 0)
+                .map(currency => `${currency === 'MYR' ? 'RM' : 'SGD'} ${summary.currencies[currency][field].toFixed(2)}`);
+            return values.join(' / ') || '—';
+        }
+
+        function getAllSalesRecords() {
+            return collectAllSales([...db, ...archivedItems], normalizePhotos).map(record => ({
+                ...record,
+                category: getCleanCategory(record.category)
+            }));
+        }
+
+        function getSalesReportFilters() {
+            return {
+                scope: document.getElementById('sales-report-scope').value,
+                eventName: document.getElementById('popup-report-event').value || appSettings.popupEvent.name,
+                currency: document.getElementById('sales-report-currency').value,
+                startDate: document.getElementById('popup-report-start-date').value,
+                endDate: document.getElementById('popup-report-end-date').value,
+                paymentMethod: document.getElementById('popup-report-payment').value
+            };
+        }
+
         function renderPopupSalesSnapshot() {
             const records = getPopupSalesRecords();
             const summary = summarizePopupSales(records);
@@ -580,13 +605,17 @@
             const modal = document.getElementById('popup-sales-report-modal');
             modal.classList.remove('hidden');
             modal.classList.add('flex');
-            const allEvents = collectPopupSales([...db, ...archivedItems], normalizePhotos, '')
+            const allEvents = getAllSalesRecords()
+                .filter(record => record.isPopupSale)
                 .map(record => record.saleEvent)
                 .filter(Boolean);
             const eventNames = [...new Set([appSettings.popupEvent.name, ...allEvents])];
             const eventSelect = document.getElementById('popup-report-event');
             eventSelect.innerHTML = eventNames.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
             eventSelect.value = appSettings.popupEvent.name;
+            document.getElementById('sales-report-scope').value = 'event';
+            document.getElementById('sales-report-currency').value = 'all';
+            eventSelect.disabled = false;
             document.getElementById('popup-report-start-date').value = appSettings.popupEvent.startDate;
             document.getElementById('popup-report-end-date').value = appSettings.popupEvent.endDate;
             window.renderPopupSalesReport();
@@ -599,52 +628,72 @@
         };
 
         window.resetPopupSalesFilters = function() {
+            document.getElementById('sales-report-scope').value = 'event';
             document.getElementById('popup-report-event').value = appSettings.popupEvent.name;
             document.getElementById('popup-report-start-date').value = appSettings.popupEvent.startDate;
             document.getElementById('popup-report-end-date').value = appSettings.popupEvent.endDate;
             document.getElementById('popup-report-payment').value = 'all';
+            document.getElementById('sales-report-currency').value = 'all';
+            document.getElementById('popup-report-event').disabled = false;
+            window.renderPopupSalesReport();
+        };
+
+        function setSalesReportDatesForSelectedEvent() {
+            const selectedEvent = document.getElementById('popup-report-event').value;
+            const range = getSalesReportEventDateRange(selectedEvent, appSettings.popupEvent);
+            document.getElementById('popup-report-start-date').value = range.startDate;
+            document.getElementById('popup-report-end-date').value = range.endDate;
+        }
+
+        window.handleSalesReportScopeChange = function() {
+            const isEventScope = document.getElementById('sales-report-scope').value === 'event';
+            document.getElementById('popup-report-event').disabled = !isEventScope;
+            if (isEventScope) {
+                setSalesReportDatesForSelectedEvent();
+            } else {
+                document.getElementById('popup-report-start-date').value = '';
+                document.getElementById('popup-report-end-date').value = '';
+            }
             window.renderPopupSalesReport();
         };
 
         window.handlePopupReportEventChange = function() {
-            const selectedEvent = document.getElementById('popup-report-event').value;
-            const isActiveEvent = selectedEvent === appSettings.popupEvent.name;
-            document.getElementById('popup-report-start-date').value = isActiveEvent ? appSettings.popupEvent.startDate : '';
-            document.getElementById('popup-report-end-date').value = isActiveEvent ? appSettings.popupEvent.endDate : '';
+            setSalesReportDatesForSelectedEvent();
             window.renderPopupSalesReport();
         };
 
         window.renderPopupSalesReport = function() {
-            const selectedEvent = document.getElementById('popup-report-event').value || appSettings.popupEvent.name;
-            const isActiveEvent = selectedEvent === appSettings.popupEvent.name;
-            document.getElementById('popup-report-title').textContent = `${selectedEvent} Sales Report`;
+            const filters = getSalesReportFilters();
+            const isActiveEvent = filters.scope === 'event' && filters.eventName === appSettings.popupEvent.name;
+            const scopeTitle = filters.scope === 'event' ? filters.eventName : (filters.scope === 'popup' ? '所有 Popup' : '所有销售');
+            document.getElementById('popup-report-title').textContent = `${scopeTitle} Sales Report`;
             document.getElementById('popup-report-event-meta').textContent = isActiveEvent
                 ? `${appSettings.popupEvent.startDate} – ${appSettings.popupEvent.endDate} · SGD`
-                : '历史活动 · SGD';
-            const records = filterPopupSales(getPopupSalesRecords(selectedEvent), {
-                startDate: document.getElementById('popup-report-start-date').value,
-                endDate: document.getElementById('popup-report-end-date').value,
-                paymentMethod: document.getElementById('popup-report-payment').value
-            });
-            const summary = summarizePopupSales(records);
+                : (filters.scope === 'popup' ? '所有 Popup 活动 · 币别分开统计' : '全品牌销售 · 币别分开统计');
+            const records = filterSales(getAllSalesRecords(), filters);
+            const summary = summarizeSalesByCurrency(records);
             document.getElementById('popup-report-count').textContent = summary.count;
-            document.getElementById('popup-report-total').textContent = formatSgdAmount(summary.total);
-            document.getElementById('popup-report-average').textContent = formatSgdAmount(summary.average);
+            document.getElementById('popup-report-total').textContent = formatSalesSummary(summary, 'total');
+            document.getElementById('popup-report-average').textContent = formatSalesSummary(summary, 'average');
             document.getElementById('popup-report-filter-status').textContent = `${summary.count} records`;
             document.getElementById('popup-report-export-button').disabled = records.length === 0;
 
+            const breakdownMoney = value => ['MYR', 'SGD']
+                .filter(currency => value[`${currency}Count`] > 0)
+                .map(currency => `${currency === 'MYR' ? 'RM' : 'SGD'} ${value[currency].toFixed(2)}`)
+                .join(' / ') || '—';
             const renderBreakdown = (entries, emptyText) => entries.length
-                ? entries.map(([label, value]) => `<div class="flex items-center justify-between gap-3 rounded bg-stone-50 px-3 py-2 text-xs"><span class="font-bold text-stone-600">${escapeHtml(label)}</span><span class="text-stone-500">${value.count} 件 · <b class="text-stone-800">${escapeHtml(formatSgdAmount(value.total))}</b></span></div>`).join('')
+                ? entries.map(([label, value]) => `<div class="flex items-center justify-between gap-3 rounded bg-stone-50 px-3 py-2 text-xs"><span class="font-bold text-stone-600">${escapeHtml(label)}</span><span class="text-right text-stone-500">${value.count} 件 · <b class="text-stone-800">${escapeHtml(breakdownMoney(value))}</b></span></div>`).join('')
                 : `<p class="py-2 text-xs text-stone-400">${emptyText}</p>`;
 
             const dailyEntries = Object.entries(summary.byDate).sort(([a], [b]) => a.localeCompare(b));
-            const paymentEntries = Object.entries(summary.byPayment).sort(([, a], [, b]) => b.total - a.total);
+            const paymentEntries = Object.entries(summary.byPayment).sort(([, a], [, b]) => b.count - a.count);
             document.getElementById('popup-report-daily').innerHTML = renderBreakdown(dailyEntries, '没有符合条件的销售。');
             document.getElementById('popup-report-payments').innerHTML = renderBreakdown(paymentEntries, '没有付款记录。');
 
             const list = document.getElementById('popup-report-list');
             if (!records.length) {
-                list.innerHTML = '<div class="rounded bg-stone-50 py-8 text-center text-sm text-stone-400">没有符合条件的 Singapore Popup 销售。</div>';
+                list.innerHTML = '<div class="rounded bg-stone-50 py-8 text-center text-sm text-stone-400">没有符合条件的销售记录。</div>';
                 return;
             }
             list.innerHTML = records.map(record => {
@@ -656,34 +705,30 @@
                             <div class="break-words font-mono text-sm font-black text-stone-800">${escapeHtml(identity)}</div>
                             <div class="mt-1 break-words text-xs text-stone-600">${escapeHtml(record.itemName || record.styleSku || '-')} · ${escapeHtml(record.category || '-')}</div>
                         </div>
-                        <div class="flex-shrink-0 text-right"><div class="font-black text-pink-700">${escapeHtml(formatSgdAmount(record.soldPrice))}</div><div class="mt-1 text-[10px] text-stone-500">${escapeHtml(record.paymentMethod)}</div></div>
+                        <div class="flex-shrink-0 text-right"><div class="font-black text-pink-700">${escapeHtml(formatSoldMoney(record.soldPrice, record.soldCurrency))}</div><div class="mt-1 text-[10px] text-stone-500">${escapeHtml(record.paymentMethod)}</div></div>
                     </div>
-                    <div class="mt-2 text-[10px] leading-5 text-stone-500">${escapeHtml(record.soldDate || 'Date not recorded')} · Sold at: ${escapeHtml(record.soldLocation || 'Singapore Popup')} · From: ${escapeHtml(originalLocation)}</div>
+                    <div class="mt-2 text-[10px] leading-5 text-stone-500">${escapeHtml(record.soldDate || 'Date not recorded')} · ${escapeHtml(record.salesChannel)}${record.saleEvent ? ` · ${escapeHtml(record.saleEvent)}` : ''} · Sold at: ${escapeHtml(record.soldLocation || originalLocation)}</div>
                     ${record.salesNote ? `<div class="mt-1 break-words rounded bg-yellow-50 px-2 py-1 text-xs text-stone-600">Note: ${escapeHtml(record.salesNote)}</div>` : ''}
                 </div>`;
             }).join('');
         };
 
         window.exportPopupSalesCsv = function() {
-            const selectedEvent = document.getElementById('popup-report-event').value || appSettings.popupEvent.name;
-            const records = filterPopupSales(getPopupSalesRecords(selectedEvent), {
-                startDate: document.getElementById('popup-report-start-date').value,
-                endDate: document.getElementById('popup-report-end-date').value,
-                paymentMethod: document.getElementById('popup-report-payment').value
-            });
+            const filters = getSalesReportFilters();
+            const records = filterSales(getAllSalesRecords(), filters);
             if (!records.length) {
-                alert('没有可导出的 Singapore Popup 销售记录。');
+                alert('没有可导出的销售记录。');
                 return;
             }
-            const blob = new Blob([`\uFEFF${buildPopupSalesCsv(records)}`], { type: 'text/csv;charset=utf-8' });
+            const blob = new Blob([`\uFEFF${buildSalesCsv(records)}`], { type: 'text/csv;charset=utf-8' });
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.download = `Singapore_Popup_Sales_${new Date().toISOString().slice(0, 10)}.csv`;
+            link.download = `Weiweiwei_Sales_${filters.scope}_${new Date().toISOString().slice(0, 10)}.csv`;
             document.body.appendChild(link);
             link.click();
             link.remove();
-            URL.revokeObjectURL(url);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
         };
         
         window.renderMonthlyCategorySales = function() {
@@ -1326,8 +1371,10 @@
                         }
                         
                         let quickDispatchHTML = '';
+                        let quickSaleHTML = '';
                         
                         if (!isSold) {
+                            quickSaleHTML = `<button type="button" aria-label="标记 ${escapeHtml(p.garmentId || item.styleSku || '商品')} 为售出" onclick="window.quickStartSold(event, ${inlineString(item.id)}, ${idx})" class="mt-2 min-h-[44px] w-full rounded border border-pink-200 bg-pink-50 px-1 text-[10px] font-black text-pink-700 hover:bg-pink-100">售出</button>`;
                             let labelText = isOnline ? '🌐 已上線, 調貨至...' : '📦 安排出貨/調貨...';
                             let bgClass = isOnline ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100' : 'bg-stone-50 text-stone-600 border-stone-200 hover:bg-stone-100';
                             
@@ -1371,6 +1418,7 @@
                             </div>
                             <div class="mt-1 w-full truncate text-center font-mono text-[9px] font-bold text-stone-600">${escapeHtml(p.garmentId || item.styleSku || '尚未编号')}</div>
                             <div class="w-full truncate text-center text-[8px] text-stone-400">${escapeHtml(locationText)}</div>
+                            ${quickSaleHTML}
                             <div class="w-full dispatch-wrapper">
                                 ${quickDispatchHTML}
                             </div>
@@ -1846,6 +1894,20 @@
             if (editingExistingSale) document.getElementById('sold-price-input').value = photo.soldPrice ?? '';
             setSoldWriteStatus();
             document.getElementById('sold-modal').classList.remove('hidden');
+        };
+        window.quickStartSold = function(event, itemId, photoIndex) {
+            event?.stopPropagation();
+            const item = db.find(candidate => candidate.id === itemId);
+            const photo = item ? normalizePhotos(item)[photoIndex] : null;
+            if (!item || !photo || photo.status === 'Sold') {
+                showOperationToast('商品资料已改变，请重新整理后再试', true);
+                return;
+            }
+            currentDetailItem = item;
+            currentDetailPhotoIdx = photoIndex;
+            detailBaseVersion = getVersion(item);
+            tempLocations = [...photo.locations];
+            window.triggerSoldFlow();
         };
         window.updateSaleModeUI = function(resetPrice = false) {
             const isPopupSale = document.getElementById('popup-sale-mode').checked;

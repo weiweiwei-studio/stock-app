@@ -14,6 +14,16 @@ export function formatSingaporeDate(value) {
     return `${part('year')}-${part('month')}-${part('day')}`;
 }
 
+export function getSalesReportEventDateRange(selectedEvent, activeEvent = {}) {
+    if (String(selectedEvent || '') !== String(activeEvent.name || '')) {
+        return { startDate: '', endDate: '' };
+    }
+    return {
+        startDate: String(activeEvent.startDate || ''),
+        endDate: String(activeEvent.endDate || '')
+    };
+}
+
 export function collectPopupSales(items = [], normalizePhotos = item => item.photos || [], eventName = POPUP_SALES_EVENT) {
     const records = [];
     items.forEach(item => {
@@ -40,6 +50,89 @@ export function collectPopupSales(items = [], normalizePhotos = item => item.pho
         });
     });
     return records.sort((a, b) => b.soldDate.localeCompare(a.soldDate) || a.garmentId.localeCompare(b.garmentId));
+}
+
+export function collectAllSales(items = [], normalizePhotos = item => item.photos || []) {
+    const records = [];
+    items.forEach(item => {
+        normalizePhotos(item).forEach((photo, photoIndex) => {
+            if (photo.status !== 'Sold') return;
+            const amount = Number(photo.soldPrice);
+            const soldCurrency = getSoldCurrency(photo);
+            const isPopupSale = soldCurrency === 'SGD'
+                && Boolean(photo.saleEvent)
+                && (photo.salesChannel === POPUP_SALES_CHANNEL || photo.saleEvent === POPUP_SALES_EVENT);
+            records.push({
+                itemId: item.id || '',
+                photoIndex,
+                garmentId: photo.garmentId || '',
+                styleSku: item.styleSku || '',
+                itemName: item.itemName || '',
+                category: item.category || '',
+                soldDate: formatSingaporeDate(photo.soldAt),
+                soldPrice: Number.isFinite(amount) && amount >= 0 ? amount : 0,
+                soldCurrency,
+                paymentMethod: photo.paymentMethod || 'Not recorded',
+                salesChannel: photo.salesChannel || (isPopupSale ? POPUP_SALES_CHANNEL : 'Not recorded'),
+                salesNote: photo.salesNote || '',
+                soldLocation: photo.soldLocation || '',
+                saleEvent: photo.saleEvent || '',
+                isPopupSale,
+                originalLocations: Array.isArray(photo.locations) ? [...photo.locations] : []
+            });
+        });
+    });
+    return records.sort((a, b) => b.soldDate.localeCompare(a.soldDate) || a.garmentId.localeCompare(b.garmentId));
+}
+
+export function filterSales(records = [], filters = {}) {
+    const scope = String(filters.scope || 'event');
+    const eventName = String(filters.eventName || '');
+    const currency = String(filters.currency || 'all').toUpperCase();
+    const startDate = String(filters.startDate || '');
+    const endDate = String(filters.endDate || '');
+    const paymentMethod = String(filters.paymentMethod || 'all');
+    return records.filter(record => {
+        if (scope === 'event' && (!record.isPopupSale || record.saleEvent !== eventName)) return false;
+        if (scope === 'popup' && !record.isPopupSale) return false;
+        if (currency !== 'ALL' && record.soldCurrency !== currency) return false;
+        if (startDate && (!record.soldDate || record.soldDate < startDate)) return false;
+        if (endDate && (!record.soldDate || record.soldDate > endDate)) return false;
+        if (paymentMethod !== 'all' && record.paymentMethod !== paymentMethod) return false;
+        return true;
+    });
+}
+
+export function summarizeSalesByCurrency(records = []) {
+    const summary = {
+        count: records.length,
+        currencies: {
+            MYR: { count: 0, total: 0, average: 0 },
+            SGD: { count: 0, total: 0, average: 0 }
+        },
+        byDate: {},
+        byPayment: {}
+    };
+    records.forEach(record => {
+        const currency = record.soldCurrency === 'SGD' ? 'SGD' : 'MYR';
+        const amount = Number(record.soldPrice) || 0;
+        const date = record.soldDate || 'Date not recorded';
+        const payment = record.paymentMethod || 'Not recorded';
+        summary.currencies[currency].count++;
+        summary.currencies[currency].total += amount;
+        summary.byDate[date] ||= { count: 0, MYR: 0, SGD: 0, MYRCount: 0, SGDCount: 0 };
+        summary.byPayment[payment] ||= { count: 0, MYR: 0, SGD: 0, MYRCount: 0, SGDCount: 0 };
+        summary.byDate[date].count++;
+        summary.byDate[date][currency] += amount;
+        summary.byDate[date][`${currency}Count`]++;
+        summary.byPayment[payment].count++;
+        summary.byPayment[payment][currency] += amount;
+        summary.byPayment[payment][`${currency}Count`]++;
+    });
+    Object.values(summary.currencies).forEach(value => {
+        value.average = value.count ? value.total / value.count : 0;
+    });
+    return summary;
 }
 
 export function filterPopupSales(records = [], filters = {}) {
@@ -87,6 +180,26 @@ export function buildPopupSalesCsv(records = []) {
         record.itemName,
         record.category,
         record.soldPrice.toFixed(2),
+        record.paymentMethod,
+        record.salesNote,
+        record.soldLocation,
+        record.originalLocations.join(' + ')
+    ]);
+    return [headers, ...rows].map(row => row.map(csvCell).join(',')).join('\r\n');
+}
+
+export function buildSalesCsv(records = []) {
+    const headers = ['Sold Date', 'Garment ID', 'Style SKU', 'Product', 'Category', 'Sold Price', 'Currency', 'Sales Channel', 'Sale Event', 'Payment Method', 'Sales Note', 'Sold Location', 'Original Location'];
+    const rows = records.map(record => [
+        record.soldDate,
+        record.garmentId,
+        record.styleSku,
+        record.itemName,
+        record.category,
+        record.soldPrice.toFixed(2),
+        record.soldCurrency,
+        record.salesChannel,
+        record.saleEvent,
         record.paymentMethod,
         record.salesNote,
         record.soldLocation,
