@@ -2059,9 +2059,42 @@
                 return false;
             }
         }
-        window.returnSoldItemToStock = async function() {
-            if (!currentDetailItem || !confirm('确认取消售出？原销售会保留在 History，商品将返回库存。')) return;
-            await updateItemStatus({ status: 'Available', soldPrice: null, soldAt: null, soldCurrency: null, paymentMethod: null, salesChannel: null, saleEvent: null, soldLocation: null, salesNote: '' }, '', false, 'sale_reversed');
+        function setSaleReversalStatus(message = '', isError = false) {
+            const status = document.getElementById('sale-reversal-status');
+            status.textContent = message;
+            status.className = message
+                ? `mt-3 rounded p-2 text-xs font-bold ${isError ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'}`
+                : 'hidden';
+        }
+        window.returnSoldItemToStock = function() {
+            if (!currentDetailItem) return;
+            const modal = document.getElementById('sale-reversal-modal');
+            setSaleReversalStatus();
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            window.setTimeout(() => document.getElementById('btn-cancel-sale-reversal')?.focus(), 0);
+        };
+        window.closeSaleReversalConfirmation = function() {
+            const modal = document.getElementById('sale-reversal-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            document.getElementById('btn-return-stock')?.focus();
+        };
+        window.confirmReturnSoldItemToStock = async function() {
+            if (!currentDetailItem) return;
+            const button = document.getElementById('btn-confirm-sale-reversal');
+            if (button.disabled) return;
+            button.disabled = true;
+            button.textContent = '处理中...';
+            setSaleReversalStatus('正在写入 Firebase，请不要关闭页面…');
+            try {
+                const succeeded = await updateItemStatus({ status: 'Available', soldPrice: null, soldAt: null, soldCurrency: null, paymentMethod: null, salesChannel: null, saleEvent: null, soldLocation: null, salesNote: '' }, '', false, 'sale_reversed');
+                if (succeeded) window.closeSaleReversalConfirmation();
+                else setSaleReversalStatus('未能取消售出，资料尚未写入。请确认网络并重新开启商品后再试。', true);
+            } finally {
+                button.disabled = false;
+                button.textContent = '确认回到库存';
+            }
         };
         window.closeDetailModal = () => document.getElementById('detail-modal').classList.add('hidden');
 

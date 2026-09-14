@@ -295,6 +295,39 @@ test('visible item-detail actions share the available tablet width', async ({ pa
     expect((saveBox?.x ?? 0) + (saveBox?.width ?? 0)).toBeLessThanOrEqual(768);
 });
 
+test('sale reversal confirmation is visible and actionable in Chromium', async ({ page }) => {
+    await page.evaluate(() => {
+        document.getElementById('auth-screen')?.classList.add('hidden');
+        document.body.classList.remove('auth-pending');
+        const modal = document.getElementById('sale-reversal-modal');
+        modal?.classList.remove('hidden');
+        modal?.classList.add('flex');
+        window.__saleReversalChoice = '';
+        window.closeSaleReversalConfirmation = () => {
+            window.__saleReversalChoice = 'cancelled';
+            modal?.classList.add('hidden');
+        };
+        window.confirmReturnSoldItemToStock = () => { window.__saleReversalChoice = 'confirmed'; };
+    });
+
+    const modal = page.locator('#sale-reversal-modal');
+    await expect(modal).toBeVisible();
+    for (const selector of ['#btn-cancel-sale-reversal', '#btn-confirm-sale-reversal']) {
+        const box = await page.locator(selector).boundingBox();
+        expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+        expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
+    }
+    await page.locator('#btn-confirm-sale-reversal').tap();
+    expect(await page.evaluate(() => window.__saleReversalChoice)).toBe('confirmed');
+    await page.evaluate(() => {
+        const status = document.getElementById('sale-reversal-status');
+        status.textContent = '未能取消售出，资料尚未写入。';
+        status.className = 'mt-3 rounded p-2 text-xs font-bold bg-red-50 text-red-700';
+    });
+    await expect(page.locator('#sale-reversal-status')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+});
+
 test('item detail modal scrolls to its actions on a phone', async ({ page }) => {
     await page.evaluate(() => {
         document.getElementById('auth-screen')?.classList.add('hidden');
