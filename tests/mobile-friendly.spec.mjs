@@ -280,6 +280,21 @@ test('garment history and sold-item correction actions remain usable on a phone'
     expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
 });
 
+test('visible item-detail actions share the available tablet width', async ({ page }) => {
+    await page.setViewportSize({ width: 768, height: 844 });
+    await page.evaluate(() => {
+        document.getElementById('auth-screen')?.classList.add('hidden');
+        document.body.classList.remove('auth-pending');
+        document.getElementById('detail-modal')?.classList.remove('hidden');
+        document.getElementById('btn-return-stock')?.classList.add('hidden');
+    });
+
+    const soldBox = await page.locator('#btn-toggle-sold').boundingBox();
+    const saveBox = await page.locator('#btn-save-detail').boundingBox();
+    expect(Math.abs((soldBox?.width ?? 0) - (saveBox?.width ?? 0))).toBeLessThanOrEqual(1);
+    expect((saveBox?.x ?? 0) + (saveBox?.width ?? 0)).toBeLessThanOrEqual(768);
+});
+
 test('item detail modal scrolls to its actions on a phone', async ({ page }) => {
     await page.evaluate(() => {
         document.getElementById('auth-screen')?.classList.add('hidden');
