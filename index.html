@@ -827,6 +827,7 @@
         <div class="w-full max-w-xs rounded-lg bg-white p-6 shadow-xl">
             <h3 id="sale-reversal-title" class="text-lg font-bold text-stone-800">确认取消售出？</h3>
             <p class="mt-2 text-sm leading-5 text-stone-500">原销售资料会保留在 History，商品将返回库存。</p>
+            <p id="sale-reversal-status" class="hidden" role="status" aria-live="assertive"></p>
             <div class="mt-5 grid grid-cols-2 gap-2">
                 <button id="btn-cancel-sale-reversal" type="button" onclick="window.closeSaleReversalConfirmation()" class="min-h-[44px] touch-manipulation rounded border border-stone-200 px-4 py-2 text-sm font-bold text-stone-600">返回</button>
                 <button id="btn-confirm-sale-reversal" type="button" onclick="window.confirmReturnSoldItemToStock()" class="min-h-[44px] touch-manipulation rounded bg-red-600 px-4 py-2 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-60">确认回到库存</button>
