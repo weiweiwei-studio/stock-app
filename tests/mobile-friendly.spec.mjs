@@ -261,6 +261,8 @@ test('garment history and sold-item correction actions remain usable on a phone'
         document.getElementById('detail-modal')?.classList.remove('hidden');
         document.getElementById('btn-return-stock')?.classList.remove('hidden');
         document.getElementById('detail-history').innerHTML = Array.from({ length: 8 }, (_, index) => `<div>History ${index + 1}</div>`).join('');
+        window.__returnStockTapped = false;
+        window.returnSoldItemToStock = () => { window.__returnStockTapped = true; };
     });
 
     const history = page.locator('#detail-history');
@@ -269,7 +271,12 @@ test('garment history and sold-item correction actions remain usable on a phone'
     for (const selector of ['#btn-toggle-sold', '#btn-return-stock', '#btn-save-detail']) {
         const box = await page.locator(selector).boundingBox();
         expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+        expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
     }
+    const returnButton = page.locator('#btn-return-stock');
+    await returnButton.scrollIntoViewIfNeeded();
+    await returnButton.tap();
+    expect(await page.evaluate(() => window.__returnStockTapped)).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
 });
 
