@@ -205,7 +205,7 @@ test('mobile item detail uses a dynamic viewport scroll container', () => {
 });
 
 test('sold-item actions are explicit full-width mobile buttons', () => {
-    assert.match(html, /id=["']detail-action-bar["'][^>]*grid-cols-1[^>]*sm:grid-cols-3/);
+    assert.match(html, /id=["']detail-action-bar["'][^>]*grid-cols-1[^>]*sm:auto-cols-fr[^>]*sm:grid-flow-col/);
     assert.match(html, /id=["']btn-return-stock["'][^>]*type=["']button["'][^>]*w-full[^>]*touch-manipulation/);
     assert.match(html, /id=["']btn-save-detail["'][^>]*type=["']button["'][^>]*w-full/);
 });
