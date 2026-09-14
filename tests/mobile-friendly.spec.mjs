@@ -319,6 +319,12 @@ test('sale reversal confirmation is visible and actionable in Chromium', async (
     }
     await page.locator('#btn-confirm-sale-reversal').tap();
     expect(await page.evaluate(() => window.__saleReversalChoice)).toBe('confirmed');
+    await page.evaluate(() => {
+        const status = document.getElementById('sale-reversal-status');
+        status.textContent = '未能取消售出，资料尚未写入。';
+        status.className = 'mt-3 rounded p-2 text-xs font-bold bg-red-50 text-red-700';
+    });
+    await expect(page.locator('#sale-reversal-status')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
 });
 
