@@ -2059,9 +2059,32 @@
                 return false;
             }
         }
-        window.returnSoldItemToStock = async function() {
-            if (!currentDetailItem || !confirm('确认取消售出？原销售会保留在 History，商品将返回库存。')) return;
-            await updateItemStatus({ status: 'Available', soldPrice: null, soldAt: null, soldCurrency: null, paymentMethod: null, salesChannel: null, saleEvent: null, soldLocation: null, salesNote: '' }, '', false, 'sale_reversed');
+        window.returnSoldItemToStock = function() {
+            if (!currentDetailItem) return;
+            const modal = document.getElementById('sale-reversal-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            window.setTimeout(() => document.getElementById('btn-cancel-sale-reversal')?.focus(), 0);
+        };
+        window.closeSaleReversalConfirmation = function() {
+            const modal = document.getElementById('sale-reversal-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            document.getElementById('btn-return-stock')?.focus();
+        };
+        window.confirmReturnSoldItemToStock = async function() {
+            if (!currentDetailItem) return;
+            const button = document.getElementById('btn-confirm-sale-reversal');
+            if (button.disabled) return;
+            button.disabled = true;
+            button.textContent = '处理中...';
+            try {
+                const succeeded = await updateItemStatus({ status: 'Available', soldPrice: null, soldAt: null, soldCurrency: null, paymentMethod: null, salesChannel: null, saleEvent: null, soldLocation: null, salesNote: '' }, '', false, 'sale_reversed');
+                if (succeeded) window.closeSaleReversalConfirmation();
+            } finally {
+                button.disabled = false;
+                button.textContent = '确认回到库存';
+            }
         };
         window.closeDetailModal = () => document.getElementById('detail-modal').classList.add('hidden');
 
