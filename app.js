@@ -1796,7 +1796,7 @@
             const badgeSold = document.getElementById('detail-sold-badge');
             if(p.status === 'Sold') {
                 btnSold.innerText = "更正售出资料";
-                btnSold.className = "min-h-[44px] rounded bg-stone-800 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-stone-900";
+                btnSold.className = "min-h-[44px] w-full rounded bg-stone-800 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-stone-900";
                 btnReturn.classList.remove('hidden');
                 badgeSold.classList.remove('hidden');
             } else {

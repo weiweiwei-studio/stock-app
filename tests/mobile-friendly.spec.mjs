@@ -261,6 +261,8 @@ test('garment history and sold-item correction actions remain usable on a phone'
         document.getElementById('detail-modal')?.classList.remove('hidden');
         document.getElementById('btn-return-stock')?.classList.remove('hidden');
         document.getElementById('detail-history').innerHTML = Array.from({ length: 8 }, (_, index) => `<div>History ${index + 1}</div>`).join('');
+        window.__returnStockTapped = false;
+        window.returnSoldItemToStock = () => { window.__returnStockTapped = true; };
     });
 
     const history = page.locator('#detail-history');
@@ -269,8 +271,28 @@ test('garment history and sold-item correction actions remain usable on a phone'
     for (const selector of ['#btn-toggle-sold', '#btn-return-stock', '#btn-save-detail']) {
         const box = await page.locator(selector).boundingBox();
         expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+        expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
     }
+    const returnButton = page.locator('#btn-return-stock');
+    await returnButton.scrollIntoViewIfNeeded();
+    await returnButton.tap();
+    expect(await page.evaluate(() => window.__returnStockTapped)).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+});
+
+test('visible item-detail actions share the available tablet width', async ({ page }) => {
+    await page.setViewportSize({ width: 768, height: 844 });
+    await page.evaluate(() => {
+        document.getElementById('auth-screen')?.classList.add('hidden');
+        document.body.classList.remove('auth-pending');
+        document.getElementById('detail-modal')?.classList.remove('hidden');
+        document.getElementById('btn-return-stock')?.classList.add('hidden');
+    });
+
+    const soldBox = await page.locator('#btn-toggle-sold').boundingBox();
+    const saveBox = await page.locator('#btn-save-detail').boundingBox();
+    expect(Math.abs((soldBox?.width ?? 0) - (saveBox?.width ?? 0))).toBeLessThanOrEqual(1);
+    expect((saveBox?.x ?? 0) + (saveBox?.width ?? 0)).toBeLessThanOrEqual(768);
 });
 
 test('item detail modal scrolls to its actions on a phone', async ({ page }) => {
