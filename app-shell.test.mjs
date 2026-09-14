@@ -204,6 +204,12 @@ test('mobile item detail uses a dynamic viewport scroll container', () => {
     assert.match(html, /md:overflow-y-auto/);
 });
 
+test('sold-item actions are explicit full-width mobile buttons', () => {
+    assert.match(html, /id=["']detail-action-bar["'][^>]*grid-cols-1[^>]*sm:grid-cols-3/);
+    assert.match(html, /id=["']btn-return-stock["'][^>]*type=["']button["'][^>]*w-full[^>]*touch-manipulation/);
+    assert.match(html, /id=["']btn-save-detail["'][^>]*type=["']button["'][^>]*w-full/);
+});
+
 test('mobile operational controls use responsive layouts and full-width touch targets', () => {
     assert.match(html, /id=["']production-filter-panel["'][^>]*grid-cols-1[^>]*sm:grid-cols-2[^>]*lg:grid-cols-4/);
     for (const id of ['prod-filter-maker', 'prod-filter-category', 'prod-filter-style-sku', 'prod-filter-status']) {
