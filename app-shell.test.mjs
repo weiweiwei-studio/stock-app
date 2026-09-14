@@ -213,9 +213,11 @@ test('sold-item actions are explicit full-width mobile buttons', () => {
 test('sale reversal uses an in-app confirmation instead of a browser dialog', () => {
     assert.match(html, /id=["']sale-reversal-modal["'][^>]*role=["']dialog["'][^>]*aria-modal=["']true["']/);
     assert.match(html, /id=["']btn-confirm-sale-reversal["'][^>]*onclick=["']window\.confirmReturnSoldItemToStock\(\)["']/);
+    assert.match(html, /id=["']sale-reversal-status["'][^>]*role=["']status["'][^>]*aria-live=["']assertive["']/);
     assert.match(app, /window\.returnSoldItemToStock = function\(\)[\s\S]*?sale-reversal-modal[\s\S]*?classList\.add\(['"]flex['"]\)/);
     assert.doesNotMatch(app, /confirm\(['"]确认取消售出/);
     assert.match(app, /window\.confirmReturnSoldItemToStock = async function\(\)[\s\S]*?sale_reversed/);
+    assert.match(app, /setSaleReversalStatus\(['"]未能取消售出[\s\S]*?true\)/);
 });
 
 test('mobile operational controls use responsive layouts and full-width touch targets', () => {
