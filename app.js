@@ -1438,6 +1438,13 @@
                             }
                         }
 
+                        const inventoryIdentifier = String(p.garmentId || item.styleSku || '尚未编号');
+                        // Leave a little space inside the 64px card; longer IDs use a smaller font.
+                        const identifierWidthUnits = Array.from(inventoryIdentifier).reduce(
+                            (total, char) => total + (char.charCodeAt(0) > 127 ? 1 : 0.65), 0
+                        );
+                        const identifierFontSize = Math.min(8, 60 / Math.max(1, identifierWidthUnits));
+
                         gridHTML += `
                         <div class="flex flex-col items-center w-[64px] flex-shrink-0 dispatch-card">
                             <div class="relative w-full h-[84px] cursor-pointer transition-transform hover:scale-105 bg-white rounded shadow-sm border border-stone-200 group" onclick="window.openDetailModal(${inlineString(item.id)}, ${idx})">
@@ -1447,7 +1454,7 @@
                                 ${hasNote ? `<div class="has-note-dot"></div>` : ''}
                                 <div class="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity rounded flex items-center justify-center pointer-events-none"><i data-lucide="settings" class="text-white w-5 h-5 drop-shadow-md"></i></div>
                             </div>
-                            <div class="mt-1 w-full whitespace-normal break-all text-center font-mono text-[9px] font-bold text-stone-600">${escapeHtml(p.garmentId || item.styleSku || '尚未编号')}</div>
+                            <div class="mt-1 w-full whitespace-nowrap text-center font-mono font-bold text-stone-600" style="font-size: ${identifierFontSize}px">${escapeHtml(inventoryIdentifier)}</div>
                             <div class="w-full truncate text-center text-[8px] text-stone-400">${escapeHtml(locationText)}</div>
                             ${quickSaleHTML}
                             <div class="w-full dispatch-wrapper">
