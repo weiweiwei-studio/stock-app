@@ -1447,7 +1447,7 @@
                                 ${hasNote ? `<div class="has-note-dot"></div>` : ''}
                                 <div class="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity rounded flex items-center justify-center pointer-events-none"><i data-lucide="settings" class="text-white w-5 h-5 drop-shadow-md"></i></div>
                             </div>
-                            <div class="mt-1 w-full truncate text-center font-mono text-[9px] font-bold text-stone-600">${escapeHtml(p.garmentId || item.styleSku || '尚未编号')}</div>
+                            <div class="mt-1 w-full whitespace-normal break-all text-center font-mono text-[9px] font-bold text-stone-600">${escapeHtml(p.garmentId || item.styleSku || '尚未编号')}</div>
                             <div class="w-full truncate text-center text-[8px] text-stone-400">${escapeHtml(locationText)}</div>
                             ${quickSaleHTML}
                             <div class="w-full dispatch-wrapper">
