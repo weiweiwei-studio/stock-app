@@ -62,6 +62,12 @@ test('inventory product filter remains usable on a phone', async ({ page }) => {
         document.getElementById('view-allocation')?.classList.remove('hidden');
     });
 
+    const onlineFilter = page.locator('#alloc-filter-online');
+    await expect(onlineFilter).toBeVisible();
+    expect((await onlineFilter.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+    await onlineFilter.selectOption('not-online');
+    await expect(onlineFilter).toHaveValue('not-online');
+
     const styleSkuFilter = page.locator('#alloc-filter-style-sku');
     await expect(styleSkuFilter).toBeVisible();
     const box = await styleSkuFilter.boundingBox();

@@ -55,6 +55,11 @@ export function photoMatchesAllocationFilter(photo, locationFilter) {
     return photo.locations.includes(locationFilter);
 }
 
+export function photoMatchesOnlineFilter(photo, onlineFilter = 'all') {
+    if (onlineFilter !== 'not-online') return true;
+    return photo.status !== 'Sold' && !photo.locations.some(location => location.toUpperCase() === 'ONLINE');
+}
+
 export function filterAllocationItemsByCategory(items, categoryFilter, resolveCategory) {
     if (!categoryFilter || categoryFilter === 'all') return items;
     return items.filter(item => resolveCategory(item) === categoryFilter);
@@ -72,6 +77,7 @@ export function prepareAllocationPage({
     styleSkuFilter = 'all',
     garmentIdSearch = '',
     locationFilter,
+    onlineFilter = 'all',
     requestedPage,
     normalizePhotos,
     resolveCategory,
@@ -90,8 +96,8 @@ export function prepareAllocationPage({
 
     const matchesPhoto = photo => searchQuery
         ? photoMatchesGarmentSearch(photo, searchQuery)
-        : photoMatchesAllocationFilter(photo, locationFilter);
-    if (searchQuery || locationFilter !== 'all') {
+        : photoMatchesAllocationFilter(photo, locationFilter) && photoMatchesOnlineFilter(photo, onlineFilter);
+    if (searchQuery || locationFilter !== 'all' || onlineFilter !== 'all') {
         filteredItems = filteredItems.filter(item => normalizePhotos(item).some(matchesPhoto));
     }
 
