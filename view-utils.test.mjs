@@ -8,6 +8,7 @@ import {
     paginate,
     photoMatchesAllocationFilter,
     photoMatchesGarmentSearch,
+    photoMatchesOnlineFilter,
     prepareAllocationPage
 } from './view-utils.js';
 
@@ -171,4 +172,38 @@ test('Garment ID search bypasses browsing filters and counts only matching piece
     assert.equal(result.totalMatchingPieces, 1);
     assert.equal(result.currentPage, 1);
     assert.equal(result.searchQuery, '2DRS012-018');
+});
+
+test('not-online inventory filters individual pieces before pagination and composes with location and SKU', () => {
+    const items = [
+        { status: 'Partial Sold', category: 'Top', styleSku: '2TOP011', photos: [
+            { status: 'Available', locations: ['JB Studio'], garmentId: '2TOP011-001' },
+            { status: 'Available', locations: ['JB Studio', 'oNlInE'], garmentId: '2TOP011-002' },
+            { status: 'Sold', locations: ['JB Studio'], garmentId: '2TOP011-003' },
+            { status: 'Available', locations: ['PNG Studio'], garmentId: '2TOP011-004' }
+        ] },
+        { status: 'Ready', category: 'Top', styleSku: '2TOP011', photos: [{ status: 'Available', locations: ['JB Studio'] }] },
+        { status: 'Ready', category: 'Top', styleSku: '2TOP012', photos: [{ status: 'Available', locations: ['JB Studio'] }] },
+        { status: 'Making', category: 'Top', styleSku: '2TOP011', photos: [{ status: 'Available', locations: [] }] }
+    ];
+    const options = { items, categoryFilter: 'Top', styleSkuFilter: '2TOP011', locationFilter: 'JB Studio',
+        onlineFilter: 'not-online', requestedPage: 99, pageSize: 1, normalizePhotos, resolveCategory: item => item.category };
+    const result = prepareAllocationPage(options);
+    assert.equal(result.totalItems, 2);
+    assert.equal(result.totalMatchingPieces, 2);
+    assert.equal(result.currentPage, 2);
+    assert.deepEqual(result.items, [items[1]]);
+    assert.equal(prepareAllocationPage({ ...options, locationFilter: 'Sold' }).totalMatchingPieces, 0);
+    assert.equal(prepareAllocationPage({ ...options, locationFilter: 'Online' }).totalItems, 0);
+    assert.equal(prepareAllocationPage({ ...options, garmentIdSearch: '2TOP011-002' }).totalMatchingPieces, 1);
+    assert.equal(prepareAllocationPage({ ...options, onlineFilter: 'all' }).totalMatchingPieces, 3);
+});
+
+
+test('not-online excludes sold and listed pieces but includes unallocated unsold pieces', () => {
+    assert.equal(photoMatchesOnlineFilter({ status: 'Sold', locations: [] }, 'not-online'), false);
+    assert.equal(photoMatchesOnlineFilter({ status: 'Available', locations: ['online'] }, 'not-online'), false);
+    assert.equal(photoMatchesOnlineFilter({ status: 'Available', locations: [] }, 'not-online'), true);
+    assert.equal(photoMatchesOnlineFilter({ status: 'Available', locations: ['Bev C'] }, 'not-online'), true);
+    assert.equal(photoMatchesOnlineFilter({ status: 'Sold', locations: ['Online'] }), true);
 });

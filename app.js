@@ -14,7 +14,7 @@
         import { getRemainingTimeout, mapWithConcurrency, summarizeCurrentLocations } from "./pdf-export-utils.js";
         import { MIGRATION_BATCH_SIZE, collectMigrationState, makeBackupPayload } from "./image-migration-utils.js";
         import { escapeHtml, inlineString, safeImageUrl } from "./security-utils.js";
-        import { DEFAULT_PAGE_SIZE, buildPaginationItems, filterAllocationItemsByCategory, filterAllocationItemsByStyleSku, normalizeGarmentIdSearch, paginate, photoMatchesGarmentSearch, prepareAllocationPage } from "./view-utils.js";
+        import { DEFAULT_PAGE_SIZE, buildPaginationItems, filterAllocationItemsByCategory, filterAllocationItemsByStyleSku, normalizeGarmentIdSearch, paginate, photoMatchesGarmentSearch, photoMatchesOnlineFilter, prepareAllocationPage } from "./view-utils.js";
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { getFirestore, collection, updateDoc, doc, getDoc, onSnapshot, runTransaction, serverTimestamp, arrayUnion } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
@@ -1306,6 +1306,7 @@
         window.renderAllocationList = function() {
             const tbody = document.getElementById('allocation-table-body');
             const locFilter = document.getElementById('alloc-filter-location').value;
+            const onlineFilter = document.getElementById('alloc-filter-online').value;
             const catFilter = document.getElementById('alloc-filter-category').value;
             const styleSkuFilter = document.getElementById('alloc-filter-style-sku').value;
             const garmentIdSearch = normalizeGarmentIdSearch(document.getElementById('allocation-garment-search').value);
@@ -1318,6 +1319,7 @@
                 styleSkuFilter,
                 garmentIdSearch,
                 locationFilter: locFilter,
+                onlineFilter,
                 requestedPage: allocationPage,
                 normalizePhotos,
                 resolveCategory,
@@ -1348,6 +1350,7 @@
 
                     mappedPhotos.forEach(({p, idx}) => {
                         if (garmentIdSearch && !photoMatchesGarmentSearch(p, garmentIdSearch)) return;
+                        if (!garmentIdSearch && !photoMatchesOnlineFilter(p, onlineFilter)) return;
                         const isOnline = p.locations.some(l => l.toUpperCase() === 'ONLINE');
                         
                         if (!garmentIdSearch && locFilter !== 'all' && locFilter !== 'Sold' && locFilter !== 'Unallocated') {
@@ -1502,6 +1505,7 @@
                 <span class="bg-white px-2 py-0.5 rounded shadow-sm border border-blue-100 text-stone-700 text-xs font-bold">${escapeHtml(displayStyle)}</span>
                 <span class="text-blue-300 mx-1 font-bold">+</span> 
                 <span class="bg-white px-2 py-0.5 rounded shadow-sm border border-blue-100 text-stone-700 text-xs font-bold">${escapeHtml(displayLoc)}</span>
+                ${onlineFilter === 'not-online' ? '<span class="text-blue-300 mx-1 font-bold">+</span><span class="text-xs font-bold text-stone-700">未上架 Online</span>' : ''}
                 <span class="text-blue-300 mx-1 font-bold">=</span> 
                 <span class="text-xl font-black text-blue-700 ml-1 drop-shadow-sm">${totalMatchingPieces}</span> 
                 <span class="text-blue-500 font-bold text-xs ml-1">件</span>
@@ -3249,6 +3253,7 @@ window.closeImageViewer = function() {
             btn.disabled = true;
 
             const locFilter = document.getElementById('alloc-filter-location').value;
+            const onlineFilter = document.getElementById('alloc-filter-online').value;
             const catFilter = document.getElementById('alloc-filter-category').value;
             const styleSkuFilter = document.getElementById('alloc-filter-style-sku').value;
             const garmentIdSearch = normalizeGarmentIdSearch(document.getElementById('allocation-garment-search').value);
@@ -3289,6 +3294,10 @@ window.closeImageViewer = function() {
                     locPhotos = photos.filter(p => p.status !== 'Sold' && p.locations.length === 0);
                 } else {
                     locPhotos = photos.filter(p => p.status !== 'Sold' && p.locations.includes(locFilter));
+                }
+
+                if (!garmentIdSearch) {
+                    locPhotos = locPhotos.filter(photo => photoMatchesOnlineFilter(photo, onlineFilter));
                 }
 
                 if (locPhotos.length > 0) {
@@ -3386,7 +3395,7 @@ window.closeImageViewer = function() {
                 <div class="pdf-report-header" style="text-align: center; margin-bottom: 25px; border-bottom: 2px solid #78716c; padding-bottom: 15px; page-break-inside: avoid; break-inside: avoid;">
                     <h2 style="margin: 0; font-size: 24px; font-weight: 800; letter-spacing: 2px; color: #1c1917;">WEIWEIWEI 庫存清單</h2>
                     <div style="margin-top: 12px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 8px 16px; font-size: 12px; line-height: 1.45; color: #78716c; text-align: left;">
-                        <span style="flex: 1 1 360px; min-width: 0; overflow-wrap: anywhere; word-break: break-word;">📍 篩選: <b style="color: #1c1917;">${escapeHtml(garmentIdSearch ? `Garment ID · ${garmentIdSearch}` : `${displayLoc} · ${displayCat} · ${displayStyle}`)}</b></span>
+                        <span style="flex: 1 1 360px; min-width: 0; overflow-wrap: anywhere; word-break: break-word;">📍 篩選: <b style="color: #1c1917;">${escapeHtml(garmentIdSearch ? `Garment ID · ${garmentIdSearch}` : `${displayLoc} · ${displayCat} · ${displayStyle}${onlineFilter === 'not-online' ? ' · 未上架 Online' : ''}`)}</b></span>
                         <span style="white-space: nowrap;">📦 總計件數: <b style="color: #b45309; font-size: 14px;">${totalQty} 件</b></span>
                         <span style="white-space: nowrap;">🕒 盤點時間: ${dateStr}</span>
                     </div>

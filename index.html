@@ -385,6 +385,13 @@
                         </select>
                     </div>
                     <div class="flex items-center gap-2">
+                        <label for="alloc-filter-online" class="text-sm font-medium text-stone-600 flex-shrink-0">Online 上架:</label>
+                        <select id="alloc-filter-online" onchange="window.resetAllocationPage()" class="min-h-[44px] bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5">
+                            <option value="all">不限上架狀態</option>
+                            <option value="not-online">未上架 Online（未售出）</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-2">
                         <span class="text-sm font-medium text-stone-600 flex-shrink-0">過濾類別:</span>
                         <select id="alloc-filter-category" onchange="window.handleCategoryFilterChange('alloc')" class="min-h-[44px] bg-stone-50 border border-stone-200 text-sm rounded-md p-1.5 dynamic-category-select"><option value="all">全部类别</option></select>
                     </div>
