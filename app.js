@@ -587,14 +587,14 @@
         }
 
         function renderPopupSalesSnapshot() {
-            const records = getPopupSalesRecords();
-            const summary = summarizePopupSales(records);
+            const records = getAllSalesRecords();
+            const summary = summarizeSalesByCurrency(records);
             const count = document.getElementById('popup-sales-dashboard-count');
             const total = document.getElementById('popup-sales-dashboard-total');
             if (count) count.textContent = `${summary.count} 件`;
-            if (total) total.textContent = formatSgdAmount(summary.total);
+            if (total) total.textContent = formatSalesSummary(summary, 'total');
             const eventName = document.getElementById('popup-sales-dashboard-event');
-            if (eventName) eventName.textContent = appSettings.popupEvent.name;
+            if (eventName) eventName.textContent = '所有销售 · 全部期间';
             const modal = document.getElementById('popup-sales-report-modal');
             if (modal && !modal.classList.contains('hidden') && typeof window.renderPopupSalesReport === 'function') {
                 window.renderPopupSalesReport();
@@ -613,12 +613,7 @@
             const eventSelect = document.getElementById('popup-report-event');
             eventSelect.innerHTML = eventNames.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
             eventSelect.value = appSettings.popupEvent.name;
-            document.getElementById('sales-report-scope').value = 'event';
-            document.getElementById('sales-report-currency').value = 'all';
-            eventSelect.disabled = false;
-            document.getElementById('popup-report-start-date').value = appSettings.popupEvent.startDate;
-            document.getElementById('popup-report-end-date').value = appSettings.popupEvent.endDate;
-            window.renderPopupSalesReport();
+            window.resetPopupSalesFilters();
         };
 
         window.closePopupSalesReport = function() {
@@ -628,13 +623,13 @@
         };
 
         window.resetPopupSalesFilters = function() {
-            document.getElementById('sales-report-scope').value = 'event';
+            document.getElementById('sales-report-scope').value = 'all';
             document.getElementById('popup-report-event').value = appSettings.popupEvent.name;
-            document.getElementById('popup-report-start-date').value = appSettings.popupEvent.startDate;
-            document.getElementById('popup-report-end-date').value = appSettings.popupEvent.endDate;
+            document.getElementById('popup-report-start-date').value = '';
+            document.getElementById('popup-report-end-date').value = '';
             document.getElementById('popup-report-payment').value = 'all';
             document.getElementById('sales-report-currency').value = 'all';
-            document.getElementById('popup-report-event').disabled = false;
+            document.getElementById('popup-report-event').disabled = true;
             window.renderPopupSalesReport();
         };
 
