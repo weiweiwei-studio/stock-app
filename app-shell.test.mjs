@@ -293,3 +293,78 @@ test('sale writes expose pending, success and failure states without offline que
     assert.match(app, /setSoldWriteStatus\(`未写入 Firebase：\$\{error\.message\}/);
     assert.doesNotMatch(app, /enablePersistence|persistentLocalCache|offlineQueue/);
 });
+
+test('sales overview and report defaults include all recorded sales across active and archived work orders', async () => {
+    const { runInNewContext } = await import('node:vm');
+    const { collectAllSales, summarizeSalesByCurrency, getSalesReportEventDateRange } = await import('./popup-report-utils.js');
+    const { escapeHtml } = await import('./security-utils.js');
+    const nodes = new Map();
+    const node = id => {
+        if (!nodes.has(id)) nodes.set(id, {
+            value: '', textContent: '', disabled: false,
+            classList: { contains: () => true, add() {}, remove() {} }
+        });
+        return nodes.get(id);
+    };
+    const context = {
+        document: { getElementById: node },
+        window: {},
+        appSettings: { popupEvent: { name: 'Singapore', startDate: '2026-09-18', endDate: '2026-09-20' } },
+        db: [{ photos: [
+            { status: 'Sold', soldPrice: 100, soldCurrency: 'MYR', soldAt: '2026-10-01' },
+            { status: 'Sold', soldPrice: 50, soldCurrency: 'SGD', saleEvent: 'Singapore', salesChannel: 'Popup', soldAt: '2026-09-18' },
+            { status: 'Ready', soldPrice: 999, soldCurrency: 'MYR' }
+        ] }],
+        archivedItems: [{ photos: [{ status: 'Sold', soldPrice: 25, soldCurrency: 'MYR' }] }],
+        normalizePhotos: item => item.photos,
+        getCleanCategory: value => value,
+        collectAllSales, summarizeSalesByCurrency, getSalesReportEventDateRange, escapeHtml
+    };
+    const start = app.indexOf('function formatSalesSummary(');
+    const end = app.indexOf('window.handleSalesReportImageError');
+    assert.ok(start > 0 && end > start);
+    runInNewContext(app.slice(start, end), context);
+    let renders = 0;
+    context.window.renderPopupSalesReport = () => { renders++; };
+
+    context.renderPopupSalesSnapshot();
+    assert.equal(node('popup-sales-dashboard-count').textContent, '3 件');
+    assert.equal(node('popup-sales-dashboard-total').textContent, 'RM 125.00 / SGD 50.00');
+    assert.equal(node('popup-sales-dashboard-event').textContent, '所有销售 · 全部期间');
+
+    // Opening the overview must discard a previously selected event, dates and payment.
+    for (let attempt = 0; attempt < 2; attempt++) {
+        node('sales-report-scope').value = 'event';
+        node('popup-report-start-date').value = '2026-09-18';
+        node('popup-report-end-date').value = '2026-09-20';
+        node('popup-report-payment').value = 'Cash';
+        node('sales-report-currency').value = 'SGD';
+        if (attempt === 0) context.window.openPopupSalesReport();
+        else context.window.resetPopupSalesFilters();
+        assert.equal(node('sales-report-scope').value, 'all');
+        assert.equal(node('popup-report-start-date').value, '');
+        assert.equal(node('popup-report-end-date').value, '');
+        assert.equal(node('popup-report-payment').value, 'all');
+        assert.equal(node('sales-report-currency').value, 'all');
+        assert.equal(node('popup-report-event').disabled, true);
+    }
+    assert.equal(renders, 2);
+
+    // Event reporting remains available on demand.
+    node('sales-report-scope').value = 'event';
+    context.window.handleSalesReportScopeChange();
+    assert.equal(node('popup-report-event').disabled, false);
+    assert.equal(node('popup-report-start-date').value, '2026-09-18');
+
+    // Returning a sold garment to stock removes it from the overview.
+    context.db[0].photos[0].status = 'Ready';
+    context.renderPopupSalesSnapshot();
+    assert.equal(node('popup-sales-dashboard-count').textContent, '2 件');
+    assert.equal(node('popup-sales-dashboard-total').textContent, 'RM 25.00 / SGD 50.00');
+
+    context.db = [];
+    context.archivedItems = [];
+    context.renderPopupSalesSnapshot();
+    assert.equal(node('popup-sales-dashboard-count').textContent, '0 件');
+    assert.equal(node('popup-sales-dashboard-total').textContent, '—');
+});
