@@ -622,6 +622,20 @@
                         <p class="mt-1 text-[9px] text-stone-400">上傳時自動壓縮並建立列表縮圖</p>
                     </div>
                 </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label for="new-item-status" class="block text-xs font-medium text-stone-500 mb-1">初始狀態</label>
+                        <select id="new-item-status" name="initialStatus" onchange="window.syncNewProductionFields()" class="w-full min-h-[44px] border p-2 rounded text-sm bg-white">
+                            <option value="To Make">To Make · 待製作</option>
+                            <option value="Making">Making · 製作中</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="new-item-making-date" class="block text-xs font-medium text-stone-500 mb-1">開始製作日</label>
+                        <input id="new-item-making-date" name="makingDate" type="date" aria-describedby="new-item-production-help" class="w-full min-h-[44px] border p-2 rounded text-sm">
+                    </div>
+                </div>
+                <p id="new-item-production-help" class="text-xs text-stone-500">待製作可選填未來排程；製作中需填實際開始日（馬來西亞日期）。</p>
                 <div class="flex justify-end pt-2 gap-2">
                     <button type="button" onclick="window.closeModal()" class="text-stone-500 text-sm hover:bg-stone-100 px-3 py-1.5 rounded transition">取消</button>
                     <button type="submit" id="btn-submit" class="bg-stone-800 text-white px-4 py-2 rounded text-sm shadow-sm transition hover:bg-stone-900">確認新增</button>
@@ -947,3 +961,4 @@
     <script type="module" src="./app.js"></script>
 </body>
 </html>
+
