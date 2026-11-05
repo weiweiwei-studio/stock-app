@@ -1,5 +1,39 @@
 import { expect, test } from '@playwright/test';
 
+test('new work order production fields support Making and planned dates on a phone', async ({ page }) => {
+    const app = await (await page.request.get('/app.js')).text();
+    const sync = app.slice(app.indexOf('window.syncNewProductionFields ='), app.indexOf('window.handleAddItem ='));
+    await page.evaluate(source => {
+        document.getElementById('auth-screen').classList.add('hidden');
+        document.body.classList.remove('auth-pending');
+        document.getElementById('add-modal').classList.remove('hidden');
+        new Function('malaysiaDate', source)(() => '2026-11-05');
+    }, sync);
+    const status = page.locator('#new-item-status');
+    const date = page.locator('#new-item-making-date');
+    await expect(status).toHaveValue('To Make');
+    await expect(date).toHaveValue('');
+    await status.selectOption('Making');
+    await expect(date).toHaveValue('2026-11-05');
+    await expect(date).toHaveAttribute('required', '');
+    await date.fill('2026-11-06');
+    expect(await date.evaluate(el => el.validity.rangeOverflow)).toBe(true);
+    await status.selectOption('To Make');
+    expect(await date.evaluate(el => el.checkValidity())).toBe(true);
+    await page.evaluate(() => {
+        document.getElementById('add-item-form').reset();
+        window.syncNewProductionFields();
+    });
+    await expect(status).toHaveValue('To Make');
+    await expect(date).toHaveValue('');
+    expect(await date.evaluate(el => el.required)).toBe(false);
+    for (const control of [status, date]) expect((await control.boundingBox()).height).toBeGreaterThanOrEqual(44);
+    expect(await page.evaluate(() => {
+        const panel = document.querySelector('#add-modal > div');
+        return panel.scrollWidth > panel.clientWidth;
+    })).toBe(false);
+});
+
 test.beforeEach(async ({ page }) => {
     await page.route(/^https:\/\//, route => route.abort());
     await page.goto('/index.html');
@@ -360,3 +394,4 @@ test('item detail modal scrolls to its actions on a phone', async ({ page }) => 
     await expect(page.locator('#btn-save-detail')).toBeInViewport();
     await expect(page.locator('#btn-toggle-sold')).toBeInViewport();
 });
+

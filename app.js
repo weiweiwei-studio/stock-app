@@ -1,3 +1,4 @@
+import { initialProductionFields, malaysiaDate } from './work-order-utils.js';
         import { ADMIN_EMAIL, getAuthErrorMessage, isAuthorizedAdmin } from "./auth-utils.js";
         import { isLocationReferenced, isStyleSkuReferenced, partitionStockItems } from "./archive-utils.js";
         import { POPUP_SALES_CHANNEL, POPUP_SALES_EVENT, formatSoldMoney, getSoldCurrency, hasSingaporePopupLocation } from "./sales-utils.js";
@@ -1039,7 +1040,7 @@
                 const itemsToday = db.filter(item => {
                     let targetDate = null;
                     if (calendarMode === 'production' && item.makingAt) {
-                        targetDate = new Date(item.makingAt.seconds * 1000);
+                        targetDate = new Date(`${malaysiaDate(item.makingAt)}T00:00:00`);
                     } else if (calendarMode === 'arrival' && item.completedAt) {
                         targetDate = new Date(item.completedAt.seconds * 1000);
                     }
@@ -2112,13 +2113,22 @@
             return { ...allocation, counters, styleSku: sku };
         }
         
+        window.syncNewProductionFields = function() {
+            const isMaking = document.getElementById('new-item-status').value === 'Making';
+            const date = document.getElementById('new-item-making-date');
+            date.required = isMaking;
+            date.max = isMaking ? malaysiaDate() : '';
+            if (isMaking && !date.value) date.value = malaysiaDate();
+        };
+
         window.handleAddItem = async function(e) { 
             e.preventDefault(); 
             const btn = document.getElementById('btn-submit'); 
             btn.innerText = '處理中...'; 
             btn.disabled = true; 
             try { 
-                const form = new FormData(e.target); 
+                const form = new FormData(e.target);
+                const production = initialProductionFields(form.get('initialStatus'), form.get('makingDate')); 
                 const originStudio = form.get('originStudio');
                 const fileInput = document.querySelector('input[name="initialPhotos"]'); 
                 let photoObjs = []; 
@@ -2155,7 +2165,7 @@
                         quantity: allocation.photos.length,
                         cost: 0,
                         price: form.get('price'),
-                        status: 'To Make',
+                        ...production,
                         photos: allocation.photos,
                         _version: 1,
                         updatedAt: serverTimestamp(),
@@ -2163,7 +2173,8 @@
                     });
                 });
                 window.closeModal(); 
-                e.target.reset(); 
+                e.target.reset();
+                window.syncNewProductionFields(); 
             } catch (error) { console.error(error); alert("Error: " + error.message); } finally { btn.innerText = '確認新增'; btn.disabled = false; } 
         };
         
@@ -2188,7 +2199,7 @@
             document.getElementById('edit-price').value = item.price !== undefined ? item.price : ''; 
             document.getElementById('edit-originStudio').value = item.originStudio || 'JB Studio'; 
             document.getElementById('edit-addPhotos').value = ''; 
-            document.getElementById('edit-startDate').value = formatDateForInput(item.makingAt); 
+            document.getElementById('edit-startDate').value = item.makingAt ? malaysiaDate(item.makingAt) : ''; 
             document.getElementById('edit-completedDate').value = formatDateForInput(item.completedAt); 
             
             window.tempEditPhotos = JSON.parse(JSON.stringify(normalizePhotos(item)));
@@ -2256,7 +2267,7 @@
                 }; 
                 if (requestedStyleSku) data.styleSku = requestedStyleSku;
                 
-                data.makingAt = sDateVal ? new Date(sDateVal.replace(/-/g, '/')) : null;
+                data.makingAt = sDateVal ? new Date(`${sDateVal}T00:00:00+08:00`) : null;
                 data.completedAt = cDateVal ? new Date(cDateVal.replace(/-/g, '/')) : null;
                 
                 let existingPhotos = [...window.tempEditPhotos]; 
@@ -3222,6 +3233,7 @@
             window.switchView('dashboard');
         };
         window.openModal = () => {
+            window.syncNewProductionFields();
             window.updateNewItemSkuOptions();
             document.getElementById('add-modal').classList.remove('hidden');
         };
@@ -3477,3 +3489,4 @@ window.closeImageViewer = function() {
             btn.disabled = false;
             lucide.createIcons();
         }
+
