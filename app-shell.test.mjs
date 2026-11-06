@@ -368,3 +368,51 @@ test('sales overview and report defaults include all recorded sales across activ
     assert.equal(node('popup-sales-dashboard-count').textContent, '0 件');
     assert.equal(node('popup-sales-dashboard-total').textContent, '—');
 });
+
+test('SKU default prices autofill without carrying manual prices to another product', async () => {
+    const { runInNewContext } = await import('node:vm');
+    const select = { value: 'A', options: [{ value: '' }, { value: 'A' }, { value: 'B' }, { value: 'C' }] };
+    const price = { value: '', dataset: {} };
+    const input = { value: '125.50' };
+    let accept = false, stored;
+    const context = { window: {}, document: { getElementById: id => id === 'new-item-styleSku' ? select : id === 'new-item-price' ? price : input },
+        appSettings: { skuPrices: { A: 100, B: 200 } }, confirm: () => accept, alert: () => {},
+        dbFirestore: {}, doc: () => 'settings', DEFAULT_STYLE_SKUS: [{sku:'A'}],
+        normalizeStyleSkuCatalog: values => values,
+        runTransaction: async (_, fn) => fn({ get: async () => ({ exists: () => true, data: () => ({ skuPrices: { B: 222 } }) }),
+            update: (_, value) => { stored = value; } })
+    };
+    runInNewContext(app.slice(app.indexOf('window.resetNewPriceState ='), app.indexOf('window.updateNewItemSkuOptions =')), context);
+    context.window.syncNewItemPrice();
+    assert.equal(price.value, '100');
+    price.value = '90';
+    context.window.syncNewItemPrice();
+    assert.equal(price.value, '90');
+    select.value = 'B';
+    context.window.syncNewItemPrice();
+    assert.equal(select.value, 'A');
+    assert.equal(price.value, '90');
+    accept = true;
+    select.value = 'B';
+    context.window.syncNewItemPrice();
+    assert.equal(price.value, '200');
+    select.value = 'C';
+    context.window.syncNewItemPrice();
+    assert.equal(price.value, '');
+    assert.match(price.placeholder, /未設定/);
+    context.window.resetNewPriceState();
+    assert.equal(price.dataset.sku, undefined);
+
+    const button = { disabled: false };
+    await context.window.saveSkuPrice('A', button);
+    assert.equal(stored.skuPrices.A, 125.5);
+    assert.equal(stored.skuPrices.B, 222);
+    assert.equal(button.disabled, false);
+    input.value = '-5'; stored = undefined;
+    await context.window.saveSkuPrice('A', button);
+    assert.equal(stored, undefined);
+    input.value = '';
+    await context.window.saveSkuPrice('A', button);
+    assert.equal(stored.skuPrices.A, undefined);
+    assert.equal(stored.skuPrices.B, 222);
+});
