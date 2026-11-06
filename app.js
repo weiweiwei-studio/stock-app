@@ -245,6 +245,7 @@ import { initialProductionFields, malaysiaDate } from './work-order-utils.js';
                         categories: data.categories || appSettings.categories,
                         styleSkus: normalizeStyleSkuCatalog([...(data.styleSkus || []), ...DEFAULT_STYLE_SKUS]),
                         popupEvent: normalizePopupEvent(data.popupEvent),
+                        skuPrices: data.skuPrices || {},
                         weekly_goals: data.weekly_goals || {} 
                     };
                 }
@@ -2588,7 +2589,7 @@ import { initialProductionFields, malaysiaDate } from './work-order-utils.js';
             document.getElementById('settings-makers-list').innerHTML = render('makers'); 
             document.getElementById('settings-locations-list').innerHTML = render('locations'); 
             document.getElementById('settings-styleSkus-list').innerHTML = normalizeStyleSkuCatalog(appSettings.styleSkus)
-                .map(entry => `<span class="bg-stone-100 px-2 py-1 rounded text-[10px] mr-1 mb-1 inline-block border cursor-pointer hover:bg-red-50 hover:text-red-500" onclick="window.removeStyleSku(${inlineString(entry.sku)})"><b>${escapeHtml(entry.category || 'OTHER')}</b> · <b class="font-mono">${escapeHtml(entry.sku)}</b>${entry.name ? ` · ${escapeHtml(entry.name)}` : ''} &times;</span>`)
+                .map(entry => `<div class="mb-2"><span class="bg-stone-100 px-2 py-1 rounded text-[10px] mr-1 mb-1 inline-block border cursor-pointer hover:bg-red-50 hover:text-red-500" onclick="window.removeStyleSku(${inlineString(entry.sku)})"><b>${escapeHtml(entry.category || 'OTHER')}</b> · <b class="font-mono">${escapeHtml(entry.sku)}</b>${entry.name ? ` · ${escapeHtml(entry.name)}` : ''} &times;</span><label class="text-xs text-stone-600">RM 預設售價 <input id="sku-price-${escapeHtml(entry.sku)}" type="number" min="0" step="0.01" value="${escapeHtml(appSettings.skuPrices?.[entry.sku] ?? '')}" aria-label="${escapeHtml(entry.sku)} RM 預設售價" class="border p-2 rounded text-sm" placeholder="未設定"><button type="button" onclick="window.saveSkuPrice(${inlineString(entry.sku)}, this)" class="border p-2 rounded text-sm">儲存售價</button></label></div>`)
                 .join('');
             document.getElementById('popup-event-name').value = appSettings.popupEvent.name;
             document.getElementById('popup-event-location').value = appSettings.popupEvent.location;
@@ -3130,7 +3131,8 @@ import { initialProductionFields, malaysiaDate } from './work-order-utils.js';
                 categories: skuCategories,
                 hasLegacyItems,
                 locations: appSettings.locations,
-                styleSkus: distinctStyleSkus
+                styleSkus: distinctStyleSkus,
+                skuPrices: appSettings.skuPrices || {}
             });
             if (nextSignature === dropdownSignature) return;
             dropdownSignature = nextSignature;
@@ -3206,6 +3208,56 @@ import { initialProductionFields, malaysiaDate } from './work-order-utils.js';
             window.updateNewItemSkuOptions();
         };
 
+        window.resetNewPriceState = function() {
+            const price = document.getElementById('new-item-price');
+            delete price.dataset.sku;
+            delete price.dataset.autoValue;
+        };
+        window.syncNewItemPrice = function() {
+            const select = document.getElementById('new-item-styleSku');
+            const price = document.getElementById('new-item-price');
+            const sku = select.value;
+            if (price.dataset.sku === sku) return;
+            const previous = price.dataset.sku || '';
+            const manual = previous && price.value !== (price.dataset.autoValue || '');
+            const canRestore = Array.from(select.options).some(option => option.value === previous);
+            if (manual && canRestore && !confirm('切換商品會帶入新商品的預設售價，取代目前手動價格。是否繼續？')) {
+                select.value = previous;
+                return;
+            }
+            const value = appSettings.skuPrices?.[sku];
+            const amount = value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value)) && Number(value) >= 0 ? String(value) : '';
+            price.value = sku ? amount : '';
+            price.dataset.sku = sku;
+            price.dataset.autoValue = price.value;
+            price.placeholder = sku && amount === '' ? '未設定售價，請手動填寫' : 'RM';
+        };
+        window.saveSkuPrice = async function(sku, button) {
+            const input = document.getElementById('sku-price-' + sku);
+            const raw = input.value.trim();
+            if (raw !== '' && (!/^\d+(\.\d{1,2})?$/.test(raw) || !Number.isFinite(Number(raw)))) {
+                alert('請輸入有效的 RM 售價（最多兩位小數），或留空清除預設價。');
+                return;
+            }
+            if (button.disabled) return;
+            button.disabled = true;
+            try {
+                await runTransaction(dbFirestore, async transaction => {
+                    const settingsRef = doc(dbFirestore, 'settings', 'config');
+                    const snapshot = await transaction.get(settingsRef);
+                    if (!snapshot.exists()) throw new Error('找不到系統設定。');
+                    const latest = snapshot.data();
+                    const catalog = normalizeStyleSkuCatalog([...DEFAULT_STYLE_SKUS, ...(latest.styleSkus || [])]);
+                    if (!catalog.some(entry => entry.sku === sku)) throw new Error('此 SKU 已不存在，請重新整理。');
+                    const prices = { ...(latest.skuPrices || {}) };
+                    if (raw === '') delete prices[sku];
+                    else prices[sku] = Number(raw);
+                    transaction.update(settingsRef, { skuPrices: prices });
+                });
+            } catch (error) { alert('售價儲存失敗：' + error.message); }
+            finally { button.disabled = false; }
+        };
+
         window.updateNewItemSkuOptions = function() {
             const categorySelect = document.getElementById('new-item-category');
             const skuSelect = document.getElementById('new-item-styleSku');
@@ -3214,9 +3266,10 @@ import { initialProductionFields, malaysiaDate } from './work-order-utils.js';
             const oldSku = normalizeStyleSku(skuSelect.value);
             const matches = normalizeStyleSkuCatalog(appSettings.styleSkus).filter(entry => entry.category === category);
             skuSelect.innerHTML = '<option value="">選擇 Style SKU</option>' + matches
-                .map(entry => `<option value="${escapeHtml(entry.sku)}">${escapeHtml(entry.sku)}${entry.name ? ` — ${escapeHtml(entry.name)}` : ''}</option>`)
+                .map(entry => `<option value="${escapeHtml(entry.sku)}">${escapeHtml(entry.sku)}${entry.name ? ` — ${escapeHtml(entry.name)}` : ''} · ${appSettings.skuPrices?.[entry.sku] !== undefined ? `RM ${escapeHtml(appSettings.skuPrices[entry.sku])}` : '未設定售價'}</option>`)
                 .join('');
             if (matches.some(entry => entry.sku === oldSku)) skuSelect.value = oldSku;
+            window.syncNewItemPrice();
         };
         
         window.switchView = (v) => {

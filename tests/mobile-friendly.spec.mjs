@@ -395,3 +395,22 @@ test('item detail modal scrolls to its actions on a phone', async ({ page }) => 
     await expect(page.locator('#btn-toggle-sold')).toBeInViewport();
 });
 
+
+test('new order SKU price autofill and reset work with the real form', async ({ page }) => {
+    const app = await (await page.request.get('/app.js')).text();
+    await page.evaluate(source => {
+        document.getElementById('auth-screen').classList.add('hidden');
+        document.body.classList.remove('auth-pending');
+        document.getElementById('add-modal').classList.remove('hidden');
+        document.getElementById('new-item-styleSku').innerHTML = '<option value="">Select</option><option value="A">A</option><option value="B">B</option>';
+        new Function('appSettings', source)({ skuPrices: { A: 139.5 } });
+    }, app.slice(app.indexOf('window.resetNewPriceState ='), app.indexOf('window.updateNewItemSkuOptions =')));
+    await page.locator('#new-item-styleSku').selectOption('A');
+    await expect(page.locator('#new-item-price')).toHaveValue('139.5');
+    await page.locator('#new-item-styleSku').selectOption('B');
+    await expect(page.locator('#new-item-price')).toHaveValue('');
+    await page.locator('#new-item-price').fill('79.90');
+    await page.evaluate(() => document.getElementById('add-item-form').reset());
+    await page.locator('#new-item-styleSku').selectOption('A');
+    await expect(page.locator('#new-item-price')).toHaveValue('139.5');
+});

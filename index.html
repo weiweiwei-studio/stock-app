@@ -580,7 +580,7 @@
     <div id="add-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-lg shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
             <h3 class="text-lg font-bold mb-4">新增工單 (Batch)</h3>
-            <form id="add-item-form" onsubmit="window.handleAddItem(event)" class="space-y-4">
+            <form id="add-item-form" onreset="window.resetNewPriceState()" onsubmit="window.handleAddItem(event)" class="space-y-4">
                 <div class="grid grid-cols-2 gap-4">
                     <input type="text" name="month" id="form-month-input" class="col-span-2 border p-2 rounded text-sm" placeholder="月份 (例: Oct)">
                 </div>
@@ -590,7 +590,7 @@
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-stone-500 mb-1">Style SKU</label>
-                    <select name="styleSku" id="new-item-styleSku" required class="w-full border p-2 rounded text-sm bg-white font-mono"></select>
+                    <select name="styleSku" id="new-item-styleSku" onchange="window.syncNewItemPrice()" required class="w-full border p-2 rounded text-sm bg-white font-mono"></select>
                     <p class="mt-1 text-[9px] text-stone-400">每件會自動取得例如 2BTM005-001 的永久 Garment ID。</p>
                 </div>
                  <div class="grid grid-cols-2 gap-4">
@@ -604,7 +604,7 @@
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-stone-500 mb-1">主定價 (Price RM)</label>
-                        <input type="number" name="price" placeholder="RM" required class="w-full border-stone-300 rounded-md shadow-sm text-sm p-2 border">
+                        <input type="number" name="price" id="new-item-price" min="0" step="0.01" placeholder="RM" required class="w-full border-stone-300 rounded-md shadow-sm text-sm p-2 border">
                     </div>
 
                 </div>
